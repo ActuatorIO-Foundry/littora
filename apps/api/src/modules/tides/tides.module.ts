@@ -1,0 +1,1 @@
+import { Module } from '@nestjs/common';import { TidesService } from './tides.service';import { TidesController } from './tides.controller';@Module({providers:[TidesService],controllers:[TidesController],exports:[TidesService]}) export class TidesModule{}

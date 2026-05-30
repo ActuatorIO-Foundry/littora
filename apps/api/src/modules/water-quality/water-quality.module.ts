@@ -1,0 +1,1 @@
+import { Module } from '@nestjs/common';import { WaterQualityService } from './water-quality.service';import { WaterQualityController } from './water-quality.controller';@Module({providers:[WaterQualityService],controllers:[WaterQualityController],exports:[WaterQualityService]}) export class WaterQualityModule{}

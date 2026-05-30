@@ -1,0 +1,1 @@
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';import { ReportsService } from './reports.service';@Controller('reports') export class ReportsController{constructor(private s:ReportsService){} @Post() create(@Body() dto:any){return this.s.create(dto)} @Get() list(@Query('beachId')beachId:string){return this.s.list(beachId)}}

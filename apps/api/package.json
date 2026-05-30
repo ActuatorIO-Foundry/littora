@@ -1,0 +1,36 @@
+{
+  "scripts": {
+    "start:dev": "nest start --watch",
+    "start:prod": "node dist/main.js",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@nestjs/common": "latest",
+    "@nestjs/config": "latest",
+    "@nestjs/core": "latest",
+    "@nestjs/jwt": "latest",
+    "@nestjs/passport": "latest",
+    "@nestjs/platform-express": "latest",
+    "@nestjs/schedule": "latest",
+    "bcryptjs": "latest",
+    "bullmq": "latest",
+    "class-transformer": "latest",
+    "class-validator": "latest",
+    "ioredis": "latest",
+    "passport": "latest",
+    "passport-jwt": "latest",
+    "pg": "latest",
+    "reflect-metadata": "latest",
+    "rxjs": "latest"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.21",
+    "@nestjs/schematics": "latest",
+    "@nestjs/testing": "latest",
+    "@types/node": "latest",
+    "@types/pg": "latest",
+    "ts-node": "latest",
+    "typescript": "^5.7.3"
+  }
+}

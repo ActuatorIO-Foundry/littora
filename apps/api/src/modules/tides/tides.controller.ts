@@ -1,0 +1,1 @@
+import { Controller, Get, Query } from '@nestjs/common';import { TidesService } from './tides.service';@Controller('tides') export class TidesController{constructor(private s:TidesService){} @Get() get(@Query('lat')lat:string,@Query('lon')lon:string,@Query('harbor')harbor?:string){return this.s.get(+lat,+lon,harbor)}}

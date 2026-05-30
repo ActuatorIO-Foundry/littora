@@ -1,0 +1,1 @@
+import { Injectable } from '@nestjs/common';@Injectable() export class AlertsService{async get(department?:string){return {provider:'meteofrance-ready',department,alerts:[],warning:process.env.METEOFRANCE_API_KEY?'Configure chosen vigilance/BMS endpoint mapping.':'METEOFRANCE_API_KEY missing; official vigilance/BMS unavailable in this environment.'}}}

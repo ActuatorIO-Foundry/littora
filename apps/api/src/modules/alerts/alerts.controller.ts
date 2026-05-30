@@ -1,0 +1,1 @@
+import { Controller, Get, Query } from '@nestjs/common';import { AlertsService } from './alerts.service';@Controller('alerts') export class AlertsController{constructor(private s:AlertsService){} @Get() get(@Query('department')department?:string){return this.s.get(department)}}

@@ -1,0 +1,1 @@
+import { Controller, Get, Query } from '@nestjs/common';import { RecommendationsService } from './recommendations.service';@Controller('recommendations') export class RecommendationsController{constructor(private s:RecommendationsService){} @Get() best(@Query('lat')lat:string,@Query('lon')lon:string,@Query('usage')usage='bathing'){return this.s.best(+lat,+lon,usage)}}

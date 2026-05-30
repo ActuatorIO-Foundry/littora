@@ -1,0 +1,131 @@
+<main class="detail-shell">
+    <nav class="topbar">
+        <a routerLink="/">← Retour Littora</a>
+        <div class="source-switch" aria-label="Source de données">
+            <button type="button" [class.active]="selectedSource === 'auto'" (click)="selectedSource = 'auto'">Auto</button>
+            <button type="button" [class.active]="selectedSource === 'openmeteo'" (click)="selectedSource = 'openmeteo'">Open-Meteo</button>
+            <button type="button" [class.active]="selectedSource === 'meteofrance'" (click)="selectedSource = 'meteofrance'">Météo-France</button>
+            <button type="button" [class.active]="selectedSource === 'community'" (click)="selectedSource = 'community'">Communauté</button>
+        </div>
+    </nav>
+
+    <div *ngIf="loading" class="state-card">Chargement de l’analyse plage...</div>
+    <div *ngIf="error" class="state-card error">{{ error }}</div>
+
+    <ng-container *ngIf="beach && score && !error">
+        <section class="beach-hero">
+            <div>
+                <p class="eyebrow">{{ beach.coastline }} · {{ beach.region }}</p>
+                <h1>{{ beach.name }}</h1>
+                <p>{{ beach.city }} · {{ beach.department }} · {{ beach.lat | number:'1.4-4' }}, {{ beach.lon | number:'1.4-4' }}</p>
+            </div>
+            <aside class="flag-panel" [class.green]="score.safety?.flag === 'green'" [class.yellow]="score.safety?.flag === 'yellow'" [class.red]="score.safety?.flag === 'red'">
+                <span>{{ flagText() }}</span>
+                <strong>{{ score.scores.bathing }}/100</strong>
+                <small>{{ score.safety?.source || 'Estimation Littora croisée météo, mer, qualité eau et signalements.' }}</small>
+            </aside>
+        </section>
+
+        <section class="map-section">
+            <iframe *ngIf="mapUrl" [src]="mapUrl" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Carte OpenStreetMap de la plage"></iframe>
+            <div class="amenity-panel">
+                <p class="eyebrow">Autour de la plage</p>
+                <h2>Accès, confort et services</h2>
+                <div class="amenity-group">
+                    <h3>Parkings</h3>
+                    <span *ngFor="let item of amenitiesBy('parking')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km</span>
+                    <small *ngIf="!amenitiesBy('parking').length">Aucun parking OSM détecté dans le rayon.</small>
+                </div>
+                <div class="amenity-group">
+                    <h3>Toilettes et secours</h3>
+                    <span *ngFor="let item of amenitiesBy('toilets')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km</span>
+                    <span *ngFor="let item of amenitiesBy('rescue')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km</span>
+                    <small *ngIf="!amenitiesBy('toilets').length && !amenitiesBy('rescue').length">Surveillance et sanitaires à confirmer localement.</small>
+                </div>
+                <div class="amenity-group">
+                    <h3>Location et vie locale</h3>
+                    <span *ngFor="let item of amenitiesBy('rental')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km</span>
+                    <span *ngFor="let item of amenitiesBy('food')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km</span>
+                    <small *ngIf="!amenitiesBy('rental').length && !amenitiesBy('food').length">Loueurs et commerces à enrichir par OSM ou communauté.</small>
+                </div>
+            </div>
+        </section>
+
+        <section class="score-section">
+            <article *ngFor="let usage of usages" class="score-card">
+                <span>{{ usage.label }}</span>
+                <strong>{{ score.scores[usage.key] }}/100</strong>
+                <p>{{ usage.text }}</p>
+            </article>
+        </section>
+
+        <section class="metrics-section">
+            <div class="metric-card" [ngClass]="currentMetricClass('air', score.current?.weather, 'temperature_2m')">
+                <span>Air</span><strong>{{ metricValue(score.current?.weather, 'temperature_2m') }}°C</strong>
+            </div>
+            <div class="metric-card" [ngClass]="currentMetricClass('water', score.current?.marine, 'sea_surface_temperature')">
+                <span>Eau</span><strong>{{ metricValue(score.current?.marine, 'sea_surface_temperature') }}°C</strong>
+            </div>
+            <div class="metric-card" [ngClass]="currentMetricClass('uv', score.current?.weather, 'uv_index')">
+                <span>UV</span><strong>{{ metricValue(score.current?.weather, 'uv_index') }}</strong>
+            </div>
+            <div class="metric-card" [ngClass]="currentMetricClass('wind', score.current?.weather, 'wind_speed_10m')">
+                <span>Vent</span><strong>{{ metricValue(score.current?.weather, 'wind_speed_10m') }} km/h</strong>
+            </div>
+            <div class="metric-card" [ngClass]="currentMetricClass('wave', score.current?.marine, 'wave_height')">
+                <span>Vagues</span><strong>{{ metricValue(score.current?.marine, 'wave_height') }} m</strong>
+            </div>
+            <div class="metric-card" [ngClass]="currentMetricClass('salinity', score.current?.marine, 'salinity_ppt')">
+                <span>Salinité</span><strong>{{ metricValue(score.current?.marine, 'salinity_ppt') }} ppt</strong>
+            </div>
+        </section>
+
+        <section class="forecast-section">
+            <div class="section-title">
+                <p class="eyebrow">Tendances</p>
+                <h2>Évolutions et prédictions court terme</h2>
+            </div>
+            <article class="chart-card" *ngFor="let chart of [
+                { key: 'uv', label: 'UV', fallback: +(score.current?.weather?.['uv_index'] || 3) },
+                { key: 'water', label: 'Température eau', fallback: +(score.current?.marine?.['sea_surface_temperature'] || 21) },
+                { key: 'air', label: 'Température air', fallback: +(score.current?.weather?.['temperature_2m'] || 24) },
+                { key: 'wave', label: 'Vagues', fallback: +(score.current?.marine?.['wave_height'] || 0.4) }
+            ]">
+                <h3>{{ chart.label }}</h3>
+                <div class="bars">
+                    <span *ngFor="let point of chartValues(chart.key, chart.fallback)"
+                        [style.height.px]="chartHeight(point, chartValues(chart.key, chart.fallback))">
+                        <small>{{ point.value | number:'1.0-1' }}</small>
+                    </span>
+                </div>
+            </article>
+        </section>
+
+        <section class="community-section">
+            <div>
+                <p class="eyebrow">Hub communautaire</p>
+                <h2>Signalements récents</h2>
+                <p>Méduses, pollution, courant, affluence et ressentis complètent les données officielles quand elles ne sont pas disponibles en temps réel.</p>
+            </div>
+            <div class="report-list">
+                <span *ngFor="let report of reports">{{ report.type || 'signalement' }} · {{ report.created_at | date:'short' }}</span>
+                <small *ngIf="!reports.length">Aucun signalement récent pour cette plage.</small>
+            </div>
+        </section>
+
+        <section class="sources-section">
+            <div>
+                <p class="eyebrow">Sources</p>
+                <h2>Moyenne multi-sources et choix utilisateur</h2>
+                <p>Le mode Auto privilégie la source branchée la plus fraîche puis garde les fallbacks visibles. Les connecteurs Météo-France, SHOM et ARS sont prêts à remplacer ou compléter Open-Meteo dès que les clés et jeux de données officiels sont configurés.</p>
+            </div>
+            <div class="provider-grid">
+                <span>Météo: {{ providerLabel(score.providers?.['weather']) }}</span>
+                <span>Mer: {{ providerLabel(score.providers?.['marine']) }}</span>
+                <span>Marées: {{ providerLabel(score.providers?.['tides']) }}</span>
+                <span>Qualité eau: {{ providerLabel(score.providers?.['waterQuality']) }}</span>
+                <span>Communauté: {{ providerLabel(score.providers?.['community']) }}</span>
+            </div>
+        </section>
+    </ng-container>
+</main>

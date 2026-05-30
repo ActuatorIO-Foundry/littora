@@ -1,0 +1,11 @@
+{
+  "name": "littora-platform",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "docker:local": "docker compose -f docker-compose.local.yml up --build",
+    "docker:prod": "docker compose -f docker-compose.prod.yml up --build -d",
+    "build:api": "npm --prefix apps/api run build",
+    "build:web": "npm --prefix apps/web run build"
+  }
+}

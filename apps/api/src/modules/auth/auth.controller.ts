@@ -1,0 +1,1 @@
+import { Controller, Get } from '@nestjs/common';@Controller('auth') export class AuthController{@Get('status') status(){return {ready:true,mode:'jwt-ready',next:'Add register/login once user model policy is fixed.'}}}

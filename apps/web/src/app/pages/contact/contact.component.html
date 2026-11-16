@@ -1,0 +1,48 @@
+<main class="contact-shell">
+    <section class="contact-hero">
+        <div>
+            <p class="eyebrow">Contact</p>
+            <h1>Discuter données, territoire ou partenariat.</h1>
+            <p>
+                Littora peut connecter des sources municipales, postes de secours, qualité d’eau, location nautique ou
+                signalements terrain pour enrichir les recommandations locales.
+            </p>
+        </div>
+
+        <aside>
+            <strong>Sources prioritaires</strong>
+            <span>Météo-France, SHOM, ARS, communes littorales, offices de tourisme, clubs nautiques.</span>
+        </aside>
+    </section>
+
+    <section class="contact-grid">
+        <form (ngSubmit)="submit()">
+            <label>Nom<input name="name" [(ngModel)]="name"></label>
+            <label>Email<input name="email" type="email" [(ngModel)]="email"></label>
+            <label>Sujet
+                <select name="subject" [(ngModel)]="subject">
+                    <option>Partenariat API</option>
+                    <option>Commune ou territoire</option>
+                    <option>Signalement de données</option>
+                    <option>Demande générale</option>
+                </select>
+            </label>
+            <label>Message<textarea name="message" rows="7" [(ngModel)]="message"></textarea></label>
+            <button type="submit">Envoyer</button>
+            <small *ngIf="sent">Message préparé côté interface. Le branchement email/API contact reste à connecter.</small>
+        </form>
+
+        <div class="contact-notes">
+            <article>
+                <span>01</span>
+                <h2>Données officielles</h2>
+                <p>Connecteurs prêts pour basculer des fallbacks vers des sources certifiées dès disponibilité des clés ou datasets.</p>
+            </article>
+            <article>
+                <span>02</span>
+                <h2>Terrain</h2>
+                <p>Signalements méduses, pollution, affluence, drapeau observé et propreté enrichissent l’analyse court terme.</p>
+            </article>
+        </div>
+    </section>
+</main>

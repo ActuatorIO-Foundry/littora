@@ -52,8 +52,9 @@ moteur graphique n'est charge pour cet indicateur. Le rendu s'arrete hors ecran,
 dans un onglet masque et avec la preference de mouvement reduit, y compris
 lorsqu'elle change pendant le chargement. Les reponses API ne sont pas retardees
 pour prolonger artificiellement l'animation.
-La hauteur reste fixee a 100 pixels ; la resolution du canvas suit la largeur
-du conteneur lors des redimensionnements.
+Le bandeau mesure 200 pixels de haut et porte le message blanc en surimpression,
+avec un voile de contraste. La resolution du canvas suit les dimensions du
+conteneur lors des redimensionnements.
 
 Les survols ajoutent un relief de 2 a 3 pixels aux commandes, une translation
 des fleches et une mise en evidence des elements interactifs. Les dimensions

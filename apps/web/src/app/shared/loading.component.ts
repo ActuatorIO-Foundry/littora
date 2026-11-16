@@ -29,32 +29,50 @@ import { paintShoreWave } from "./shore-wave";
         width: 100%;
       }
       .loading {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-        min-height: 166px;
-        padding: 18px 0;
-        color: var(--muted);
-        font-size: 13px;
+        position: relative;
+        isolation: isolate;
+        min-height: 200px;
+        margin-block: 18px;
+        color: white;
+        font-size: 15px;
         text-align: center;
+        mask-image: linear-gradient(
+          to bottom,
+          transparent,
+          black 8%,
+          black 92%,
+          transparent
+        );
+      }
+      .loading::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(
+          to bottom,
+          #041c2200,
+          #041c22a8 32%,
+          #041c22a8 68%,
+          #041c2200
+        );
       }
       .loading-wave {
         display: block;
         width: 100%;
-        height: 100px;
-        mask-image: linear-gradient(
-          to bottom,
-          transparent,
-          black 22%,
-          black 75%,
-          transparent
-        );
+        height: 200px;
       }
       .loading span {
-        max-width: 32ch;
-        padding-inline: 12px;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        z-index: 1;
+        transform: translate(-50%, -50%);
+        width: calc(100% - 40px);
+        max-width: 540px;
+        line-height: 1.55;
+        font-weight: 600;
+        text-shadow: 0 1px 4px #041c2280;
       }
     `,
   ],
@@ -84,8 +102,10 @@ export class LoadingComponent implements AfterViewInit, OnDestroy {
         const canvas = this.wave.nativeElement;
         if (!canvas.clientWidth) return;
         const width = Math.round(canvas.clientWidth * 2);
-        if (canvas.width !== width) {
+        const height = Math.round(canvas.clientHeight * 2);
+        if (canvas.width !== width || canvas.height !== height) {
           canvas.width = width;
+          canvas.height = height;
           this.draw();
         }
       });

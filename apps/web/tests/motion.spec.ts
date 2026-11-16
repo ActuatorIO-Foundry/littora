@@ -34,7 +34,15 @@ test("chargement : vague visible, animee et arret dynamique", async ({
       height: el.getBoundingClientRect().height,
     }));
     expect(dimensions.width).toBeCloseTo(dimensions.container, 1);
-    expect(dimensions.height).toBe(100);
+    expect(dimensions.height).toBe(200);
+    const label = page.locator("app-loading .loading > span");
+    await expect(label).toHaveCSS("color", "rgb(255, 255, 255)");
+    const labelBox = (await label.boundingBox())!;
+    const waveBox = (await canvas.boundingBox())!;
+    expect(labelBox.y).toBeGreaterThan(waveBox.y);
+    expect(labelBox.y + labelBox.height).toBeLessThan(
+      waveBox.y + waveBox.height,
+    );
     await expect(page.getByRole("status")).toContainText("prochaine escale");
     await expect(canvas).toHaveAttribute("data-motion", "running");
     const colors = await canvas.evaluate((element) => {
@@ -143,7 +151,7 @@ test("chargement : pleine largeur de fiche et redimensionnement", async ({
         height: el.getBoundingClientRect().height,
       }));
       expect(sizes.width).toBeCloseTo(sizes.container, 1);
-      expect(sizes.height).toBe(100);
+      expect(sizes.height).toBe(200);
     }
     await page.screenshot({
       path: info.outputPath("full-width-loading.png"),

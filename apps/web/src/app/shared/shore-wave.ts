@@ -27,7 +27,10 @@ export function paintShoreWave(
   texture: HTMLImageElement | undefined,
   time: number,
 ): void {
-  const { width, height } = ctx.canvas;
+  const width = ctx.canvas.width;
+  const height = 200;
+  ctx.save();
+  ctx.scale(1, ctx.canvas.height / height);
   ctx.clearRect(0, 0, width, height);
   const water = ctx.createLinearGradient(0, 0, 0, height);
   water.addColorStop(0, "#228f9f");
@@ -40,8 +43,12 @@ export function paintShoreWave(
   if (texture?.complete && texture.naturalWidth) {
     const sx = texture.naturalWidth * 0.03;
     const sy = texture.naturalHeight * 0.22;
-    const sw = texture.naturalWidth * 0.46;
-    const sh = Math.min(texture.naturalHeight * 0.45, (sw * height) / width);
+    const aspect = ctx.canvas.width / ctx.canvas.height;
+    const sw = Math.min(
+      texture.naturalWidth * 0.46,
+      texture.naturalHeight * 0.45 * aspect,
+    );
+    const sh = sw / aspect;
     ctx.globalAlpha = 0.8;
     for (let y = 0; y < height; y += 4) {
       const drift = Math.sin(y * 0.06 + time * 0.8) * 2.4;
@@ -108,4 +115,5 @@ export function paintShoreWave(
       ctx.fill();
     }
   }
+  ctx.restore();
 }

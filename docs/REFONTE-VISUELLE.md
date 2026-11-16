@@ -46,6 +46,18 @@ Les transitions Motion sont ponctuelles. Navigation clavier, lien d'evitement,
 labels de formulaire, messages de statut et alternative tabulaire aux graphes
 sont prevus. Les couleurs ne sont pas les seuls porteurs d'information.
 
+Les chargements utilisent une petite vague en Canvas 2D : texture d'eau reprise
+de l'accueil, refraction et ecume animees a 30 images par seconde. Aucun nouveau
+moteur graphique n'est charge pour cet indicateur. Le rendu s'arrete hors ecran,
+dans un onglet masque et avec la preference de mouvement reduit, y compris
+lorsqu'elle change pendant le chargement. Les reponses API ne sont pas retardees
+pour prolonger artificiellement l'animation.
+
+Les survols ajoutent un relief de 2 a 3 pixels aux commandes, une translation
+des fleches et une mise en evidence des elements interactifs. Les dimensions
+de mise en page restent stables. Les mouvements de survol sont reserves aux
+pointeurs precis et desactives en mode mouvement reduit.
+
 ## Recette locale
 
 Depuis la racine :
@@ -71,8 +83,8 @@ Les tests interceptent les API pour les etats controles et n'ecrivent pas dans
 la base. Captures et traces sont produites dans `apps/web/test-results`, ignore
 par Git. Viewports : 360, 390, 768, 1440 et 1920 pixels.
 
-Recette du 16 novembre 2026 : compilation production reussie, 35 tests de
-parcours reussis sur les cinq formats et selection geographique rejouee
+Recette du 16 novembre 2026 : compilation production reussie, 50 tests de
+parcours et d'animation reussis sur les cinq formats et selection geographique rejouee
 trois fois par format. Controle du canvas non vide, anime et stable en pause
 sur mobile et desktop. Parcours catalogue/fiche controle avec l'API locale,
 sans erreur JavaScript ni creation de signalement. Les tests automatises

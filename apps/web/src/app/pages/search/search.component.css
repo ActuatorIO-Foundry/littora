@@ -113,6 +113,9 @@
   font-size: 13px;
   color: var(--muted);
   white-space: nowrap;
+  transition:
+    color var(--hover-duration),
+    border-color var(--hover-duration);
 }
 .usage-tabs button.active {
   color: var(--sea);
@@ -243,6 +246,7 @@
   font-family: var(--heading);
   line-height: 1.4;
   overflow-wrap: anywhere;
+  transition: color var(--hover-duration);
 }
 .beach-name > button:hover {
   color: var(--sea);
@@ -273,6 +277,34 @@
   gap: 5px;
   font-weight: 650;
   min-height: 44px;
+}
+.details-link app-icon,
+.water-symbol app-icon,
+.usage-tabs app-icon {
+  transition: transform var(--hover-duration) var(--ease-out);
+}
+.beach-result:focus-within:not(.selected) {
+  background: var(--wash);
+}
+@media (hover: hover) and (pointer: fine) {
+  .beach-result:hover:not(.selected) {
+    background: var(--wash);
+  }
+  .usage-tabs button:hover {
+    color: var(--sea);
+    border-bottom-color: #91c8c9;
+  }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .details-link:hover app-icon {
+    transform: translateX(3px);
+  }
+  .beach-result:hover .water-symbol app-icon {
+    transform: translateY(-2px);
+  }
+  .usage-tabs button:hover app-icon {
+    transform: translateY(-2px);
+  }
 }
 .beach-overview {
   margin-top: 17px;

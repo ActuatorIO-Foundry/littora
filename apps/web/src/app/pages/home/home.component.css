@@ -122,13 +122,10 @@
   min-height: 58px;
   padding: 11px 5px;
   color: var(--ink);
-  transition:
-    background 0.2s,
-    padding 0.2s;
+  transition: background var(--hover-duration);
 }
-.coast-list button:hover {
+.coast-list button:focus-visible {
   background: var(--aqua);
-  padding-left: 12px;
 }
 .coast-number {
   font-size: 10px;
@@ -139,6 +136,8 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
+  transition: transform var(--hover-duration) var(--ease-out);
 }
 .coast-list strong {
   font-size: 14px;
@@ -151,6 +150,7 @@
 .coast-list button app-icon {
   margin-left: auto;
   color: var(--sea);
+  transition: transform var(--hover-duration) var(--ease-out);
 }
 .usages-section {
   background: var(--wash);
@@ -174,10 +174,12 @@
 .usages a > app-icon:first-child {
   color: var(--sea);
   margin-bottom: 19px;
+  transition: transform var(--hover-duration) var(--ease-out);
 }
 .usages h3 {
   font-size: 16px;
   margin-bottom: 9px;
+  transition: color var(--hover-duration);
 }
 .usages p {
   font-size: 13px;
@@ -190,8 +192,30 @@
   color: var(--sea);
   transition: transform 0.2s;
 }
-.usages a:hover > app-icon:last-child {
-  transform: translateX(5px);
+.usages a:focus-visible h3 {
+  color: var(--sea);
+}
+@media (hover: hover) and (pointer: fine) {
+  .coast-list button:hover {
+    background: var(--aqua);
+  }
+  .usages a:hover h3 {
+    color: var(--sea);
+  }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .coast-list button:hover div {
+    transform: translateX(3px);
+  }
+  .coast-list button:hover app-icon {
+    transform: translate(2px, -2px);
+  }
+  .usages a:hover > app-icon:first-child {
+    transform: translateY(-3px) rotate(-4deg);
+  }
+  .usages a:hover > app-icon:last-child {
+    transform: translateX(5px);
+  }
 }
 .about-section {
   display: grid;

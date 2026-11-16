@@ -16,6 +16,8 @@
   --amber: #98620a;
   --danger: #b63d35;
   --heading: "Plus Jakarta Sans Variable", sans-serif;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --hover-duration: 240ms;
   font-family: "DM Sans Variable", sans-serif;
   color: var(--ink);
   font-synthesis: none;
@@ -150,16 +152,17 @@ small {
   font-size: 14px;
   font-weight: 600;
   transition:
-    background 0.18s,
-    transform 0.18s,
-    border-color 0.18s;
+    background var(--hover-duration),
+    transform var(--hover-duration) var(--ease-out),
+    box-shadow var(--hover-duration),
+    border-color var(--hover-duration);
 }
-.btn:hover {
+.btn:not(:disabled):hover {
   background: var(--wash);
   border-color: #a9c4c5;
   color: var(--ink);
 }
-.btn:active {
+.btn:not(:disabled):active {
   transform: translateY(1px);
 }
 .btn-primary {
@@ -167,7 +170,7 @@ small {
   color: white;
   border-color: var(--coral);
 }
-.btn-primary:hover {
+.btn-primary:not(:disabled):hover {
   background: #be3c2c;
   color: white;
   border-color: #be3c2c;
@@ -177,7 +180,7 @@ small {
   background: var(--sea);
   border-color: var(--sea);
 }
-.btn-sea:hover {
+.btn-sea:not(:disabled):hover {
   color: white;
   background: var(--sea-dark);
 }
@@ -188,6 +191,7 @@ small {
   font-size: 14px;
   font-weight: 650;
   color: var(--sea);
+  transition: color var(--hover-duration);
 }
 .icon-button {
   display: inline-grid;
@@ -199,8 +203,12 @@ small {
   background: white;
   color: var(--ink);
   flex-shrink: 0;
+  transition:
+    background var(--hover-duration),
+    border-color var(--hover-duration),
+    box-shadow var(--hover-duration);
 }
-.icon-button:hover {
+.icon-button:not(:disabled):hover {
   background: var(--aqua);
 }
 [data-tooltip] {
@@ -346,6 +354,10 @@ input[type="checkbox"] {
   color: var(--muted);
   font-size: 13px;
   white-space: nowrap;
+  transition:
+    background var(--hover-duration),
+    color var(--hover-duration),
+    box-shadow var(--hover-duration);
 }
 .segmented button.active {
   background: white;
@@ -425,6 +437,52 @@ input[type="checkbox"] {
 }
 .leaflet-tooltip {
   white-space: nowrap;
+}
+.btn app-icon,
+.text-link app-icon,
+.icon-button app-icon {
+  transition: transform var(--hover-duration) var(--ease-out);
+}
+.zone-marker {
+  transition:
+    background var(--hover-duration),
+    color var(--hover-duration),
+    box-shadow var(--hover-duration);
+}
+@media (hover: hover) and (pointer: fine) {
+  .segmented button:not(.active):not(:disabled):hover {
+    background: var(--aqua);
+    color: var(--sea-dark);
+  }
+  .zone-marker:hover {
+    background: var(--aqua);
+    color: var(--sea-dark);
+    box-shadow: 0 3px 10px #163b4024;
+  }
+  .zone-marker.selected:hover {
+    background: var(--sea-dark);
+    color: white;
+  }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .btn:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 12px #163b4012;
+  }
+  .btn:not(:disabled):active {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+  .btn:not(:disabled):hover app-icon[name="arrow"],
+  .text-link:hover app-icon[name="arrow"] {
+    transform: translateX(3px);
+  }
+  .text-link:hover app-icon[name="left"] {
+    transform: translateX(-3px);
+  }
+  .icon-button:not(:disabled):hover app-icon {
+    transform: scale(1.08);
+  }
 }
 @media (max-width: 800px) {
   .container {

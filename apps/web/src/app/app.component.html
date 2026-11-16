@@ -1,10 +1,75 @@
+<a class="skip-link" href="#main-content" (click)="skipToContent($event)"
+  >Aller au contenu</a
+>
 <header class="app-topbar">
-    <a routerLink="/" class="topbar-brand">Littora</a>
-    <nav aria-label="Navigation principale">
-        <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Accueil</a>
-        <a routerLink="/recherche" routerLinkActive="active">Recherche plage</a>
-        <a routerLink="/contact" routerLinkActive="active">Contact</a>
+  <div class="nav-inner container">
+    <a
+      routerLink="/"
+      class="brand"
+      aria-label="Littora, accueil"
+      (click)="menuOpen = false"
+      ><app-icon name="waves" [size]="32" />littora<span class="brand-dot"
+        >.</span
+      ></a
+    >
+    <nav
+      id="main-nav"
+      aria-label="Navigation principale"
+      [class.open]="menuOpen"
+    >
+      <a
+        routerLink="/"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        (click)="menuOpen = false"
+        >Accueil</a
+      >
+      <a
+        routerLink="/recherche"
+        routerLinkActive="active"
+        (click)="menuOpen = false"
+        >Explorer les plages</a
+      >
+      <a
+        routerLink="/contact"
+        routerLinkActive="active"
+        (click)="menuOpen = false"
+        >Contact</a
+      >
     </nav>
+    <span class="preview-label">Version de travail</span>
+    <button
+      class="icon-button menu-toggle"
+      (click)="menuOpen = !menuOpen"
+      [attr.aria-expanded]="menuOpen"
+      aria-controls="main-nav"
+      [attr.aria-label]="menuOpen ? 'Fermer le menu' : 'Ouvrir le menu'"
+    >
+      <app-icon [name]="menuOpen ? 'close' : 'menu'" />
+    </button>
+  </div>
 </header>
-
-<router-outlet></router-outlet>
+<div id="main-content" tabindex="-1"><router-outlet /></div>
+<footer>
+  <div class="footer-inner container">
+    <a class="brand" routerLink="/"
+      ><app-icon name="waves" [size]="26" />littora<span class="brand-dot"
+        >.</span
+      ></a
+    >
+    <p>Le littoral, en toute clarté.</p>
+    <div>
+      <a routerLink="/contact">Nous contacter</a
+      ><a
+        href="https://github.com/ActuatorIO-Foundry/littora"
+        target="_blank"
+        rel="noopener"
+        >Le projet <app-icon name="external" [size]="13"
+      /></a>
+    </div>
+  </div>
+  <p class="footer-note container">
+    Les conditions évoluent. Sur place, les consignes des autorités et des
+    sauveteurs prévalent.
+  </p>
+</footer>

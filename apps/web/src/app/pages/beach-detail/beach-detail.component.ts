@@ -1,229 +1,330 @@
-import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { ActivatedRoute, RouterLink } from '@angular/router';
-
-import { Beach, BeachAmenity, BeachAmenitiesResponse, BeachScore, MetricPoint } from '../../models/beach.model';
-
-type UsageKey = 'bathing' | 'family' | 'paddle' | 'boat';
-
+import { CommonModule } from "@angular/common";
+import { ChangeDetectorRef, Component, OnDestroy, OnInit } from "@angular/core";
+import { ActivatedRoute, RouterLink } from "@angular/router";
+import { Subscription, timeout } from "rxjs";
+import {
+  Beach,
+  BeachAmenity,
+  BeachAmenitiesResponse,
+  BeachScore,
+  MetricPoint,
+} from "../../models/beach.model";
+import { LittoraApiService } from "../../services/littora-api.service";
+import { IconComponent } from "../../shared/icon.component";
+import { LoadingComponent } from "../../shared/loading.component";
+import { CoastMapComponent } from "../../shared/coast-map.component";
+import {
+  metricValue,
+  metricClass,
+  providerLabel,
+} from "../../shared/presentation";
+type UsageKey = "bathing" | "family" | "paddle" | "boat";
+interface Report {
+  type: string;
+  created_at: string;
+  value?: { flag?: string };
+}
 @Component({
-    selector: 'app-beach-detail',
-    standalone: true,
-    imports: [CommonModule, RouterLink],
-    templateUrl: './beach-detail.component.html',
-    styleUrl: './beach-detail.component.css'
+  selector: "app-beach-detail",
+  standalone: true,
+  imports: [
+    CommonModule,
+    RouterLink,
+    IconComponent,
+    LoadingComponent,
+    CoastMapComponent,
+  ],
+  templateUrl: "./beach-detail.component.html",
+  styleUrl: "./beach-detail.component.css",
 })
-export class BeachDetailComponent implements OnInit {
-    beach: Beach | null = null;
-    score: BeachScore | null = null;
-    amenities: BeachAmenitiesResponse | null = null;
-    reports: any[] = [];
-    mapUrl: SafeResourceUrl | null = null;
-    selectedSource: 'auto' | 'openmeteo' | 'meteofrance' | 'community' = 'auto';
-    loading = true;
-    error = '';
-    status = 'initialisation';
-    booted = false;
-
-    readonly usages: Array<{ key: UsageKey; label: string; text: string }> = [
-        { key: 'bathing', label: 'Baignade', text: 'Qualité d’eau, UV, vagues, courant et température de l’eau.' },
-        { key: 'family', label: 'Famille', text: 'Baignade plus équipements: surveillance, toilettes, parking et confort.' },
-        { key: 'paddle', label: 'Sports nautiques', text: 'Vent, rafales, houle et courant pénalisent fortement le score.' },
-        { key: 'boat', label: 'Bateau', text: 'Lecture plaisance avec mer, rafales, courant et préparation de sortie.' }
-    ];
-
-    constructor(
-        private readonly route: ActivatedRoute,
-        private readonly sanitizer: DomSanitizer,
-        private readonly cdr: ChangeDetectorRef
-    ) {
-        setTimeout(() => this.loadFromRoute(), 0);
+export class BeachDetailComponent implements OnInit, OnDestroy {
+  beach: Beach | null = null;
+  score: BeachScore | null = null;
+  amenities: BeachAmenitiesResponse | null = null;
+  reports: Report[] = [];
+  loading = true;
+  loadingScore = true;
+  loadingAmenities = true;
+  error = "";
+  scoreError = "";
+  reportError = "";
+  reportMessage = "";
+  sending = false;
+  reportsUnavailable = false;
+  amenitiesUnavailable = false;
+  selectedUsage: UsageKey = "bathing";
+  selectedChart = "air";
+  readonly metricValue = metricValue;
+  readonly metricClass = metricClass;
+  readonly providerLabel = providerLabel;
+  readonly usages: Array<{
+    key: UsageKey;
+    label: string;
+    icon: string;
+    text: string;
+  }> = [
+    {
+      key: "bathing",
+      label: "Baignade",
+      icon: "bathing",
+      text: "Température de l’eau, vagues, vent et qualité sanitaire.",
+    },
+    {
+      key: "family",
+      label: "Famille",
+      icon: "family",
+      text: "Conditions de baignade et équipements référencés à proximité.",
+    },
+    {
+      key: "paddle",
+      label: "Sports nautiques",
+      icon: "wind",
+      text: "Vent, rafales, houle et courant pour préparer la sortie.",
+    },
+    {
+      key: "boat",
+      label: "Bateau",
+      icon: "boat",
+      text: "Vent et état de la mer pour une première lecture de la côte.",
+    },
+  ];
+  readonly charts = [
+    { key: "air", label: "Air", unit: "°C", icon: "sun" },
+    { key: "water", label: "Eau", unit: "°C", icon: "waves" },
+    { key: "uv", label: "UV", unit: "", icon: "sun" },
+    { key: "wave", label: "Vagues", unit: "m", icon: "waves" },
+  ];
+  readonly groups: Array<{
+    category: BeachAmenity["category"];
+    name: string;
+    icon: string;
+  }> = [
+    { category: "parking", name: "Stationnement", icon: "parking" },
+    { category: "toilets", name: "Toilettes", icon: "toilets" },
+    { category: "rescue", name: "Poste de secours", icon: "rescue" },
+    { category: "rental", name: "Locations nautiques", icon: "boat" },
+    { category: "food", name: "Restauration", icon: "compass" },
+  ];
+  private readonly subscriptions = new Subscription();
+  private scoreRequest?: Subscription;
+  constructor(
+    private readonly route: ActivatedRoute,
+    private readonly api: LittoraApiService,
+    private readonly cdr: ChangeDetectorRef,
+  ) {}
+  ngOnInit(): void {
+    const id = this.route.snapshot.paramMap.get("id");
+    if (!id) {
+      this.error = "Plage introuvable.";
+      this.loading = false;
+      return;
     }
-
-    ngOnInit(): void {
-        this.loadFromRoute();
-    }
-
-    private async loadFromRoute(): Promise<void> {
-        if (this.booted) return;
-        this.booted = true;
-        const id = this.route.snapshot.paramMap.get('id') || window.location.pathname.split('/').filter(Boolean).pop();
-        if (!id) {
-            this.error = 'Plage introuvable.';
+    this.subscriptions.add(
+      this.api
+        .getBeach(id)
+        .pipe(timeout(15000))
+        .subscribe({
+          next: (b) => {
+            this.beach = b;
             this.loading = false;
-            return;
-        }
-
-        this.status = 'appel score';
-        try {
-            const score = await this.fetchJson<BeachScore>(`/api/score/beach/${id}`);
-            this.score = score;
-            this.beach = score.beach;
-            this.mapUrl = this.buildMapUrl(score.beach);
+            this.cdr.markForCheck();
+          },
+          error: () => {
+            this.error = "Cette plage ne peut pas être chargée.";
             this.loading = false;
-            this.status = 'score charge';
-            this.cdr.detectChanges();
-            this.loadExtras(id);
-        } catch {
-            this.error = 'Impossible de calculer les conditions de cette plage.';
-            this.loading = false;
-            this.status = 'erreur score';
-            this.cdr.detectChanges();
-        }
-    }
-
-    private async loadExtras(id: string): Promise<void> {
-        try {
-            this.amenities = await this.fetchJson<BeachAmenitiesResponse>(`/api/beaches/${id}/amenities`);
-            this.cdr.detectChanges();
-        } catch {
-            this.amenities = null;
-            this.cdr.detectChanges();
-        }
-
-        try {
-            this.reports = await this.fetchJson<any[]>(`/api/reports?beachId=${id}`);
-            this.cdr.detectChanges();
-        } catch {
-            this.reports = [];
-            this.cdr.detectChanges();
-        }
-    }
-
-    private async fetchJson<T>(url: string): Promise<T> {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json() as Promise<T>;
-    }
-
-    metricValue(source: Record<string, unknown> | undefined, key: string, fallback = '—'): string {
-        const value = source?.[key];
-        if (value === null || value === undefined || value === '') return fallback;
-        if (typeof value === 'number') return Number.isInteger(value) ? String(value) : value.toFixed(1);
-        return String(value);
-    }
-
-    metricClass(kind: 'air' | 'water' | 'uv' | 'wind' | 'wave' | 'salinity', raw: unknown): string {
-        const value = Number(raw);
-        if (!Number.isFinite(value)) return 'metric-neutral';
-
-        if (kind === 'air' || kind === 'water') {
-            if (value < 20) return 'metric-blue';
-            if (value < 25) return 'metric-green';
-            if (value < 30) return 'metric-orange';
-            return 'metric-red';
-        }
-
-        if (kind === 'uv') {
-            if (value < 3) return 'metric-green';
-            if (value < 6) return 'metric-orange';
-            return 'metric-red';
-        }
-
-        if (kind === 'wind') {
-            if (value < 12) return 'metric-green';
-            if (value < 25) return 'metric-orange';
-            return 'metric-red';
-        }
-
-        if (kind === 'wave') {
-            if (value < 0.5) return 'metric-green';
-            if (value < 1.2) return 'metric-orange';
-            return 'metric-red';
-        }
-
-        if (value >= 32 && value <= 39) return 'metric-green';
-        if (value >= 28 && value < 32) return 'metric-orange';
-        return 'metric-blue';
-    }
-
-    currentMetricClass(kind: 'air' | 'water' | 'uv' | 'wind' | 'wave' | 'salinity', source: Record<string, unknown> | undefined, key: string): string {
-        return this.metricClass(kind, source?.[key]);
-    }
-
-    providerLabel(provider?: string): string {
-        const labels: Record<string, string> = {
-            'open-meteo': 'Open-Meteo Forecast API',
-            'open-meteo-marine': 'Open-Meteo Marine API',
-            'open-meteo-mapped': 'Météo-France à configurer, Open-Meteo actif',
-            'local-weather-fallback': 'Fallback local météo',
-            'local-marine-fallback': 'Fallback local marine',
-            'local-tide-estimator': 'Estimateur local marées',
-            'baignades-sante/data-gouv-ready': 'ARS / data.gouv à ingérer',
-            'littora-reports': 'Signalements Littora'
-        };
-        return provider ? labels[provider] ?? provider : 'Non disponible';
-    }
-
-    flagText(): string {
-        const flag = this.score?.safety?.flag;
-        if (flag === 'green') return this.score?.safety?.communityFlag ? 'Drapeau vert signalé' : 'Drapeau vert estimé';
-        if (flag === 'yellow') return this.score?.safety?.communityFlag ? 'Drapeau jaune signalé' : 'Drapeau jaune estimé';
-        if (flag === 'red') return this.score?.safety?.communityFlag ? 'Drapeau rouge signalé' : 'Drapeau rouge estimé';
-        return 'Drapeau à confirmer';
-    }
-
-    async signalFlag(flag: 'green' | 'yellow' | 'red'): Promise<void> {
-        if (!this.beach) return;
-        await fetch('/api/reports', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({
-                beachId: this.beach.id,
-                type: 'flag',
-                value: { flag, source: 'detail-page' },
-                confidence: 0.85
-            })
-        });
-        this.score = await this.fetchJson<BeachScore>(`/api/score/beach/${this.beach.id}`);
-        await this.loadExtras(this.beach.id);
-        this.cdr.detectChanges();
-    }
-
-    flagLabel(flag: string): string {
-        if (flag === 'green') return 'Vert';
-        if (flag === 'yellow') return 'Jaune';
-        if (flag === 'red') return 'Rouge';
-        return flag;
-    }
-
-    amenitiesBy(category: BeachAmenity['category']): BeachAmenity[] {
-        return this.amenities?.amenities.filter((amenity) => amenity.category === category).slice(0, 5) ?? [];
-    }
-
-    amenityStatus(item: BeachAmenity): string {
-        if (item.verification === 'to_verify' || item.source === 'local-hint') return 'à vérifier';
-        if (item.source === 'openstreetmap' || item.source === 'openstreetmap-nominatim') return 'OSM';
-        return 'fiche locale';
-    }
-
-    chartValues(key: string, fallback: number): MetricPoint[] {
-        const points = this.score?.forecast?.[key];
-        if (points?.length) return points;
-        return Array.from({ length: 8 }, (_, index) => ({
-            time: `${index * 3}h`,
-            value: Math.max(0, fallback + Math.sin(index / 1.4) * fallback * 0.08)
-        }));
-    }
-
-    chartHeight(point: MetricPoint, points: MetricPoint[]): number {
-        const values = points.map((item) => item.value);
-        const min = Math.min(...values);
-        const max = Math.max(...values);
-        if (max === min) return 42;
-        return 20 + ((point.value - min) / (max - min)) * 52;
-    }
-
-    private buildMapUrl(beach: Beach): SafeResourceUrl {
-        const delta = 0.018;
-        const bbox = [
-            beach.lon - delta,
-            beach.lat - delta,
-            beach.lon + delta,
-            beach.lat + delta
-        ].join(',');
-        const url = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${beach.lat},${beach.lon}`;
-        return this.sanitizer.bypassSecurityTrustResourceUrl(url);
-    }
+            this.cdr.markForCheck();
+          },
+        }),
+    );
+    this.loadScore(id);
+    this.subscriptions.add(
+      this.api
+        .getBeachAmenities(id)
+        .pipe(timeout(20000))
+        .subscribe({
+          next: (r) => {
+            this.amenities = r;
+            this.loadingAmenities = false;
+            this.cdr.markForCheck();
+          },
+          error: () => {
+            this.loadingAmenities = false;
+            this.amenitiesUnavailable = true;
+            this.cdr.markForCheck();
+          },
+        }),
+    );
+    this.loadReports(id);
+  }
+  loadScore(id: string): void {
+    this.loadingScore = true;
+    this.scoreError = "";
+    this.scoreRequest?.unsubscribe();
+    this.scoreRequest = this.api
+      .getScore(id)
+      .pipe(timeout(25000))
+      .subscribe({
+        next: (r) => {
+          this.score = r;
+          this.loadingScore = false;
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          this.loadingScore = false;
+          this.scoreError =
+            "Conditions indisponibles. Les informations de la plage restent consultables.";
+          this.cdr.markForCheck();
+        },
+      });
+  }
+  private loadReports(id: string): void {
+    this.subscriptions.add(
+      this.api
+        .getReports(id)
+        .pipe(timeout(12000))
+        .subscribe({
+          next: (r) => {
+            this.reports = r as Report[];
+            this.reportsUnavailable = false;
+            this.cdr.markForCheck();
+          },
+          error: () => {
+            this.reportsUnavailable = true;
+            this.cdr.markForCheck();
+          },
+        }),
+    );
+  }
+  get backQuery() {
+    return this.route.snapshot.queryParams;
+  }
+  get selectedUsageInfo() {
+    return this.usages.find((u) => u.key === this.selectedUsage)!;
+  }
+  get chart() {
+    return this.charts.find((c) => c.key === this.selectedChart)!;
+  }
+  get points(): MetricPoint[] {
+    return (this.score?.forecast?.[this.selectedChart] ?? []).filter(
+      (p) => p.value !== null && Number.isFinite(p.value),
+    );
+  }
+  get bounds() {
+    const values = this.points.map((p) => p.value);
+    const min = Math.floor(Math.min(...values) - 1);
+    return {
+      min:
+        this.selectedChart === "air" || this.selectedChart === "water"
+          ? min
+          : Math.max(0, min),
+      max: Math.ceil(Math.max(...values, 1)) + 1,
+    };
+  }
+  chartX(index: number): number {
+    return 48 + (index / Math.max(this.points.length - 1, 1)) * 660;
+  }
+  chartY(value: number): number {
+    const b = this.bounds;
+    return 184 - ((value - b.min) / (b.max - b.min)) * 150;
+  }
+  chartPath(): string {
+    return this.points
+      .map(
+        (p, i) => `${i ? "L" : "M"}${this.chartX(i)},${this.chartY(p.value)}`,
+      )
+      .join(" ");
+  }
+  chartTime(time: string): string {
+    const date = new Date(time);
+    return Number.isNaN(date.getTime())
+      ? "—"
+      : new Intl.DateTimeFormat("fr-FR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }).format(date);
+  }
+  get chartTicks() {
+    const b = this.bounds;
+    return [b.min, (b.min + b.max) / 2, b.max];
+  }
+  amenitiesBy(category: BeachAmenity["category"]): BeachAmenity[] {
+    return this.realAmenities.filter((a) => a.category === category);
+  }
+  get realAmenities(): BeachAmenity[] {
+    return (this.amenities?.amenities ?? []).filter(
+      (a) => a.source !== "local-hint" && a.verification !== "to_verify",
+    );
+  }
+  signal(
+    type: "jellyfish" | "pollution" | "current" | "crowd" | "flag",
+    flag?: string,
+  ): void {
+    if (!this.beach || this.sending) return;
+    this.sending = true;
+    this.reportMessage = "";
+    this.reportError = "";
+    this.subscriptions.add(
+      this.api
+        .createReport({
+          beachId: this.beach.id,
+          type,
+          value: { ...(flag ? { flag } : {}), source: "detail-page" },
+          confidence: 0.7,
+        })
+        .pipe(timeout(12000))
+        .subscribe({
+          next: () => {
+            this.sending = false;
+            this.reportMessage =
+              "Observation enregistrée. Merci pour votre contribution.";
+            this.loadReports(this.beach!.id);
+            this.cdr.markForCheck();
+          },
+          error: () => {
+            this.sending = false;
+            this.reportError = "L’observation n’a pas pu être envoyée.";
+            this.cdr.markForCheck();
+          },
+        }),
+    );
+  }
+  reportLabel(type: string): string {
+    return (
+      (
+        {
+          jellyfish: "Présence de méduses",
+          pollution: "Pollution signalée",
+          current: "Courant signalé",
+          crowd: "Affluence",
+          flag: "Drapeau observé",
+        } as Record<string, string>
+      )[type] ?? "Observation"
+    );
+  }
+  flagLabel(flag?: string): string {
+    return flag
+      ? ((
+          { green: "Vert", yellow: "Jaune", red: "Rouge" } as Record<
+            string,
+            string
+          >
+        )[flag] ?? flag)
+      : "";
+  }
+  dateLabel(raw: unknown): string {
+    if (!raw) return "Non renseignée";
+    const d = new Date(String(raw));
+    return Number.isNaN(d.getTime())
+      ? "Non renseignée"
+      : new Intl.DateTimeFormat("fr-FR", {
+          day: "numeric",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        }).format(d);
+  }
+  ngOnDestroy(): void {
+    this.subscriptions.unsubscribe();
+    this.scoreRequest?.unsubscribe();
+  }
 }

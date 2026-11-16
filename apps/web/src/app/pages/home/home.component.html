@@ -1,66 +1,107 @@
-<main class="landing-shell">
-    <section class="landing-hero">
-        <div class="hero-copy">
-            <p class="brand">LITTORA</p>
-            <h1>Choisir la bonne plage devient une décision météo, marine et terrain.</h1>
-            <p>
-                Littora agrège météo, mer, qualité d’eau, sécurité, équipements et signalements communautaires pour
-                recommander les plages les plus adaptées à chaque usage.
-            </p>
-            <div class="hero-actions">
-                <a routerLink="/recherche" class="primary-action">Rechercher une plage</a>
-                <a routerLink="/contact" class="secondary-action">Nous contacter</a>
-            </div>
+<main>
+  <section class="hero" aria-labelledby="hero-title">
+    <app-ocean-scene />
+    <div class="hero-content container" appReveal>
+      <p class="hero-kicker">Un autre regard sur le littoral</p>
+      <h1 id="hero-title">Littora<span>.</span></h1>
+      <h2>Votre prochaine escale<br />commence ici.</h2>
+      <p class="hero-description">
+        Météo, baignade et vie du littoral.<br />Tout commence par la bonne
+        plage.
+      </p>
+      <a class="btn btn-primary" routerLink="/recherche"
+        >Trouver une plage <app-icon name="arrow" [size]="18"
+      /></a>
+    </div>
+    <a class="hero-scroll" href="#explorer"
+      ><app-icon name="down" [size]="17" />Explorer le littoral</a
+    >
+  </section>
+  <div class="intro-strip">
+    <div class="container">
+      <span><app-icon name="sun" />Météo & conditions marines</span
+      ><span><app-icon name="compass" />6 façades à explorer</span
+      ><span><app-icon name="message" />Observations locales</span
+      ><span
+        ><app-icon name="waves" />Un littoral, mille façons d’en profiter</span
+      >
+    </div>
+  </div>
+  <section class="explore-section container" id="explorer" appReveal>
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">À chaque envie, sa côte</p>
+        <h2>À la rencontre du littoral.</h2>
+      </div>
+      <form class="search-field" (ngSubmit)="search()">
+        <app-icon name="search" [size]="19" /><input
+          name="query"
+          aria-label="Rechercher une plage ou une ville"
+          placeholder="Une plage, une ville…"
+          [(ngModel)]="query"
+        /><button type="submit" class="search-go" aria-label="Rechercher">
+          <app-icon name="arrow" [size]="19" />
+        </button>
+      </form>
+    </div>
+    <div class="coast-explorer">
+      <app-coast-map (zoneSelect)="explore($event)" />
+      <div class="coast-list">
+        <div class="coast-list-heading">
+          <h3>Les façades françaises</h3>
+          <span class="caption">France métropolitaine</span>
         </div>
-
-        <aside class="live-panel">
-            <span class="status-dot"></span>
-            <div>
-                <strong>Observations quasi temps réel</strong>
-                <small>Météo et mer toutes les 15 min quand l’API source le permet. Signalements communautaires en direct.</small>
-            </div>
-        </aside>
-    </section>
-
-    <section class="map-dashboard">
-        <div class="map-frame">
-            <iframe [src]="mapUrl" loading="lazy" title="Carte OpenStreetMap du littoral français"></iframe>
-            <div class="map-overlay">
-                <span>Manche</span>
-                <span>Atlantique</span>
-                <span>Méditerranée</span>
-            </div>
-        </div>
-
-        <div class="weather-board">
-            <p class="eyebrow">Synthèse France littorale</p>
-            <h2>Lecture rapide avant de partir</h2>
-            <div class="observation-grid">
-                <article *ngFor="let card of observationCards" [class]="card.level">
-                    <span>{{ card.label }}</span>
-                    <strong>{{ card.value }}</strong>
-                    <small>{{ card.state }}</small>
-                </article>
-            </div>
-        </div>
-    </section>
-
-    <section class="concept-section">
+        <button
+          *ngFor="let zone of zones; let i = index"
+          (click)="explore(zone)"
+        >
+          <span class="coast-number">0{{ i + 1 }}</span>
+          <div>
+            <strong>{{ zone.name }}</strong><span>{{ zone.coastline }}</span>
+          </div>
+          <app-icon name="diagonal" [size]="18" />
+        </button>
+      </div>
+    </div>
+  </section>
+  <section class="usages-section">
+    <div class="container" appReveal>
+      <div class="section-heading">
         <div>
-            <p class="eyebrow">Concept</p>
-            <h2>Une plateforme plage & mer, pas seulement une météo.</h2>
+          <p class="eyebrow">Votre journée, votre rythme</p>
+          <h2>La mer se vit de mille façons.</h2>
         </div>
-        <p>
-            Les informations existent déjà, mais elles sont dispersées entre météo, baignade, marine, cartographie et
-            retours terrain. Littora les rassemble dans une interface unique avec des scores par usage: baignade,
-            famille, sports nautiques et bateau.
-        </p>
-    </section>
-
-    <section class="usecase-grid">
-        <article *ngFor="let useCase of useCases">
-            <span></span>
-            <p>{{ useCase }}</p>
-        </article>
-    </section>
+        <a routerLink="/recherche" class="text-link"
+          >Toutes les plages <app-icon name="arrow" [size]="18"
+        /></a>
+      </div>
+      <div class="usages">
+        <a
+          *ngFor="let usage of usages"
+          routerLink="/recherche"
+          [queryParams]="{ usage: usage.id }"
+          ><app-icon [name]="usage.icon" [size]="30" />
+          <h3>{{ usage.name }}</h3>
+          <p>{{ usage.text }}</p>
+          <app-icon name="arrow" [size]="18"
+        /></a>
+      </div>
+    </div>
+  </section>
+  <section class="about-section container" appReveal>
+    <div>
+      <p class="eyebrow">L’esprit Littora</p>
+      <h2>Moins d’incertitudes.<br />Plus de bord de mer.</h2>
+    </div>
+    <div>
+      <p>
+        Choisir une plage, c’est aussi regarder le vent, l’eau, les accès et la
+        vie sur place. Littora rassemble ces regards pour vous aider à préparer
+        une journée qui vous ressemble.
+      </p>
+      <a routerLink="/recherche" class="text-link"
+        >Préparer ma prochaine sortie <app-icon name="arrow" [size]="18"
+      /></a>
+    </div>
+  </section>
 </main>

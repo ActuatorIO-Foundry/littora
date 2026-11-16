@@ -5,8 +5,18 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   timeout: 45000,
+  forbidOnly: Boolean(process.env["CI"]),
+  reporter: [["list"], ["html", { open: "never" }]],
+  webServer: process.env["LITTORA_URL"]
+    ? undefined
+    : {
+        command: "npm exec -- ng serve --host 127.0.0.1 --port 4300",
+        url: "http://127.0.0.1:4300",
+        reuseExistingServer: false,
+        timeout: 120000,
+      },
   use: {
-    baseURL: process.env["LITTORA_URL"] || "http://127.0.0.1:4200",
+    baseURL: process.env["LITTORA_URL"] || "http://127.0.0.1:4300",
     channel: process.env["PLAYWRIGHT_CHANNEL"] || undefined,
     screenshot: "only-on-failure",
     trace: "retain-on-failure",

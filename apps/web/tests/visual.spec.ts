@@ -1,4 +1,4 @@
-import { expect, test, Page } from "@playwright/test";
+import { expect, test, Page } from "./fixtures";
 
 const beaches = [
   {

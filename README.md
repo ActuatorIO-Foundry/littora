@@ -72,9 +72,20 @@ Voir `.env.example`.
 5. Ajouter mentions légales, politique RGPD, disclaimer sécurité mer.
 
 ## Vérifications utiles
+La [décision d'architecture](docs/architecture/ADR-001-monolithe-modulaire.md)
+et le [premier lot de garde-fous](docs/architecture/GARDE-FOUS.md) décrivent la
+migration progressive, la CI, les tests isolés et la restauration.
+
 ```bash
+nvm use
+npm run check:toolchain
+npm run install:ci
+npm run test:api
 npm --prefix apps/api run build
 npm --prefix apps/web run build
+npm run test:ui
 ```
 
-Si une base locale a déjà été initialisée avant l'ajout de PostGIS `geom`, recrée le volume `pgdata` ou applique `scripts/init.sql` dans la base.
+Ne pas recréer le volume `pgdata` ni rejouer le seed historique sur une base
+existante pour changer son schéma. Préserver les données et attendre les
+migrations versionnées suivies dans #8, avec sauvegarde préalable.

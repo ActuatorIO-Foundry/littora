@@ -1,4 +1,4 @@
-import { expect, Page, test } from "@playwright/test";
+import { expect, Page, test } from "./fixtures";
 
 async function holdCatalogue(page: Page): Promise<() => void> {
   let release!: () => void;

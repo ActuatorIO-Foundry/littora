@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main, architecture]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API build and regression tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/api/package-lock.json
+      - run: npm run check:toolchain
+      - run: npm --prefix apps/api ci --no-audit --no-fund
+      - run: npm run test:api
+      - run: git diff --exit-code -- apps/api/package-lock.json apps/web/package-lock.json
+
+  web:
+    name: Web build and responsive tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm run check:toolchain
+      - run: npm --prefix apps/web ci --no-audit --no-fund
+      - run: npm run build:web
+      - run: npm exec -- playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: npm run test:ui
+      - run: git diff --exit-code -- apps/api/package-lock.json apps/web/package-lock.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 7
+
+  storage:
+    name: PostGIS, Redis and restore smoke tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: littora
+          POSTGRES_PASSWORD: test-only-password
+          POSTGRES_DB: littora_ci_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U littora -d littora_ci_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://littora:test-only-password@127.0.0.1:5432/littora_ci_test
+      TEST_REDIS_URL: redis://127.0.0.1:6379/15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/api/package-lock.json
+      - run: npm --prefix apps/api ci --no-audit --no-fund
+      - run: npm run test:integration
+      - name: Restore a disposable database and compare its contents
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: bash scripts/test-database-restore.sh

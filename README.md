@@ -13,15 +13,36 @@
 Application web de recommandation plage et mer : Angular + NestJS + PostgreSQL/PostGIS + Redis + Docker Compose, avec API météo/marine branchées et fallbacks locaux pour travailler sans clé payante.
 
 ## Lancer en local
+Voir le [guide d'exploitation locale](docs/architecture/EXPLOITATION-LOCALE.md)
+pour conserver les donnees, choisir des ports libres et reconstruire uniquement
+l'API. Ne pas remplacer un fichier `.env` existant.
+
 ```bash
-cp .env.example .env
+test -f .env || cp .env.example .env
 docker compose -f docker-compose.local.yml up --build
 ```
 
 Frontend: http://localhost:4200  
 API: http://localhost:3000/api
 
+Les ports exposes sont configurables via `API_PORT`, `WEB_PORT`,
+`POSTGRES_PORT` et `REDIS_PORT`. Pour le frontend natif avec l'API Docker :
+
+```bash
+nvm use
+npm --prefix apps/web ci
+npm --prefix apps/web run start:local
+```
+
+Le lanceur lit les ports dans `.env`, avec priorite aux variables du shell.
+Les ports internes Docker restent fixes ; ne pas arreter une autre application
+pour liberer un port, choisir par exemple `API_PORT=3001`.
+
 ## Lancer en production
+**Configuration presente mais non validee pour un deploiement public.** Les
+corrections proxy/HTTPS (#29) et les images d'infrastructure (#33) restent
+bloquantes. Une CI verte des images applicatives ne valide pas toute la stack.
+
 ```bash
 cp .env.example .env.prod
 # Renseigner DOMAIN, JWT_SECRET et les clés API disponibles.
@@ -81,6 +102,7 @@ nvm use
 npm run check:toolchain
 npm run install:ci
 npm run test:api
+npm run test:ops
 npm --prefix apps/api run build
 npm --prefix apps/web run build
 npm run test:ui

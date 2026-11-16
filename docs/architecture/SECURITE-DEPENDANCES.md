@@ -97,6 +97,14 @@ Les processus deja lances ne changent pas de dependances avec un push. Reinstall
 avec npm ci et redemarrer les services, ou reconstruire leurs images, pour appliquer
 les correctifs a une instance. Aucune mise en production ni fusion dans main dans ce lot.
 
+## Lot d'exploitation suivant
+
+Le [lot d'exploitation locale](EXPLOITATION-LOCALE.md) applique ensuite les
+correctifs au conteneur API existant apres sauvegarde/restauration verifiee.
+Il complete la politique des scripts, les ports, la protection de main et les
+scans des images finales. Les anciennes images d'infrastructure sont suivies
+dans #33 ; #9 reste ouvert tant que ce blocage securite n'est pas traite.
+
 ## References
 
 - [Avis critique proxy-addr](https://github.com/advisories/GHSA-jqcg-44mw-7w3h)

@@ -5,6 +5,7 @@ export interface Beach {
   department: string;
   region: string;
   coastline: string;
+  waterType?: 'sea' | 'river' | 'lake' | 'unknown';
   lat: number;
   lon: number;
   has_lifeguard: boolean;
@@ -39,6 +40,12 @@ export interface BeachScore {
     alerts: string[];
     source?: string;
     official?: boolean;
+    communityFlag?: {
+      flag: 'green' | 'yellow' | 'red';
+      confidence: number;
+      counts: Record<string, number>;
+      history: Array<{ flag: string; time: string; confidence: number }>;
+    } | null;
   };
   forecast?: Record<string, MetricPoint[]>;
   providers?: Record<string, string>;
@@ -60,6 +67,7 @@ export interface BeachAmenity {
   lon: number;
   distanceKm: number;
   source: string;
+  verification?: 'listed' | 'to_verify';
 }
 
 export interface BeachAmenitiesResponse {
@@ -71,7 +79,7 @@ export interface BeachAmenitiesResponse {
 
 export interface ReportPayload {
   beachId: string;
-  type: 'jellyfish' | 'pollution' | 'current' | 'crowd' | 'other';
+  type: 'jellyfish' | 'pollution' | 'current' | 'crowd' | 'flag' | 'other';
   value?: Record<string, unknown>;
   confidence?: number;
 }

@@ -15,6 +15,7 @@ test-results/
 playwright-report/
 *.db
 *.db-*
+.local/
 
 # Independent local project, not part of Littora
 /apps/nova/

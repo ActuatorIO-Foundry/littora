@@ -7,6 +7,9 @@
     "npm": "11.19.1"
   },
   "packageManager": "npm@11.19.1",
+  "allowScripts": {
+    "msgpackr-extract@3.0.4": false
+  },
   "scripts": {
     "test": "npm run build && node --test test/*.test.cjs",
     "test:integration": "npm run build && node --test test/integration/*.test.cjs",

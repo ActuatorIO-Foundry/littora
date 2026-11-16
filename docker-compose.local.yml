@@ -6,21 +6,23 @@ services:
       POSTGRES_PASSWORD: littora
       POSTGRES_DB: littora
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
   api:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
     env_file: .env
+    environment:
+      API_PORT: 3000
     ports:
-      - "3000:3000"
+      - "127.0.0.1:${API_PORT:-3000}:3000"
     depends_on:
       - postgres
       - redis
@@ -30,7 +32,7 @@ services:
       dockerfile: Dockerfile.local
     command: npm start -- --host 0.0.0.0 --poll 2000
     ports:
-      - "4200:4200"
+      - "127.0.0.1:${WEB_PORT:-4200}:4200"
     volumes:
       - ./apps/web:/app
       - web_node_modules:/app/node_modules

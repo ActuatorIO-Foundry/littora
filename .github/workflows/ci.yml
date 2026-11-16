@@ -14,6 +14,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  operations:
+    name: Local configuration and install policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+      - run: npm run check:toolchain
+      - run: npm run test:ops
+
+  images:
+    name: Runtime image security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Build runtime images
+        run: |
+          docker build -t littora-api:ci apps/api
+          docker build -f apps/web/Dockerfile.prod -t littora-web:ci apps/web
+      - name: Install verified scanner
+        run: |
+          curl --fail --location --retry 3 --output /tmp/trivy.tar.gz https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_Linux-64bit.tar.gz
+          printf '%s  %s\n' bc0fc726e017b8927a62b2d3531d7a84ee01769daf5c99ed866dced54089fdbf /tmp/trivy.tar.gz | sha256sum --check
+          tar -xzf /tmp/trivy.tar.gz -C /tmp trivy
+      - name: Scan runtime OS and packages
+        run: |
+          mkdir -p image-reports
+          status=0
+          for image in api web; do
+            /tmp/trivy image --image-src docker --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --format json --output "image-reports/$image.json" "littora-$image:ci" || status=1
+          done
+          exit "$status"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: ${{ !cancelled() }}
+        with:
+          name: runtime-image-reports
+          path: image-reports/
+          retention-days: 7
+
   api:
     name: API build and regression tests
     runs-on: ubuntu-24.04

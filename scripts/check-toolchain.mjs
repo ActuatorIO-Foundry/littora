@@ -29,7 +29,9 @@ for (const directory of ['apps/api', 'apps/web']) {
   for (const dockerfile of dockerfiles) {
     const content = readFileSync(new URL(`${directory}/${dockerfile}`, root), 'utf8');
     const versions = [...content.matchAll(/^FROM node:([^\s]+)/gm)].map((match) => match[1]);
-    assert.ok(versions.length && versions.every((version) => version === `${nodeVersion}-alpine`));
+    assert.ok(versions.length && versions.every((version) =>
+      version.startsWith(`${nodeVersion}-alpine@sha256:`) && /@sha256:[a-f0-9]{64}$/.test(version),
+    ));
     assert.ok(content.includes('npm ci'), `${dockerfile}: use npm ci`);
     assert.ok(!content.includes('npm install'), `${dockerfile}: non-reproducible installation`);
   }

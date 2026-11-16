@@ -26,6 +26,7 @@ import { paintShoreWave } from "./shore-wave";
     `
       :host {
         display: block;
+        width: 100%;
       }
       .loading {
         display: flex;
@@ -34,35 +35,26 @@ import { paintShoreWave } from "./shore-wave";
         justify-content: center;
         gap: 10px;
         min-height: 166px;
-        padding: 18px 12px;
+        padding: 18px 0;
         color: var(--muted);
         font-size: 13px;
         text-align: center;
       }
       .loading-wave {
         display: block;
-        width: min(270px, 100%);
-        aspect-ratio: 3.2;
-        height: auto;
-        mask-image:
-          linear-gradient(
-            to right,
-            transparent,
-            black 16%,
-            black 84%,
-            transparent
-          ),
-          linear-gradient(
-            to bottom,
-            transparent,
-            black 22%,
-            black 75%,
-            transparent
-          );
-        mask-composite: intersect;
+        width: 100%;
+        height: 100px;
+        mask-image: linear-gradient(
+          to bottom,
+          transparent,
+          black 22%,
+          black 75%,
+          transparent
+        );
       }
       .loading span {
         max-width: 32ch;
+        padding-inline: 12px;
       }
     `,
   ],
@@ -74,6 +66,7 @@ export class LoadingComponent implements AfterViewInit, OnDestroy {
   private texture?: HTMLImageElement;
   private context: CanvasRenderingContext2D | null = null;
   private visibility?: IntersectionObserver;
+  private resize?: ResizeObserver;
   private frame = 0;
   private elapsed = 0;
   private lastFrame = 0;
@@ -87,6 +80,16 @@ export class LoadingComponent implements AfterViewInit, OnDestroy {
     this.zone.runOutsideAngular(() => {
       this.context = this.wave.nativeElement.getContext("2d");
       if (!this.context) return;
+      this.resize = new ResizeObserver(() => {
+        const canvas = this.wave.nativeElement;
+        if (!canvas.clientWidth) return;
+        const width = Math.round(canvas.clientWidth * 2);
+        if (canvas.width !== width) {
+          canvas.width = width;
+          this.draw();
+        }
+      });
+      this.resize.observe(this.wave.nativeElement);
       this.draw();
       this.texture = new Image();
       this.texture.decoding = "async";
@@ -138,6 +141,7 @@ export class LoadingComponent implements AfterViewInit, OnDestroy {
     this.destroyed = true;
     cancelAnimationFrame(this.frame);
     this.visibility?.disconnect();
+    this.resize?.disconnect();
     this.motion.removeEventListener("change", this.refreshMotion);
     document.removeEventListener("visibilitychange", this.refreshMotion);
     if (this.texture) this.texture.onload = null;

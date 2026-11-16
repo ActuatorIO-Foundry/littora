@@ -27,8 +27,7 @@ export function paintShoreWave(
   texture: HTMLImageElement | undefined,
   time: number,
 ): void {
-  const width = 640,
-    height = 200;
+  const { width, height } = ctx.canvas;
   ctx.clearRect(0, 0, width, height);
   const water = ctx.createLinearGradient(0, 0, 0, height);
   water.addColorStop(0, "#228f9f");
@@ -42,7 +41,7 @@ export function paintShoreWave(
     const sx = texture.naturalWidth * 0.03;
     const sy = texture.naturalHeight * 0.22;
     const sw = texture.naturalWidth * 0.46;
-    const sh = texture.naturalHeight * 0.45;
+    const sh = Math.min(texture.naturalHeight * 0.45, (sw * height) / width);
     ctx.globalAlpha = 0.8;
     for (let y = 0; y < height; y += 4) {
       const drift = Math.sin(y * 0.06 + time * 0.8) * 2.4;
@@ -90,9 +89,10 @@ export function paintShoreWave(
     ctx.stroke();
 
     for (const dot of foam) {
-      const x = dot.x + Math.sin(time * 0.55 + dot.wake * 6) * 6;
-      const width = 30 + Math.sin(x * 0.04 + time * 0.3) * 10;
-      const y = front(x) - dot.wake * width;
+      const x =
+        (dot.x * width) / 640 + Math.sin(time * 0.55 + dot.wake * 6) * 6;
+      const wakeWidth = 30 + Math.sin(x * 0.04 + time * 0.3) * 10;
+      const y = front(x) - dot.wake * wakeWidth;
       const dissolve = 0.8 + Math.sin(time * 0.8 + dot.x * 0.08) * 0.2;
       ctx.fillStyle = `rgba(255,255,252,${dot.alpha * (1 - dot.wake * 0.65) * strength * dissolve})`;
       ctx.beginPath();

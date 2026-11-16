@@ -28,12 +28,20 @@ test("chargement : vague visible, animee et arret dynamique", async ({
     await page.goto("/recherche");
     const canvas = page.locator(".loading-wave");
     await expect(canvas).toBeVisible();
+    const dimensions = await canvas.evaluate((el) => ({
+      width: el.getBoundingClientRect().width,
+      container: el.closest("app-loading")!.getBoundingClientRect().width,
+      height: el.getBoundingClientRect().height,
+    }));
+    expect(dimensions.width).toBeCloseTo(dimensions.container, 1);
+    expect(dimensions.height).toBe(100);
     await expect(page.getByRole("status")).toContainText("prochaine escale");
     await expect(canvas).toHaveAttribute("data-motion", "running");
     const colors = await canvas.evaluate((element) => {
-      const pixels = (element as HTMLCanvasElement)
+      const canvas = element as HTMLCanvasElement;
+      const pixels = canvas
         .getContext("2d")!
-        .getImageData(0, 0, 640, 200).data;
+        .getImageData(0, 0, canvas.width, canvas.height).data;
       let min = 255,
         max = 0;
       for (let i = 0; i < pixels.length; i += 4) {
@@ -93,6 +101,59 @@ test("chargement : mouvement reduit des le premier rendu", async ({ page }) => {
     const before = await frame(page);
     await page.waitForTimeout(250);
     expect(await frame(page)).toBe(before);
+  } finally {
+    release();
+  }
+  await expect(page.locator("app-loading")).toHaveCount(0);
+});
+
+test("chargement : pleine largeur de fiche et redimensionnement", async ({
+  page,
+}, info) => {
+  let release!: () => void;
+  const ready = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/**", (route) =>
+    route.fulfill({ status: 503, json: {} }),
+  );
+  await page.route("**/api/beaches/full-width", async (route) => {
+    await ready;
+    await route.fulfill({ status: 503, json: {} });
+  });
+  try {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/plages/full-width");
+    const canvas = page.locator(".loading-wave");
+    await expect(canvas).toBeVisible();
+    const viewport = page.viewportSize()!;
+    for (const width of [viewport.width, 500, viewport.width]) {
+      await page.setViewportSize({ width, height: viewport.height });
+      await expect
+        .poll(() =>
+          canvas.evaluate((el) => {
+            const wave = el as HTMLCanvasElement;
+            return Math.abs(wave.width - wave.clientWidth * 2);
+          }),
+        )
+        .toBeLessThanOrEqual(1);
+      const sizes = await canvas.evaluate((el) => ({
+        width: el.getBoundingClientRect().width,
+        container: el.closest("app-loading")!.getBoundingClientRect().width,
+        height: el.getBoundingClientRect().height,
+      }));
+      expect(sizes.width).toBeCloseTo(sizes.container, 1);
+      expect(sizes.height).toBe(100);
+    }
+    await page.screenshot({
+      path: info.outputPath("full-width-loading.png"),
+      fullPage: true,
+    });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
   } finally {
     release();
   }

@@ -122,6 +122,15 @@ test("accueil : scene, carte et navigation responsive", async ({
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute(
+    "href",
+    "/favicon.svg",
+  );
+  const favicon = await page.request.get("/favicon.svg");
+  expect(favicon.ok()).toBe(true);
+  const iconMarkup = await favicon.text();
+  expect(iconMarkup).toContain('fill="#007eaa"');
+  expect(iconMarkup).toContain('fill="#d94d3b"');
   await expect(page.getByRole("heading", { name: "Littora." })).toBeVisible();
   await expect(
     page.locator(".leaflet-overlay-pane path").first(),

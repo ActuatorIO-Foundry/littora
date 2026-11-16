@@ -1,5 +1,15 @@
 # Littora - plateforme intelligente plage & mer
 
+> **Prototype en cours d'audit, non prêt pour la production.** Le code est
+> consultable sous [licence propriétaire](LICENSE). L'exécution, le déploiement,
+> la réutilisation et l'exploitation commerciale nécessitent une autorisation
+> écrite. Les instructions techniques ci-dessous s'adressent au titulaire et
+> aux personnes autorisées. Elles ne constituent pas une permission d'usage.
+>
+> L'[audit du 16 novembre 2026](docs/AUDIT-2026-11-16.md) distingue les fonctions
+> existantes des simulations et des connecteurs à développer. Les anciennes
+> mentions « prêt » ci-dessous doivent être lues à la lumière de cet audit.
+
 Application web de recommandation plage et mer : Angular + NestJS + PostgreSQL/PostGIS + Redis + Docker Compose, avec API météo/marine branchées et fallbacks locaux pour travailler sans clé payante.
 
 ## Lancer en local

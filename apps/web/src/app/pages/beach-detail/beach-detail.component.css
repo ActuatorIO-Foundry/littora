@@ -201,6 +201,15 @@ button.active {
   font-weight: 820;
 }
 
+.amenity-group span small {
+  display: inline-flex;
+  margin-left: 6px;
+  padding: 2px 6px;
+  background: rgba(15, 118, 110, 0.1);
+  color: #0f766e;
+  font-size: 0.72rem;
+}
+
 .score-section {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -320,9 +329,25 @@ button.active {
 }
 
 .report-list,
-.provider-grid {
+.provider-grid,
+.flag-actions {
   display: grid;
   gap: 8px;
+}
+
+.flag-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.flag-actions button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: #14212b;
+  color: #fff;
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
 }
 
 .state-card {

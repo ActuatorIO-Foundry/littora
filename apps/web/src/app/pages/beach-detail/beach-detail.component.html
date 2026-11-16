@@ -33,19 +33,19 @@
                 <h2>Accès, confort et services</h2>
                 <div class="amenity-group">
                     <h3>Parkings</h3>
-                    <span *ngFor="let item of amenitiesBy('parking')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km</span>
+                    <span *ngFor="let item of amenitiesBy('parking')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km <small>{{ amenityStatus(item) }}</small></span>
                     <small *ngIf="!amenitiesBy('parking').length">Aucun parking OSM détecté dans le rayon.</small>
                 </div>
                 <div class="amenity-group">
                     <h3>Toilettes et secours</h3>
-                    <span *ngFor="let item of amenitiesBy('toilets')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km</span>
-                    <span *ngFor="let item of amenitiesBy('rescue')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km</span>
+                    <span *ngFor="let item of amenitiesBy('toilets')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km <small>{{ amenityStatus(item) }}</small></span>
+                    <span *ngFor="let item of amenitiesBy('rescue')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km <small>{{ amenityStatus(item) }}</small></span>
                     <small *ngIf="!amenitiesBy('toilets').length && !amenitiesBy('rescue').length">Surveillance et sanitaires à confirmer localement.</small>
                 </div>
                 <div class="amenity-group">
                     <h3>Location et vie locale</h3>
-                    <span *ngFor="let item of amenitiesBy('rental')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km</span>
-                    <span *ngFor="let item of amenitiesBy('food')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km</span>
+                    <span *ngFor="let item of amenitiesBy('rental')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km <small>{{ amenityStatus(item) }}</small></span>
+                    <span *ngFor="let item of amenitiesBy('food')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km <small>{{ amenityStatus(item) }}</small></span>
                     <small *ngIf="!amenitiesBy('rental').length && !amenitiesBy('food').length">Loueurs et commerces à enrichir par OSM ou communauté.</small>
                 </div>
             </div>
@@ -108,6 +108,14 @@
                 <p>Méduses, pollution, courant, affluence et ressentis complètent les données officielles quand elles ne sont pas disponibles en temps réel.</p>
             </div>
             <div class="report-list">
+                <div class="flag-actions">
+                    <button type="button" (click)="signalFlag('green')">Drapeau vert</button>
+                    <button type="button" (click)="signalFlag('yellow')">Drapeau jaune</button>
+                    <button type="button" (click)="signalFlag('red')">Drapeau rouge</button>
+                </div>
+                <span *ngFor="let item of score.safety?.communityFlag?.history">
+                    Drapeau {{ flagLabel(item.flag) }} · {{ item.time | date:'short' }}
+                </span>
                 <span *ngFor="let report of reports">{{ report.type || 'signalement' }} · {{ report.created_at | date:'short' }}</span>
                 <small *ngIf="!reports.length">Aucun signalement récent pour cette plage.</small>
             </div>

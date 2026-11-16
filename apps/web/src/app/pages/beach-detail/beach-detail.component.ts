@@ -158,14 +158,44 @@ export class BeachDetailComponent implements OnInit {
 
     flagText(): string {
         const flag = this.score?.safety?.flag;
-        if (flag === 'green') return 'Drapeau vert estimé';
-        if (flag === 'yellow') return 'Drapeau jaune estimé';
-        if (flag === 'red') return 'Drapeau rouge estimé';
+        if (flag === 'green') return this.score?.safety?.communityFlag ? 'Drapeau vert signalé' : 'Drapeau vert estimé';
+        if (flag === 'yellow') return this.score?.safety?.communityFlag ? 'Drapeau jaune signalé' : 'Drapeau jaune estimé';
+        if (flag === 'red') return this.score?.safety?.communityFlag ? 'Drapeau rouge signalé' : 'Drapeau rouge estimé';
         return 'Drapeau à confirmer';
+    }
+
+    async signalFlag(flag: 'green' | 'yellow' | 'red'): Promise<void> {
+        if (!this.beach) return;
+        await fetch('/api/reports', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                beachId: this.beach.id,
+                type: 'flag',
+                value: { flag, source: 'detail-page' },
+                confidence: 0.85
+            })
+        });
+        this.score = await this.fetchJson<BeachScore>(`/api/score/beach/${this.beach.id}`);
+        await this.loadExtras(this.beach.id);
+        this.cdr.detectChanges();
+    }
+
+    flagLabel(flag: string): string {
+        if (flag === 'green') return 'Vert';
+        if (flag === 'yellow') return 'Jaune';
+        if (flag === 'red') return 'Rouge';
+        return flag;
     }
 
     amenitiesBy(category: BeachAmenity['category']): BeachAmenity[] {
         return this.amenities?.amenities.filter((amenity) => amenity.category === category).slice(0, 5) ?? [];
+    }
+
+    amenityStatus(item: BeachAmenity): string {
+        if (item.verification === 'to_verify' || item.source === 'local-hint') return 'à vérifier';
+        if (item.source === 'openstreetmap' || item.source === 'openstreetmap-nominatim') return 'OSM';
+        return 'fiche locale';
     }
 
     chartValues(key: string, fallback: number): MetricPoint[] {

@@ -11,6 +11,8 @@ npm/
 .angular/
 *.tsbuildinfo
 coverage/
+test-results/
+playwright-report/
 *.db
 *.db-*
 

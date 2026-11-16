@@ -10,3 +10,5 @@ Dockerfile
 .git
 .gitignore
 .DS_Store
+test-results
+playwright-report

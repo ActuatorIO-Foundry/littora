@@ -1,21 +1,16 @@
-FROM node:20-alpine
-
+FROM node:24.22.3-alpine AS build
 WORKDIR /app
-
-ENV NODE_ENV=development
-
-COPY package*.json ./
-
-RUN npm install --include=dev --no-audit --no-fund
-
+COPY package.json package-lock.json ./
+RUN npm ci --include=dev --no-audit --no-fund
 COPY . .
-
 RUN npm run build
 
-RUN find dist -maxdepth 4 -type f -print
-
+FROM node:24.22.3-alpine AS runtime
+WORKDIR /app
 ENV NODE_ENV=production
-
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund
+COPY --from=build /app/dist ./dist
+USER node
 EXPOSE 3000
-
 CMD ["node", "dist/main.js"]

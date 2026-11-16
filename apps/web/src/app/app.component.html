@@ -1,1 +1,10 @@
+<header class="app-topbar">
+    <a routerLink="/" class="topbar-brand">Littora</a>
+    <nav aria-label="Navigation principale">
+        <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Accueil</a>
+        <a routerLink="/recherche" routerLinkActive="active">Recherche plage</a>
+        <a routerLink="/contact" routerLinkActive="active">Contact</a>
+    </nav>
+</header>
+
 <router-outlet></router-outlet>

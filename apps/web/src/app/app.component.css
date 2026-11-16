@@ -2,3 +2,55 @@
   display: block;
   min-height: 100vh;
 }
+
+.app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 12px clamp(16px, 3vw, 42px);
+  border-bottom: 1px solid rgba(20, 33, 43, 0.08);
+  background: rgba(248, 252, 251, 0.88);
+  backdrop-filter: blur(16px);
+}
+
+.topbar-brand {
+  color: #0f766e;
+  font-size: 0.9rem;
+  font-weight: 950;
+  letter-spacing: 0.16em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+nav a {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: #33434b;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+nav a.active {
+  background: #14212b;
+  color: #fff;
+}
+
+@media (max-width: 560px) {
+  .app-topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

@@ -24,6 +24,9 @@ export class RecommendationsService {
           ...beach,
           scores: score.scores,
           selectedScore: score.scores[selectedUsage] ?? score.scores.bathing,
+          flag: score.safety?.flag,
+          waterTemp: Number(score.current?.marine?.sea_surface_temperature ?? NaN),
+          airTemp: Number(score.current?.weather?.temperature_2m ?? NaN),
         });
       } catch {
         // Ignore beaches that cannot currently be scored because one provider failed.

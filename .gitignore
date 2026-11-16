@@ -3,3 +3,16 @@ node_modules/
 npm/
 *.log
 .DS_Store
+
+# Local configuration and generated files
+.env
+.env.*
+!.env.example
+.angular/
+*.tsbuildinfo
+coverage/
+*.db
+*.db-*
+
+# Independent local project, not part of Littora
+/apps/nova/

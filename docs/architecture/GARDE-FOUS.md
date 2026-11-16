@@ -2,6 +2,8 @@
 
 Branche : `architecture`. Decision : [ADR-001](ADR-001-monolithe-modulaire.md).
 Suivi : #9 et #10. Aucun changement d'apparence ou de regle de score dans ce lot.
+Reference historique : `bc514f4`. Les [correctifs de dependances](SECURITE-DEPENDANCES.md)
+documentent les mises a jour du lot suivant et les audits desormais bloquants.
 
 ## Environnement reproductible
 
@@ -121,7 +123,9 @@ affectees transitivement, pas autant de failles independantes. Le triage de
 l'exposition et les correctifs restent dans #9 ; aucune exception de securite
 n'est acceptee implicitement par une CI verte. Traiter ce point avant publication.
 
-#9 reste ouvert pour le triage et la correction des vulnerabilites, les images
-systeme et la documentation complete des ports de lancement.
+Le constat d'audit ci-dessus est historique : les alertes npm ont ensuite ete
+corrigees dans le lot [securite des dependances](SECURITE-DEPENDANCES.md).
+#9 reste ouvert pour les images systeme, la politique des scripts d'installation
+et la documentation complete des ports de lancement.
 #10 reste ouvert pour les controles manquants et les regressions des prochains lots.
 Ne pas fusionner automatiquement la branche ; conserver le visuel valide.

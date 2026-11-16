@@ -6,6 +6,7 @@
   "packageManager": "npm@11.19.1",
   "scripts": {
     "check:toolchain": "node scripts/check-toolchain.mjs",
+    "audit": "npm --prefix apps/api audit --audit-level=low && npm --prefix apps/web audit --audit-level=low",
     "install:ci": "npm --prefix apps/api ci && npm --prefix apps/web ci",
     "test:api": "npm --prefix apps/api test",
     "test:integration": "npm --prefix apps/api run test:integration",

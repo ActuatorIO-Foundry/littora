@@ -27,6 +27,7 @@ jobs:
           cache-dependency-path: apps/api/package-lock.json
       - run: npm run check:toolchain
       - run: npm --prefix apps/api ci --no-audit --no-fund
+      - run: npm --prefix apps/api audit --audit-level=low
       - run: npm run test:api
       - run: git diff --exit-code -- apps/api/package-lock.json apps/web/package-lock.json
 
@@ -43,6 +44,8 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
       - run: npm run check:toolchain
       - run: npm --prefix apps/web ci --no-audit --no-fund
+      - run: npm --prefix apps/web audit --audit-level=low
+      - run: npm --prefix apps/web run test:tooling
       - run: npm run build:web
       - run: npm exec -- playwright install --with-deps chromium
         working-directory: apps/web

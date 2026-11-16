@@ -1,0 +1,72 @@
+LITTORA - LICENCE PROPRIETAIRE DE CONSULTATION UNIQUEMENT
+Version 1.0 - 16 novembre 2026
+
+Copyright (c) 2026 Les titulaires des droits du projet Littora,
+sur leurs contributions respectives. Tous droits reserves.
+Depot de reference : https://github.com/ActuatorIO-Foundry/littora
+
+1. Objet
+
+Cette licence concerne les elements originaux du projet Littora dont les
+titulaires detiennent les droits : code source, documentation, textes,
+elements graphiques et leur organisation originale (le "Projet").
+La mise a disposition du Projet permet sa consultation. Elle ne constitue
+ni une licence open source ni une autorisation generale d'utilisation.
+
+2. Consultation autorisee
+
+La lecture et l'examen du Projet sont autorises a titre personnel, sans
+exploitation. Seules les copies techniques necessaires a cette consultation
+sont permises. Les mentions de droits et la presente licence doivent etre
+conservees. Aucune cession de droits de propriete intellectuelle n'intervient.
+
+3. Droits reserves
+
+Sauf autorisation ecrite prealable du titulaire competent, il est interdit
+de compiler, executer, deployer, heberger ou exploiter le Projet, a titre
+commercial ou non commercial ; de modifier, adapter, traduire, integrer ou
+reutiliser tout ou partie de ses elements proteges ; de les redistribuer,
+vendre, sous-licencier ou utiliser pour fournir un service a des tiers.
+
+Est notamment interdite la reprise de code, de contenus, d'elements graphiques
+ou d'autres expressions originales protegees du Projet pour commercialiser
+un produit, un service ou une implementation derivee du concept Littora.
+Le nom, les logos et les signes distinctifs ne font l'objet d'aucune licence
+de marque, de promotion ou d'affiliation.
+
+4. Idees, exceptions legales et plateforme d'hebergement
+
+Cette licence ne pretend pas conferer un droit exclusif sur une idee, une
+fonctionnalite ou un concept abstrait, ni interdire une creation independante
+ne reprenant aucun element protege du Projet. Les droits et exceptions
+imperatifs prevus par la loi restent applicables.
+
+Les droits de consultation et de fork accordes par les conditions de GitHub
+pour un depot public demeurent applicables dans leur perimetre. Un tel fork
+n'accorde pas de droit supplementaire d'exploitation, de deploiement ou de
+commercialisation du Projet.
+
+5. Elements tiers
+
+Les bibliotheques, dependances, donnees, cartes et autres elements appartenant
+a des tiers restent soumis a leurs licences et conditions propres. Cette
+licence ne restreint pas les droits accordes par ces tiers et ne revendique
+aucun droit exclusif sur leurs elements. Leurs attributions doivent etre
+respectees.
+
+6. Etat du Projet
+
+Le Projet est un prototype fourni en l'etat, sans garantie de fonctionnement,
+d'exactitude, de disponibilite ou d'aptitude a un usage particulier, dans les
+limites autorisees par la loi. Ses informations ne remplacent pas les consignes
+officielles de baignade, de secours ou de navigation. La responsabilite des
+titulaires est limitee dans la mesure permise par les regles applicables.
+
+7. Autorisations et evolution
+
+Toute utilisation depassant la consultation necessite une autorisation ecrite
+des titulaires des droits concernes. Les demandes peuvent etre adressees au
+mainteneur via le depot de reference. Une mise a disposition gratuite du
+service envisagee pour l'avenir n'accorde aujourd'hui aucun droit sur le code.
+Toute evolution de licence devra etre explicite et autorisee par les
+titulaires concernes.

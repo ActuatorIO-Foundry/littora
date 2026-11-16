@@ -21,12 +21,13 @@ export class ScoreService {
 
   async scoreBeach(id: string) {
     const beach = await this.beaches.get(id);
-    const [weather, marine, tides, waterQuality, community] = await Promise.all([
+    const [weather, marine, tides, waterQuality, community, flagConsensus] = await Promise.all([
       this.weather.get(beach.lat, beach.lon),
       this.marine.get(beach.lat, beach.lon),
       this.tides.get(beach.lat, beach.lon),
       this.water.get(id, beach.lat, beach.lon),
       this.reports.aggregate(id),
+      this.reports.flagConsensus(id),
     ]);
 
     const wc = weather.current;
@@ -49,7 +50,7 @@ export class ScoreService {
       beach,
       current: { weather: wc, marine: mc, tides, waterQuality, community },
       scores: { bathing, family, paddle, boat },
-      safety: this.safety(bathing, wave, current, uv, wind, waterQuality.status, communityPenalty.alerts),
+      safety: this.safety(bathing, wave, current, uv, wind, waterQuality.status, communityPenalty.alerts, flagConsensus),
       summary: this.summary(bathing, family, paddle, boat),
       forecast: {
         uv: this.series(weather.raw?.hourly, 'uv_index'),
@@ -62,7 +63,7 @@ export class ScoreService {
         marine: marine.provider.includes('fallback') ? 'medium' : 'high',
         tides: tides.reliability ?? 'medium',
         waterQuality: waterQuality.reliability ?? 'medium',
-        community: community.length ? 'fresh' : 'none',
+        community: community.length || flagConsensus ? 'fresh' : 'none',
       },
       providers: {
         weather: weather.provider,
@@ -75,18 +76,23 @@ export class ScoreService {
     };
   }
 
-  safety(bathing: number, wave: number, current: number, uv: number, wind: number, quality?: string, communityAlerts: string[] = []) {
-    const flag = bathing >= 78 && wave < 0.8 && current < 0.18 ? 'green' : bathing >= 55 && wave < 1.3 && current < 0.32 ? 'yellow' : 'red';
+  safety(bathing: number, wave: number, current: number, uv: number, wind: number, quality?: string, communityAlerts: string[] = [], communityFlag?: any) {
+    const estimatedFlag = bathing >= 78 && wave < 0.8 && current < 0.18 ? 'green' : bathing >= 55 && wave < 1.3 && current < 0.32 ? 'yellow' : 'red';
+    const flag = communityFlag?.confidence >= 0.58 ? communityFlag.flag : estimatedFlag;
     return {
       flag,
-      source: 'Estimation Littora: météo, vagues, courant, UV, qualité d’eau et signalements. Le drapeau officiel reste celui affiché sur place.',
+      source: communityFlag?.confidence >= 0.58
+        ? `Consensus communautaire récent (${Math.round(communityFlag.confidence * 100)}%) croisé avec météo/mer. Le drapeau officiel reste celui affiché sur place.`
+        : 'Estimation Littora: météo, vagues, courant, UV, qualité d’eau et signalements. Le drapeau officiel reste celui affiché sur place.',
       official: false,
+      communityFlag: communityFlag ?? null,
       alerts: [
         ...(uv >= 7 ? ['UV élevé'] : []),
         ...(wind >= 28 ? ['Vent soutenu'] : []),
         ...(wave >= 1.2 ? ['Mer agitée'] : []),
         ...(current >= 0.28 ? ['Courant marqué'] : []),
         ...(quality === 'poor' ? ['Qualité d’eau défavorable'] : []),
+        ...(communityFlag ? [`Drapeaux signalés: ${communityFlag.counts.green} vert, ${communityFlag.counts.yellow} jaune, ${communityFlag.counts.red} rouge`] : []),
         ...communityAlerts,
       ],
     };

@@ -37,6 +37,12 @@ test("chargement : vague visible, animee et arret dynamique", async ({
     expect(dimensions.height).toBe(200);
     const label = page.locator("app-loading .loading > span");
     await expect(label).toHaveCSS("color", "rgb(255, 255, 255)");
+    const overlay = await page
+      .locator("app-loading .loading")
+      .evaluate(
+        (element) => getComputedStyle(element, "::after").backgroundImage,
+      );
+    expect(overlay).toContain("rgba(4, 28, 34, 0.6)");
     const labelBox = (await label.boundingBox())!;
     const waveBox = (await canvas.boundingBox())!;
     expect(labelBox.y).toBeGreaterThan(waveBox.y);

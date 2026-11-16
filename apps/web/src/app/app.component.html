@@ -49,7 +49,25 @@
     </button>
   </div>
 </header>
-<div id="main-content" tabindex="-1"><router-outlet /></div>
+<div id="main-content" tabindex="-1" [class.coastal-page]="secondaryPage()">
+  @if (secondaryPage()) {
+    <div
+      class="coastal-backdrop"
+      [class.paused]="coastPaused || pageHidden"
+      aria-hidden="true"
+    >
+      <img
+        class="coastal-texture"
+        src="/images/lagune.jpg"
+        alt=""
+        width="1914"
+        height="822"
+        decoding="async"
+      />
+    </div>
+  }
+  <router-outlet />
+</div>
 <footer>
   <div class="footer-inner container">
     <a class="brand" routerLink="/"
@@ -69,7 +87,24 @@
     </div>
   </div>
   <p class="footer-note container">
-    Les conditions évoluent. Sur place, les consignes des autorités et des
-    sauveteurs prévalent.
+    <span
+      >Les conditions évoluent. Sur place, les consignes des autorités et des
+      sauveteurs prévalent.</span
+    >
+    @if (secondaryPage()) {
+      <button
+        class="icon-button coast-motion-control"
+        (click)="coastPaused = !coastPaused"
+        [attr.aria-label]="
+          coastPaused ? 'Animer le décor' : 'Mettre le décor en pause'
+        "
+        [attr.title]="
+          coastPaused ? 'Animer le décor' : 'Mettre le décor en pause'
+        "
+        [attr.aria-pressed]="coastPaused"
+      >
+        <app-icon [name]="coastPaused ? 'play' : 'pause'" [size]="15" />
+      </button>
+    }
   </p>
 </footer>

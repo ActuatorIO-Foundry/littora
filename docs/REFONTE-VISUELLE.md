@@ -117,3 +117,21 @@ par cette branche.
 - [x] Hierarchie des fiches, sources et etats inconnus validee.
 - [x] Retouches visuelles finales traitees.
 - [x] Accord de fusion dans `main`.
+
+## Retouches de consultation
+
+Ajouts sur `architecture`, le 16 novembre 2026 :
+
+- Fond de crique sur recherche, fiche plage et contact uniquement, a 12 %
+  d'opacite et avec saturation attenuee. L'accueil conserve sa scene actuelle.
+- Derive CSS lente de 36 secondes, pause disponible dans le pied de page,
+  suspension dans un onglet masque et arret avec `prefers-reduced-motion`.
+- Texte secondaire legerement renforce sur ces pages pour conserver le contraste.
+  Les cartes, champs et commandes restent independants du decor non interactif.
+- Voile central de la vague de chargement ramene de 66 % a 60 % : eau un peu
+  plus claire, texte blanc et dimensions de 200 pixels conserves.
+- Cinq tests responsive supplementaires couvrent le decor, sa pause et son
+  absence sur l'accueil. Les tests du chargement verifient le voile eclairci.
+
+Ces retouches sont separees du commit de correction des dependances ; aucune
+fusion dans `main` n'est incluse.

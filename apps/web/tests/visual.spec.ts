@@ -303,3 +303,47 @@ test("carte : facade selectionnable et reperes visibles", async ({ page }) => {
   ).toBeGreaterThan(0);
   await noOverflow(page);
 });
+
+test("decor littoral : discret hors accueil, pause et mouvements reduits", async ({
+  page,
+}, info) => {
+  await page.goto("/");
+  await expect(page.locator(".coastal-backdrop")).toHaveCount(0);
+  await page.getByRole("link", { name: "Trouver une plage" }).click();
+  const backdrop = page.locator(".coastal-backdrop");
+  const texture = page.locator(".coastal-texture");
+  await expect(backdrop).toBeVisible();
+  await expect(backdrop).toHaveAttribute("aria-hidden", "true");
+  await expect(backdrop).toHaveCSS("pointer-events", "none");
+  await expect(texture).toHaveCSS("opacity", "0.12");
+  await expect
+    .poll(() =>
+      texture.evaluate((image) => (image as HTMLImageElement).naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  const first = await texture.evaluate(
+    (image) => getComputedStyle(image).transform,
+  );
+  await expect
+    .poll(() => texture.evaluate((image) => getComputedStyle(image).transform))
+    .not.toBe(first);
+  await page.getByRole("button", { name: "Mettre le décor en pause" }).click();
+  await expect(texture).toHaveCSS("animation-play-state", "paused");
+  await page.getByRole("button", { name: "Animer le décor" }).click();
+  await expect(texture).toHaveCSS("animation-play-state", "running");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(texture).toHaveCSS("animation-name", "none");
+  await expect(page.locator(".coast-motion-control")).toBeHidden();
+  for (const path of ["/recherche", "/plages/test-sea", "/contact"]) {
+    await page.goto(path);
+    await expect(texture).toBeVisible();
+    await expect(texture).toHaveCSS("animation-name", "none");
+    await noOverflow(page);
+    await page.screenshot({
+      path: info.outputPath(`coast-${path.split("/").pop()}.png`),
+      fullPage: true,
+    });
+  }
+  await page.goto("/?preview=true");
+  await expect(backdrop).toHaveCount(0);
+});

@@ -52,8 +52,8 @@ import { paintShoreWave } from "./shore-wave";
         background: linear-gradient(
           to bottom,
           #041c2200,
-          #041c22a8 32%,
-          #041c22a8 68%,
+          #041c2299 32%,
+          #041c2299 68%,
           #041c2200
         );
       }

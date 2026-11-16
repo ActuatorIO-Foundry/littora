@@ -1,7 +1,7 @@
 # Refonte visuelle Littora
 
 Branche : `refactor`. Suivi : #2, #4 et #5.
-Statut : proposition implementee, validation visuelle requise avant fusion.
+Statut : refonte visuelle validee le 16 novembre 2026, fusion dans `main` autorisee.
 
 ## Direction
 
@@ -110,10 +110,10 @@ Les corrections metier et la securisation de production restent suivies dans
 la feuille de route #1. Aucun passage public ou merge automatique n'est prevu
 par cette branche.
 
-## Validation avant fusion
+## Validation visuelle
 
-- [ ] Direction Lagune/Atlas et niveau d'animation valides.
-- [ ] Lecture et confort de navigation valides sur mobile et ordinateur.
-- [ ] Hierarchie des fiches, sources et etats inconnus validee.
-- [ ] Retouches visuelles finales traitees.
-- [ ] Accord de fusion dans `main`.
+- [x] Direction Lagune/Atlas et niveau d'animation valides.
+- [x] Lecture et confort de navigation valides sur mobile et ordinateur.
+- [x] Hierarchie des fiches, sources et etats inconnus validee.
+- [x] Retouches visuelles finales traitees.
+- [x] Accord de fusion dans `main`.

@@ -1,48 +1,94 @@
-<main class="contact-shell">
-    <section class="contact-hero">
-        <div>
-            <p class="eyebrow">Contact</p>
-            <h1>Discuter données, territoire ou partenariat.</h1>
-            <p>
-                Littora peut connecter des sources municipales, postes de secours, qualité d’eau, location nautique ou
-                signalements terrain pour enrichir les recommandations locales.
-            </p>
+<main class="contact-page container">
+  <header>
+    <p class="eyebrow">Gardons le contact</p>
+    <h1>Le littoral se construit ensemble.</h1>
+    <p>
+      Une question, un regard de terrain ou une envie de contribuer ?<br />Nous
+      sommes à l’écoute.
+    </p>
+  </header>
+  <div class="contact-grid">
+    <section>
+      <div class="section-heading">
+        <h2>Votre message</h2>
+        <app-icon name="mail" [size]="24" />
+      </div>
+      <div class="notice">
+        <app-icon name="info" [size]="18" />L’envoi direct est indisponible pour
+        le moment.
+      </div>
+      <form #contact="ngForm" (ngSubmit)="copyMessage()">
+        <div class="form-row">
+          <label class="field"
+            >Votre nom<input
+              name="name"
+              [(ngModel)]="name"
+              autocomplete="name"
+              required
+              maxlength="100"
+              placeholder="Camille Martin" /></label
+          ><label class="field"
+            >Adresse e-mail<input
+              name="email"
+              type="email"
+              [(ngModel)]="email"
+              autocomplete="email"
+              required
+              email
+              placeholder="camille@exemple.fr"
+          /></label>
         </div>
-
-        <aside>
-            <strong>Sources prioritaires</strong>
-            <span>Météo-France, SHOM, ARS, communes littorales, offices de tourisme, clubs nautiques.</span>
-        </aside>
-    </section>
-
-    <section class="contact-grid">
-        <form (ngSubmit)="submit()">
-            <label>Nom<input name="name" [(ngModel)]="name"></label>
-            <label>Email<input name="email" type="email" [(ngModel)]="email"></label>
-            <label>Sujet
-                <select name="subject" [(ngModel)]="subject">
-                    <option>Partenariat API</option>
-                    <option>Commune ou territoire</option>
-                    <option>Signalement de données</option>
-                    <option>Demande générale</option>
-                </select>
-            </label>
-            <label>Message<textarea name="message" rows="7" [(ngModel)]="message"></textarea></label>
-            <button type="submit">Envoyer</button>
-            <small *ngIf="sent">Message préparé côté interface. Le branchement email/API contact reste à connecter.</small>
-        </form>
-
-        <div class="contact-notes">
-            <article>
-                <span>01</span>
-                <h2>Données officielles</h2>
-                <p>Connecteurs prêts pour basculer des fallbacks vers des sources certifiées dès disponibilité des clés ou datasets.</p>
-            </article>
-            <article>
-                <span>02</span>
-                <h2>Terrain</h2>
-                <p>Signalements méduses, pollution, affluence, drapeau observé et propreté enrichissent l’analyse court terme.</p>
-            </article>
+        <label class="field"
+          >À quel sujet ?<select name="subject" [(ngModel)]="subject">
+            <option>Une question</option>
+            <option>Une donnée à corriger</option>
+            <option>Une commune ou un territoire</option>
+            <option>Un partenariat</option>
+          </select></label
+        ><label class="field"
+          >Votre message<textarea
+            name="message"
+            [(ngModel)]="message"
+            rows="6"
+            required
+            maxlength="5000"
+            placeholder="Dites-nous ce qui vous amène…"
+          ></textarea>
+        </label>
+        <div class="form-bottom">
+          <span>{{ message.length }} / 5 000</span
+          ><button
+            class="btn btn-sea"
+            type="submit"
+            [disabled]="contact.invalid"
+          >
+            <app-icon name="mail" [size]="17" />Copier le message
+          </button>
         </div>
+        <p class="form-status" *ngIf="status" role="status">{{ status }}</p>
+      </form>
     </section>
+    <aside>
+      <div
+        class="contact-photo"
+        role="img"
+        aria-label="Illustration d’une crique méditerranéenne"
+      ></div>
+      <div class="contact-note">
+        <app-icon name="compass" [size]="25" />
+        <h2>Un projet ouvert sur la côte.</h2>
+        <p>
+          Collectivités, associations, acteurs de la mer ou visiteurs : chaque
+          regard contribue à une meilleure connaissance du littoral.
+        </p>
+        <a
+          class="text-link"
+          href="https://github.com/ActuatorIO-Foundry/littora/issues"
+          target="_blank"
+          rel="noopener"
+          >Suivre le projet <app-icon name="external" [size]="15"
+        /></a>
+      </div>
+    </aside>
+  </div>
 </main>

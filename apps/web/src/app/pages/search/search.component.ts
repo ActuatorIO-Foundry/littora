@@ -1,434 +1,357 @@
-import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
-
-import { Beach, BeachScore } from '../../models/beach.model';
-import { LittoraApiService } from '../../services/littora-api.service';
-
-type CoastalZone = {
-    id: string;
-    name: string;
-    coastline: string;
-    description: string;
-    bbox: string;
-    center: { lat: number; lon: number };
-    marker: { x: number; y: number };
+import { ChangeDetectorRef, Component, OnDestroy, OnInit } from "@angular/core";
+import { CommonModule } from "@angular/common";
+import { FormsModule } from "@angular/forms";
+import { ActivatedRoute, Router, RouterLink } from "@angular/router";
+import { Subscription, timeout } from "rxjs";
+import { Beach, BeachScore } from "../../models/beach.model";
+import { LittoraApiService } from "../../services/littora-api.service";
+import { IconComponent } from "../../shared/icon.component";
+import { LoadingComponent } from "../../shared/loading.component";
+import { CoastMapComponent } from "../../shared/coast-map.component";
+import { COASTAL_ZONES, CoastalZone } from "../../shared/coastal-zones";
+import { metricValue, providerLabel } from "../../shared/presentation";
+type Result = Beach & {
+  selectedScore?: number;
+  scores?: BeachScore["scores"];
+  flag?: string;
+  waterTemp?: number;
 };
-
-type CoastalEmprise = {
-    id: string;
-    path: string;
-};
-
 @Component({
-    selector: 'app-search',
-    standalone: true,
-    imports: [CommonModule, FormsModule, RouterLink],
-    templateUrl: './search.component.html',
-    styleUrl: './search.component.css'
+  selector: "app-search",
+  standalone: true,
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    IconComponent,
+    LoadingComponent,
+    CoastMapComponent,
+  ],
+  templateUrl: "./search.component.html",
+  styleUrl: "./search.component.css",
 })
-export class SearchComponent implements OnInit {
-    beaches: Beach[] = [];
-    recommendations: Array<Beach & { selectedScore?: number; scores?: BeachScore['scores'] }> = [];
-    selectedBeach: Beach | null = null;
-    score: BeachScore | null = null;
-    selectedUsage: 'bathing' | 'family' | 'paddle' | 'boat' = 'bathing';
-    lastPosition: { lat: number; lon: number; label: string; fallback?: boolean } | null = null;
-    selectedZone: CoastalZone | null = null;
-
-    loading = true;
-    loadingScore = false;
-    loadingRecommendations = false;
-    loadingDiscovery = false;
-    error = '';
-    locationMessage = '';
-    discoveryMessage = '';
-    reportMessage = '';
-    waterType: 'all' | 'sea' | 'river' | 'lake' = 'sea';
-    requiredFlag: 'all' | 'green' | 'yellow' | 'red' = 'all';
-    requireParking = false;
-    requireToilets = false;
-    requireLifeguard = false;
-    minWaterTemp = 10;
-    maxWaterTemp = 32;
-
-    readonly coastalZones: CoastalZone[] = [
-        {
-            id: 'manche',
-            name: 'Manche & Opale',
-            coastline: 'Manche',
-            description: 'Grandes marées, vent, plages familiales et navigation côtière.',
-            bbox: '48.6,-5.2,51.1,2.0',
-            center: { lat: 49.4, lon: -1.2 },
-            marker: { x: 47, y: 18 }
+export class SearchComponent implements OnInit, OnDestroy {
+  beaches: Result[] = [];
+  selectedBeach: Beach | null = null;
+  score: BeachScore | null = null;
+  readonly coastalZones = COASTAL_ZONES;
+  selectedZone: CoastalZone | null = null;
+  selectedUsage = "bathing";
+  query = "";
+  waterType = "all";
+  requiredFlag = "all";
+  requireParking = false;
+  requireToilets = false;
+  requireLifeguard = false;
+  minWaterTemp: number | null = null;
+  maxWaterTemp: number | null = null;
+  filtersOpen = false;
+  mobileView: "list" | "map" = "list";
+  sort = "name";
+  resultLimit = 20;
+  loading = true;
+  loadingScore = false;
+  locating = false;
+  error = "";
+  scoreError = "";
+  message = "";
+  readonly usages = [
+    { id: "bathing", label: "Baignade", icon: "bathing" },
+    { id: "family", label: "Famille", icon: "family" },
+    { id: "paddle", label: "Sports nautiques", icon: "wind" },
+    { id: "boat", label: "Bateau", icon: "boat" },
+  ];
+  readonly metricValue = metricValue;
+  readonly providerLabel = providerLabel;
+  private listRequest?: Subscription;
+  private scoreRequest?: Subscription;
+  private destroyed = false;
+  constructor(
+    private readonly api: LittoraApiService,
+    private readonly cdr: ChangeDetectorRef,
+    private readonly route: ActivatedRoute,
+    private readonly router: Router,
+  ) {}
+  ngOnInit(): void {
+    const p = this.route.snapshot.queryParamMap;
+    this.query = p.get("q") ?? "";
+    this.selectedUsage = this.usages.some((u) => u.id === p.get("usage"))
+      ? p.get("usage")!
+      : "bathing";
+    this.waterType = ["sea", "river", "lake"].includes(p.get("water") ?? "")
+      ? p.get("water")!
+      : "all";
+    this.requireParking = p.get("parking") === "1";
+    this.requireToilets = p.get("toilets") === "1";
+    this.requireLifeguard = p.get("rescue") === "1";
+    this.requiredFlag = ["green", "yellow", "red"].includes(p.get("flag") ?? "")
+      ? p.get("flag")!
+      : "all";
+    this.minWaterTemp =
+      p.has("min") && Number.isFinite(Number(p.get("min")))
+        ? Number(p.get("min"))
+        : null;
+    this.maxWaterTemp =
+      p.has("max") && Number.isFinite(Number(p.get("max")))
+        ? Number(p.get("max"))
+        : null;
+    const zone = this.coastalZones.find((z) => z.id === p.get("zone"));
+    if (zone) this.exploreZone(zone);
+    else this.loadBeaches();
+  }
+  loadBeaches(): void {
+    this.listRequest?.unsubscribe();
+    this.loading = true;
+    this.error = "";
+    this.listRequest = this.api
+      .getBeaches()
+      .pipe(timeout(20000))
+      .subscribe({
+        next: (r) => {
+          this.beaches = r;
+          this.loading = false;
+          this.cdr.markForCheck();
         },
-        {
-            id: 'bretagne',
-            name: 'Bretagne',
-            coastline: 'Atlantique',
-            description: 'Houle, criques, courants et plages exposées.',
-            bbox: '47.2,-5.4,48.9,-1.0',
-            center: { lat: 48.1, lon: -3.5 },
-            marker: { x: 25, y: 36 }
+        error: () => {
+          this.loading = false;
+          this.error = "Les plages ne sont pas disponibles pour le moment.";
+          this.cdr.markForCheck();
         },
-        {
-            id: 'atlantique',
-            name: 'Atlantique',
-            coastline: 'Atlantique',
-            description: 'Longues plages, houle, surf et baignade surveillée.',
-            bbox: '43.0,-2.0,47.6,-0.7',
-            center: { lat: 45.1, lon: -1.3 },
-            marker: { x: 32, y: 64 }
+      });
+  }
+  exploreZone(zone: CoastalZone): void {
+    this.selectedZone = zone;
+    this.loading = true;
+    this.error = "";
+    this.message = "";
+    this.selectedBeach = null;
+    this.score = null;
+    this.beaches = [];
+    this.listRequest?.unsubscribe();
+    this.scoreRequest?.unsubscribe();
+    this.syncFilters();
+    this.listRequest = this.api
+      .discoverBeaches(zone)
+      .pipe(timeout(30000))
+      .subscribe({
+        next: (r) => {
+          this.beaches = r.beaches;
+          this.loading = false;
+          this.message = r.warning
+            ? "Source externe indisponible. Dernier catalogue disponible affiché."
+            : "";
+          this.cdr.markForCheck();
         },
-        {
-            id: 'occitanie',
-            name: 'Golfe du Lion',
-            coastline: 'Méditerranée',
-            description: 'Tramontane, lagunes, grandes plages et sports nautiques.',
-            bbox: '42.3,2.7,43.8,4.6',
-            center: { lat: 43.1, lon: 3.4 },
-            marker: { x: 56, y: 83 }
+        error: () => {
+          this.loading = false;
+          this.error = "Cette zone ne peut pas être chargée actuellement.";
+          this.cdr.markForCheck();
         },
-        {
-            id: 'azur',
-            name: 'Provence & Côte d’Azur',
-            coastline: 'Méditerranée',
-            description: 'Criques, plages urbaines, plaisance et eau chaude.',
-            bbox: '42.9,4.7,43.9,7.7',
-            center: { lat: 43.45, lon: 6.55 },
-            marker: { x: 74, y: 79 }
-        },
-        {
-            id: 'corse',
-            name: 'Corse',
-            coastline: 'Méditerranée',
-            description: 'Baies, mouillages, eau claire et relief côtier.',
-            bbox: '41.3,8.5,43.1,9.7',
-            center: { lat: 42.15, lon: 9.1 },
-            marker: { x: 87, y: 88 }
-        }
-    ];
-
-    readonly coastalEmprises: CoastalEmprise[] = [
-        { id: 'manche', path: 'M88 55 C124 36 170 28 218 45 L250 72 L286 96 L303 136 L292 150 C246 108 166 64 88 55Z' },
-        { id: 'bretagne', path: 'M92 62 C82 86 62 101 42 125 L58 151 L45 184 L55 217 L40 247 L68 268 L84 306 C108 250 112 150 92 62Z' },
-        { id: 'atlantique', path: 'M68 268 L84 306 L116 318 L146 347 L177 330 L214 346 L236 316 C170 314 111 296 68 268Z' },
-        { id: 'occitanie', path: 'M146 347 L177 330 L214 346 L242 314 L270 292 C226 300 184 304 146 347Z' },
-        { id: 'azur', path: 'M236 316 L282 286 L286 243 L310 214 L292 250 L282 286 L258 336 L242 314Z' },
-        { id: 'corse', path: 'M288 286 C316 296 326 330 306 362 C278 352 272 312 288 286Z' }
-    ];
-
-    private readonly fallbackPosition = {
-        lat: 43.5,
-        lon: 6.7,
-        label: 'Côte d’Azur',
-        fallback: true
-    };
-
-    constructor(private readonly api: LittoraApiService, private readonly cdr: ChangeDetectorRef) { }
-
-    ngOnInit(): void {
-        this.loadBeaches();
+      });
+  }
+  chooseZone(id: string): void {
+    const zone = this.coastalZones.find((z) => z.id === id);
+    if (zone) this.exploreZone(zone);
+    else {
+      this.selectedZone = null;
+      this.syncFilters();
+      this.loadBeaches();
     }
-
-    loadBeaches(): void {
+  }
+  useMyPosition(): void {
+    if (!navigator.geolocation) {
+      this.message = "La localisation est indisponible. Choisissez une façade.";
+      return;
+    }
+    this.locating = true;
+    this.message = "";
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (this.destroyed) return;
+        this.locating = false;
         this.loading = true;
-        this.error = '';
-        this.locationMessage = '';
-        this.beaches = [];
-
-        this.api.getBeaches().subscribe({
-            next: (beaches: Beach[]) => {
-                this.beaches = [...beaches];
-                this.selectedBeach = this.beaches.length > 0 ? this.beaches[0] : null;
-                this.loading = false;
-                this.cdr.detectChanges();
-
-                if (this.selectedBeach) {
-                    this.loadScore(this.selectedBeach);
-                }
-            },
-            error: (err: unknown) => {
-                console.error('[Littora] beaches error:', err);
-
-                this.error = 'Impossible de charger les plages depuis l’API.';
-                this.loading = false;
-                this.cdr.detectChanges();
-            }
-        });
-    }
-
-    loadScore(beach: Beach): void {
-        this.selectedBeach = beach;
-        this.loadingScore = true;
-        this.score = null;
-        this.reportMessage = '';
-
-        this.api.getScore(beach.id).subscribe({
-            next: (score: BeachScore) => {
-                this.score = score;
-                this.loadingScore = false;
-                this.cdr.detectChanges();
-            },
-            error: (err: unknown) => {
-                console.error('[Littora] score error:', err);
-
-                this.score = {
-                    beach,
-                    scores: {
-                        bathing: 0,
-                        family: 0,
-                        paddle: 0,
-                        boat: 0
-                    },
-                    error: 'Impossible de charger le score de cette plage.'
-                };
-
-                this.loadingScore = false;
-                this.cdr.detectChanges();
-            }
-        });
-    }
-
-    useMyPosition(): void {
-        if (!navigator.geolocation) {
-            this.useFallbackPosition('Géolocalisation indisponible : recommandations simulées autour de la Côte d’Azur.');
-            return;
-        }
-
-        this.loadingRecommendations = true;
-        this.locationMessage = 'Demande de position en cours...';
-        this.error = '';
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                this.lastPosition = {
-                    lat: position.coords.latitude,
-                    lon: position.coords.longitude,
-                    label: 'Ma position'
-                };
-                this.locationMessage = 'Recommandations recalculées autour de ta position.';
-                this.loadRecommendations(position.coords.latitude, position.coords.longitude);
-            },
-            () => {
-                this.useFallbackPosition('Position refusée ou indisponible : recommandations autour de la Côte d’Azur pour la démo locale.');
-            },
-            { enableHighAccuracy: true, timeout: 8000 }
-        );
-    }
-
-    loadRecommendations(lat: number, lon: number): void {
-        this.loadingRecommendations = true;
-        this.error = '';
-        this.api.getRecommendations(lat, lon, this.selectedUsage).subscribe({
-            next: (recommendations) => {
-                this.recommendations = recommendations;
-                this.loadingRecommendations = false;
-                this.cdr.detectChanges();
-                if (recommendations[0]) {
-                    this.loadScore(recommendations[0]);
-                }
-            },
-            error: () => {
-                this.loadingRecommendations = false;
-                this.error = 'Impossible de calculer les recommandations autour de ta position.';
-                this.cdr.detectChanges();
-            }
-        });
-    }
-
-    exploreZone(zone: CoastalZone): void {
-        this.selectedZone = zone;
-        this.lastPosition = { lat: zone.center.lat, lon: zone.center.lon, label: zone.name };
-        this.discoveryMessage = `Recherche des plages ${zone.name} via OpenStreetMap...`;
-        this.locationMessage = `Zone sélectionnée : ${zone.description}`;
-        this.loadingDiscovery = true;
-        this.loadingRecommendations = true;
-        this.error = '';
-        this.cdr.detectChanges();
-
-        this.api.discoverBeaches(zone).subscribe({
-            next: (result) => {
-                this.beaches = result.beaches;
-                this.discoveryMessage = result.warning
-                    ? `${result.warning} Résultats locaux utilisés.`
-                    : `${result.imported} plage(s) référencée(s) depuis ${this.discoveryProviderLabel(result.provider)}.`;
-                this.loadingDiscovery = false;
-                this.cdr.detectChanges();
-                this.loadRecommendations(zone.center.lat, zone.center.lon);
-            },
-            error: () => {
-                this.discoveryMessage = 'Découverte externe indisponible : résultats locaux utilisés.';
-                this.loadingDiscovery = false;
-                this.loadRecommendations(zone.center.lat, zone.center.lon);
-            }
-        });
-    }
-
-    changeUsage(usage: 'bathing' | 'family' | 'paddle' | 'boat'): void {
-        this.selectedUsage = usage;
-        if (this.lastPosition) {
-            this.loadRecommendations(this.lastPosition.lat, this.lastPosition.lon);
-            return;
-        }
-
-        this.recommendations = [];
-        this.cdr.detectChanges();
-    }
-
-    resetRecommendations(): void {
-        this.recommendations = [];
-        this.lastPosition = null;
+        this.error = "";
         this.selectedZone = null;
-        this.locationMessage = '';
-        this.discoveryMessage = '';
-        this.error = '';
-        if (this.beaches[0]) this.loadScore(this.beaches[0]);
-        this.cdr.detectChanges();
-    }
-
-    displayedBeaches(): Array<Beach & { selectedScore?: number; scores?: BeachScore['scores'] }> {
-        const source = (this.recommendations.length ? this.recommendations : this.beaches) as Array<Beach & { selectedScore?: number; scores?: BeachScore['scores'] }>;
-        return source.filter((beach) => {
-            const enriched = beach as Beach & { flag?: string; waterTemp?: number };
-            if (this.waterType !== 'all' && (beach.waterType ?? 'unknown') !== this.waterType) return false;
-            if (this.requireParking && !beach.has_parking) return false;
-            if (this.requireToilets && !beach.has_toilets) return false;
-            if (this.requireLifeguard && !beach.has_lifeguard) return false;
-            if (this.requiredFlag !== 'all' && enriched.flag !== this.requiredFlag) return false;
-            if (Number.isFinite(enriched.waterTemp) && (Number(enriched.waterTemp) < this.minWaterTemp || Number(enriched.waterTemp) > this.maxWaterTemp)) return false;
-            return true;
-        });
-    }
-
-    signal(type: 'jellyfish' | 'pollution' | 'current' | 'crowd' | 'other'): void {
-        if (!this.selectedBeach) return;
-
-        this.api.createReport({
-            beachId: this.selectedBeach.id,
-            type,
-            value: { source: 'web-app' },
-            confidence: 0.7
-        }).subscribe({
-            next: () => {
-                this.reportMessage = 'Signalement enregistré, merci.';
-                this.cdr.detectChanges();
+        this.listRequest?.unsubscribe();
+        this.syncFilters();
+        this.listRequest = this.api
+          .getRecommendations(
+            pos.coords.latitude,
+            pos.coords.longitude,
+            this.selectedUsage,
+          )
+          .pipe(timeout(30000))
+          .subscribe({
+            next: (r) => {
+              this.beaches = r;
+              this.loading = false;
+              this.message = "Plages à proximité de votre position.";
+              this.cdr.markForCheck();
             },
             error: () => {
-                this.reportMessage = 'Signalement indisponible pour le moment.';
-                this.cdr.detectChanges();
-            }
-        });
-    }
-
-    signalFlag(flag: 'green' | 'yellow' | 'red'): void {
-        if (!this.selectedBeach) return;
-
-        this.api.createReport({
-            beachId: this.selectedBeach.id,
-            type: 'flag',
-            value: { flag, source: 'web-app' },
-            confidence: 0.85
-        }).subscribe({
-            next: () => {
-                this.reportMessage = `Drapeau ${this.flagLabel(flag).replace('Drapeau ', '').toLowerCase()} signalé.`;
-                this.loadScore(this.selectedBeach as Beach);
+              this.loading = false;
+              this.error = "Les plages à proximité ne sont pas disponibles.";
+              this.cdr.markForCheck();
             },
-            error: () => {
-                this.reportMessage = 'Signalement indisponible pour le moment.';
-                this.cdr.detectChanges();
-            }
-        });
-    }
-
-    metricValue(source: Record<string, unknown> | undefined, key: string, fallback = '—'): string {
-        const value = source?.[key];
-        if (value === null || value === undefined || value === '') return fallback;
-        if (typeof value === 'number') return Number.isInteger(value) ? String(value) : value.toFixed(1);
-        return String(value);
-    }
-
-    metricClass(kind: 'air' | 'water' | 'uv' | 'wind' | 'wave' | 'salinity', source: Record<string, unknown> | undefined, key: string): string {
-        const value = Number(source?.[key]);
-        if (!Number.isFinite(value)) return 'metric-neutral';
-        if (kind === 'air' || kind === 'water') {
-            if (value < 20) return 'metric-blue';
-            if (value < 25) return 'metric-green';
-            if (value < 30) return 'metric-orange';
-            return 'metric-red';
+          });
+        this.cdr.markForCheck();
+      },
+      () => {
+        if (this.destroyed) return;
+        this.locating = false;
+        this.message =
+          "Position non disponible. Vous pouvez choisir une façade ou une ville.";
+        this.cdr.markForCheck();
+      },
+      { timeout: 8000, maximumAge: 120000 },
+    );
+  }
+  loadScore(beach: Beach): void {
+    this.scoreRequest?.unsubscribe();
+    this.selectedBeach = beach;
+    this.score = null;
+    this.loadingScore = true;
+    this.scoreError = "";
+    this.scoreRequest = this.api
+      .getScore(beach.id)
+      .pipe(timeout(25000))
+      .subscribe({
+        next: (r) => {
+          this.score = r;
+          this.loadingScore = false;
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          this.loadingScore = false;
+          this.scoreError = "Conditions indisponibles pour cette plage.";
+          this.cdr.markForCheck();
+        },
+      });
+  }
+  fromMap(beach: Beach): void {
+    this.resultLimit = Math.max(
+      this.resultLimit,
+      this.displayedBeaches().findIndex((b) => b.id === beach.id) + 1,
+    );
+    this.mobileView = "list";
+    this.loadScore(beach);
+    setTimeout(() =>
+      document.getElementById("beach-" + beach.id)?.scrollIntoView({
+        block: "nearest",
+        behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+      }),
+    );
+  }
+  displayedBeaches(): Result[] {
+    const q = this.query.trim().toLocaleLowerCase("fr");
+    return this.beaches
+      .filter((b) => {
+        if (
+          q &&
+          !`${b.name} ${b.city} ${b.region}`.toLocaleLowerCase("fr").includes(q)
+        )
+          return false;
+        if (this.waterType !== "all" && b.waterType !== this.waterType)
+          return false;
+        if (
+          (this.requireParking && !b.has_parking) ||
+          (this.requireToilets && !b.has_toilets) ||
+          (this.requireLifeguard && !b.has_lifeguard)
+        )
+          return false;
+        if (this.requiredFlag !== "all" && b.flag !== this.requiredFlag)
+          return false;
+        if (this.minWaterTemp !== null || this.maxWaterTemp !== null) {
+          if (
+            b.waterTemp === undefined ||
+            b.waterTemp === null ||
+            !Number.isFinite(b.waterTemp)
+          )
+            return false;
+          if (this.minWaterTemp !== null && b.waterTemp < this.minWaterTemp)
+            return false;
+          if (this.maxWaterTemp !== null && b.waterTemp > this.maxWaterTemp)
+            return false;
         }
-        if (kind === 'uv') return value < 3 ? 'metric-green' : value < 6 ? 'metric-orange' : 'metric-red';
-        if (kind === 'wind') return value < 12 ? 'metric-green' : value < 25 ? 'metric-orange' : 'metric-red';
-        if (kind === 'wave') return value < 0.5 ? 'metric-green' : value < 1.2 ? 'metric-orange' : 'metric-red';
-        return value >= 32 && value <= 39 ? 'metric-green' : value >= 28 ? 'metric-orange' : 'metric-blue';
-    }
-
-    flagLabel(flag?: 'green' | 'yellow' | 'red'): string {
-        if (flag === 'green') return 'Drapeau vert';
-        if (flag === 'yellow') return 'Drapeau jaune';
-        if (flag === 'red') return 'Drapeau rouge';
-        return 'Drapeau à vérifier';
-    }
-
-    usageLabel(usage = this.selectedUsage): string {
-        const labels = {
-            bathing: 'Baignade',
-            family: 'Famille',
-            paddle: 'Paddle',
-            boat: 'Bateau'
-        };
-        return labels[usage as keyof typeof labels] ?? 'Baignade';
-    }
-
-    scoreFor(beach: Beach & { selectedScore?: number; scores?: BeachScore['scores'] }): number | null {
-        if (beach.selectedScore !== undefined) return beach.selectedScore;
-        return beach.scores?.[this.selectedUsage] ?? null;
-    }
-
-    providerLabel(provider?: string): string {
-        if (!provider) return 'Non disponible';
-        const labels: Record<string, string> = {
-            'open-meteo': 'Open-Meteo Forecast API',
-            'open-meteo-marine': 'Open-Meteo Marine API',
-            'open-meteo-fallback': 'Open-Meteo, fallback Météo-France',
-            'open-meteo-mapped': 'Météo-France à configurer, Open-Meteo actif',
-            'local-weather-fallback': 'Fallback local météo',
-            'local-marine-fallback': 'Fallback local marine',
-            'local-tide-estimator': 'Estimateur local marées',
-            'shom-spm': 'SHOM SUP/SAPM',
-            'local-cache': 'Cache local qualité eau',
-            'baignades-sante/data-gouv-ready': 'ARS / data.gouv à ingérer'
-        };
-        return labels[provider] ?? provider;
-    }
-
-    timeLabel(value: unknown): string {
-        if (!value) return 'Non disponible';
-        const date = new Date(String(value));
-        if (Number.isNaN(date.getTime())) return String(value);
-        return new Intl.DateTimeFormat('fr-FR', {
-            day: '2-digit',
-            month: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-        }).format(date);
-    }
-
-    discoveryProviderLabel(provider?: string): string {
-        if (provider === 'openstreetmap-overpass') return 'OpenStreetMap / Overpass';
-        if (provider === 'openstreetmap-nominatim') return 'OpenStreetMap / Nominatim';
-        if (provider === 'openstreetmap-cache') return 'OpenStreetMap / cache Redis';
-        if (provider === 'local-db-fallback') return 'la base locale';
-        return provider ?? 'source inconnue';
-    }
-
-    private useFallbackPosition(message: string): void {
-        this.lastPosition = this.fallbackPosition;
-        this.locationMessage = message;
-        this.loadRecommendations(this.fallbackPosition.lat, this.fallbackPosition.lon);
-    }
-
-    trackByBeachId(index: number, beach: Beach): string {
-        return beach.id;
-    }
+        return true;
+      })
+      .sort((a, b) =>
+        this.sort === "distance"
+          ? (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity)
+          : this.sort === "score"
+            ? (this.scoreFor(b) ?? -1) - (this.scoreFor(a) ?? -1)
+            : a.name.localeCompare(b.name, "fr"),
+      );
+  }
+  scoreFor(b: Result): number | null {
+    return (
+      b.scores?.[this.selectedUsage as keyof BeachScore["scores"]] ??
+      b.selectedScore ??
+      null
+    );
+  }
+  visibleBeaches(): Result[] {
+    return this.displayedBeaches().slice(0, this.resultLimit);
+  }
+  resetFilters(): void {
+    this.query = "";
+    this.waterType = "all";
+    this.requiredFlag = "all";
+    this.requireParking = false;
+    this.requireToilets = false;
+    this.requireLifeguard = false;
+    this.minWaterTemp = null;
+    this.maxWaterTemp = null;
+    this.syncFilters();
+  }
+  filterCount(): number {
+    return (
+      Number(this.waterType !== "all") +
+      Number(this.requiredFlag !== "all") +
+      Number(this.requireParking) +
+      Number(this.requireToilets) +
+      Number(this.requireLifeguard) +
+      Number(this.minWaterTemp !== null || this.maxWaterTemp !== null)
+    );
+  }
+  syncFilters(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        q: this.query || null,
+        zone: this.selectedZone?.id ?? null,
+        usage: this.selectedUsage,
+        water: this.waterType === "all" ? null : this.waterType,
+        parking: this.requireParking ? "1" : null,
+        toilets: this.requireToilets ? "1" : null,
+        rescue: this.requireLifeguard ? "1" : null,
+        flag: this.requiredFlag === "all" ? null : this.requiredFlag,
+        min: this.minWaterTemp,
+        max: this.maxWaterTemp,
+      },
+      replaceUrl: true,
+    });
+  }
+  get queryParams() {
+    return this.route.snapshot.queryParams;
+  }
+  waterLabel(type?: string): string {
+    return type === "river"
+      ? "Rivière"
+      : type === "lake"
+        ? "Lac"
+        : type === "sea"
+          ? "Mer"
+          : "Type à préciser";
+  }
+  trackByBeachId(_: number, b: Beach): string {
+    return b.id;
+  }
+  ngOnDestroy(): void {
+    this.destroyed = true;
+    this.listRequest?.unsubscribe();
+    this.scoreRequest?.unsubscribe();
+  }
 }

@@ -1,139 +1,435 @@
-<main class="detail-shell">
-    <nav class="topbar">
-        <a routerLink="/">← Retour Littora</a>
-        <div class="source-switch" aria-label="Source de données">
-            <button type="button" [class.active]="selectedSource === 'auto'" (click)="selectedSource = 'auto'">Auto</button>
-            <button type="button" [class.active]="selectedSource === 'openmeteo'" (click)="selectedSource = 'openmeteo'">Open-Meteo</button>
-            <button type="button" [class.active]="selectedSource === 'meteofrance'" (click)="selectedSource = 'meteofrance'">Météo-France</button>
-            <button type="button" [class.active]="selectedSource === 'community'" (click)="selectedSource = 'community'">Communauté</button>
-        </div>
+<main class="detail-page container">
+  <a
+    routerLink="/recherche"
+    [queryParams]="backQuery"
+    class="text-link back-link"
+    ><app-icon name="back" [size]="16" />Retour aux plages</a
+  >
+  <app-loading *ngIf="loading" label="Ouverture de la plage…" />
+  <div *ngIf="error" class="empty-state">
+    <app-icon name="alert" [size]="35" />
+    <h1>Une escale indisponible</h1>
+    <p>{{ error }}</p>
+    <a class="btn" routerLink="/recherche">Explorer les plages</a>
+  </div>
+  <ng-container *ngIf="beach && !error">
+    <header class="beach-heading">
+      <div>
+        <p class="eyebrow">
+          {{ beach.coastline || "Le littoral" }}
+          <span *ngIf="beach.region">· {{ beach.region }}</span>
+        </p>
+        <h1>{{ beach.name }}</h1>
+        <p>
+          <app-icon name="pin" [size]="16" />{{ beach.city
+          }}<span *ngIf="beach.city && beach.department"> · </span
+          >{{ beach.department }}
+        </p>
+      </div>
+      <span class="official-status"
+        ><app-icon name="flag" [size]="20" /><span
+          >Drapeau officiel<strong>Non renseigné</strong></span
+        ></span
+      >
+    </header>
+    <nav class="section-nav" aria-label="Sections de la plage">
+      <a [routerLink]="[]" queryParamsHandling="preserve" fragment="conditions"
+        >Conditions</a
+      ><a [routerLink]="[]" queryParamsHandling="preserve" fragment="previsions"
+        >Prévisions</a
+      ><a [routerLink]="[]" queryParamsHandling="preserve" fragment="sur-place"
+        >Sur place</a
+      ><a [routerLink]="[]" queryParamsHandling="preserve" fragment="communaute"
+        >Communauté</a
+      ><a [routerLink]="[]" queryParamsHandling="preserve" fragment="sources"
+        >Sources</a
+      >
     </nav>
-
-    <div *ngIf="loading" class="state-card">Chargement de l’analyse plage...</div>
-    <div *ngIf="error" class="state-card error">{{ error }}</div>
-
-    <ng-container *ngIf="beach && score && !error">
-        <section class="beach-hero">
+    <section id="conditions" class="conditions-section">
+      <div class="section-heading">
+        <h2>Les conditions du moment</h2>
+        <span class="caption"
+          ><app-icon name="clock" [size]="13" /> Validité :
+          {{ dateLabel(score?.current?.weather?.["time"]) }}</span
+        >
+      </div>
+      <app-loading *ngIf="loadingScore" />
+      <div *ngIf="scoreError" class="notice error">
+        <app-icon name="alert" [size]="18" />{{ scoreError
+        }}<button class="text-link" (click)="loadScore(beach.id)">
+          Réessayer
+        </button>
+      </div>
+      <ng-container *ngIf="score && !loadingScore">
+        <div class="conditions-grid">
+          <div
+            [ngClass]="
+              metricClass('air', score.current?.weather?.['temperature_2m'])
+            "
+          >
+            <app-icon name="sun" /><span>Température de l’air</span
+            ><strong
+              >{{ metricValue(score.current?.weather, "temperature_2m")
+              }}<small> °C</small></strong
+            >
+          </div>
+          <div
+            [ngClass]="
+              metricClass(
+                'water',
+                score.current?.marine?.['sea_surface_temperature']
+              )
+            "
+          >
+            <app-icon name="waves" /><span>Température de l’eau</span
+            ><strong
+              >{{ metricValue(score.current?.marine, "sea_surface_temperature")
+              }}<small> °C</small></strong
+            >
+          </div>
+          <div
+            [ngClass]="
+              metricClass('wind', score.current?.weather?.['wind_speed_10m'])
+            "
+          >
+            <app-icon name="wind" /><span>Vent</span
+            ><strong
+              >{{ metricValue(score.current?.weather, "wind_speed_10m")
+              }}<small> km/h</small></strong
+            >
+          </div>
+          <div
+            [ngClass]="metricClass('uv', score.current?.weather?.['uv_index'])"
+          >
+            <app-icon name="sun" /><span>Indice UV</span
+            ><strong
+              >{{ metricValue(score.current?.weather, "uv_index")
+              }}<small> / 11+</small></strong
+            >
+          </div>
+          <div
+            [ngClass]="
+              metricClass('wave', score.current?.marine?.['wave_height'])
+            "
+          >
+            <app-icon name="waves" /><span>Hauteur des vagues</span
+            ><strong
+              >{{ metricValue(score.current?.marine, "wave_height")
+              }}<small> m</small></strong
+            >
+          </div>
+        </div>
+        <div class="alerts" *ngIf="score.safety?.alerts?.length">
+          <span *ngFor="let alert of score.safety?.alerts"
+            ><app-icon name="alert" [size]="14" />{{ alert }}</span
+          >
+        </div>
+        <div class="conditions-source">
+          {{ providerLabel(score.providers?.["weather"]) }} ·
+          {{ providerLabel(score.providers?.["marine"]) }}
+        </div>
+      </ng-container>
+    </section>
+    <div class="detail-grid">
+      <div class="detail-main">
+        <section class="usage-section" *ngIf="score">
+          <div class="section-heading">
             <div>
-                <p class="eyebrow">{{ beach.coastline }} · {{ beach.region }}</p>
-                <h1>{{ beach.name }}</h1>
-                <p>{{ beach.city }} · {{ beach.department }} · {{ beach.lat | number:'1.4-4' }}, {{ beach.lon | number:'1.4-4' }}</p>
+              <p class="eyebrow">À chacun son programme</p>
+              <h2>Quel moment pour vous ?</h2>
             </div>
-            <aside class="flag-panel" [class.green]="score.safety?.flag === 'green'" [class.yellow]="score.safety?.flag === 'yellow'" [class.red]="score.safety?.flag === 'red'">
-                <span>{{ flagText() }}</span>
-                <strong>{{ score.scores.bathing }}/100</strong>
-                <small>{{ score.safety?.source || 'Estimation Littora croisée météo, mer, qualité eau et signalements.' }}</small>
-            </aside>
-        </section>
-
-        <section class="map-section">
-            <iframe *ngIf="mapUrl" [src]="mapUrl" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Carte OpenStreetMap de la plage"></iframe>
-            <div class="amenity-panel">
-                <p class="eyebrow">Autour de la plage</p>
-                <h2>Accès, confort et services</h2>
-                <div class="amenity-group">
-                    <h3>Parkings</h3>
-                    <span *ngFor="let item of amenitiesBy('parking')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km <small>{{ amenityStatus(item) }}</small></span>
-                    <small *ngIf="!amenitiesBy('parking').length">Aucun parking OSM détecté dans le rayon.</small>
-                </div>
-                <div class="amenity-group">
-                    <h3>Toilettes et secours</h3>
-                    <span *ngFor="let item of amenitiesBy('toilets')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km <small>{{ amenityStatus(item) }}</small></span>
-                    <span *ngFor="let item of amenitiesBy('rescue')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km <small>{{ amenityStatus(item) }}</small></span>
-                    <small *ngIf="!amenitiesBy('toilets').length && !amenitiesBy('rescue').length">Surveillance et sanitaires à confirmer localement.</small>
-                </div>
-                <div class="amenity-group">
-                    <h3>Location et vie locale</h3>
-                    <span *ngFor="let item of amenitiesBy('rental')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km <small>{{ amenityStatus(item) }}</small></span>
-                    <span *ngFor="let item of amenitiesBy('food')">{{ item.name }} · {{ item.distanceKm | number:'1.1-1' }} km <small>{{ amenityStatus(item) }}</small></span>
-                    <small *ngIf="!amenitiesBy('rental').length && !amenitiesBy('food').length">Loueurs et commerces à enrichir par OSM ou communauté.</small>
-                </div>
-            </div>
-        </section>
-
-        <section class="score-section">
-            <article *ngFor="let usage of usages" class="score-card">
-                <span>{{ usage.label }}</span>
-                <strong>{{ score.scores[usage.key] }}/100</strong>
-                <p>{{ usage.text }}</p>
-            </article>
-        </section>
-
-        <section class="metrics-section">
-            <div class="metric-card" [ngClass]="currentMetricClass('air', score.current?.weather, 'temperature_2m')">
-                <span>Air</span><strong>{{ metricValue(score.current?.weather, 'temperature_2m') }}°C</strong>
-            </div>
-            <div class="metric-card" [ngClass]="currentMetricClass('water', score.current?.marine, 'sea_surface_temperature')">
-                <span>Eau</span><strong>{{ metricValue(score.current?.marine, 'sea_surface_temperature') }}°C</strong>
-            </div>
-            <div class="metric-card" [ngClass]="currentMetricClass('uv', score.current?.weather, 'uv_index')">
-                <span>UV</span><strong>{{ metricValue(score.current?.weather, 'uv_index') }}</strong>
-            </div>
-            <div class="metric-card" [ngClass]="currentMetricClass('wind', score.current?.weather, 'wind_speed_10m')">
-                <span>Vent</span><strong>{{ metricValue(score.current?.weather, 'wind_speed_10m') }} km/h</strong>
-            </div>
-            <div class="metric-card" [ngClass]="currentMetricClass('wave', score.current?.marine, 'wave_height')">
-                <span>Vagues</span><strong>{{ metricValue(score.current?.marine, 'wave_height') }} m</strong>
-            </div>
-            <div class="metric-card" [ngClass]="currentMetricClass('salinity', score.current?.marine, 'salinity_ppt')">
-                <span>Salinité</span><strong>{{ metricValue(score.current?.marine, 'salinity_ppt') }} ppt</strong>
-            </div>
-        </section>
-
-        <section class="forecast-section">
-            <div class="section-title">
-                <p class="eyebrow">Tendances</p>
-                <h2>Évolutions et prédictions court terme</h2>
-            </div>
-            <article class="chart-card" *ngFor="let chart of [
-                { key: 'uv', label: 'UV', fallback: +(score.current?.weather?.['uv_index'] || 3) },
-                { key: 'water', label: 'Température eau', fallback: +(score.current?.marine?.['sea_surface_temperature'] || 21) },
-                { key: 'air', label: 'Température air', fallback: +(score.current?.weather?.['temperature_2m'] || 24) },
-                { key: 'wave', label: 'Vagues', fallback: +(score.current?.marine?.['wave_height'] || 0.4) }
-            ]">
-                <h3>{{ chart.label }}</h3>
-                <div class="bars">
-                    <span *ngFor="let point of chartValues(chart.key, chart.fallback)"
-                        [style.height.px]="chartHeight(point, chartValues(chart.key, chart.fallback))">
-                        <small>{{ point.value | number:'1.0-1' }}</small>
-                    </span>
-                </div>
-            </article>
-        </section>
-
-        <section class="community-section">
+            <span class="badge">Scores indicatifs</span>
+          </div>
+          <div class="usage-scores" role="group" aria-label="Usage de la plage">
+            <button
+              *ngFor="let usage of usages"
+              [class.active]="selectedUsage === usage.key"
+              [attr.aria-pressed]="selectedUsage === usage.key"
+              (click)="selectedUsage = usage.key"
+            >
+              <app-icon [name]="usage.icon" /><span>{{ usage.label }}</span
+              ><strong>{{ score.scores[usage.key] }}<small>/100</small></strong>
+            </button>
+          </div>
+          <div class="score-explanation">
+            <app-icon name="info" [size]="19" />
             <div>
-                <p class="eyebrow">Hub communautaire</p>
-                <h2>Signalements récents</h2>
-                <p>Méduses, pollution, courant, affluence et ressentis complètent les données officielles quand elles ne sont pas disponibles en temps réel.</p>
+              <h3>{{ selectedUsageInfo.label }}</h3>
+              <p>{{ selectedUsageInfo.text }}</p>
+              <small
+                >Indice expérimental, pas une autorisation de baignade ni de
+                navigation.</small
+              >
             </div>
-            <div class="report-list">
-                <div class="flag-actions">
-                    <button type="button" (click)="signalFlag('green')">Drapeau vert</button>
-                    <button type="button" (click)="signalFlag('yellow')">Drapeau jaune</button>
-                    <button type="button" (click)="signalFlag('red')">Drapeau rouge</button>
-                </div>
-                <span *ngFor="let item of score.safety?.communityFlag?.history">
-                    Drapeau {{ flagLabel(item.flag) }} · {{ item.time | date:'short' }}
-                </span>
-                <span *ngFor="let report of reports">{{ report.type || 'signalement' }} · {{ report.created_at | date:'short' }}</span>
-                <small *ngIf="!reports.length">Aucun signalement récent pour cette plage.</small>
-            </div>
+          </div>
         </section>
-
-        <section class="sources-section">
+        <section id="previsions" class="forecast-section">
+          <div class="section-heading">
             <div>
-                <p class="eyebrow">Sources</p>
-                <h2>Moyenne multi-sources et choix utilisateur</h2>
-                <p>Le mode Auto privilégie la source branchée la plus fraîche puis garde les fallbacks visibles. Les connecteurs Météo-France, SHOM et ARS sont prêts à remplacer ou compléter Open-Meteo dès que les clés et jeux de données officiels sont configurés.</p>
+              <p class="eyebrow">Anticiper la journée</p>
+              <h2>Les prochaines heures</h2>
             </div>
-            <div class="provider-grid">
-                <span>Météo: {{ providerLabel(score.providers?.['weather']) }}</span>
-                <span>Mer: {{ providerLabel(score.providers?.['marine']) }}</span>
-                <span>Marées: {{ providerLabel(score.providers?.['tides']) }}</span>
-                <span>Qualité eau: {{ providerLabel(score.providers?.['waterQuality']) }}</span>
-                <span>Communauté: {{ providerLabel(score.providers?.['community']) }}</span>
+          </div>
+          <div class="segmented" role="group" aria-label="Mesure du graphique">
+            <button
+              *ngFor="let item of charts"
+              [class.active]="selectedChart === item.key"
+              [attr.aria-pressed]="selectedChart === item.key"
+              (click)="selectedChart = item.key"
+            >
+              <app-icon [name]="item.icon" [size]="16" />{{ item.label }}
+            </button>
+          </div>
+          <div class="forecast-chart" *ngIf="points.length; else noForecast">
+            <div class="chart-heading">
+              <span
+                >{{ chart.label }} <small>{{ chart.unit }}</small></span
+              ><span class="caption">Prévisions du fournisseur</span>
             </div>
+            <svg
+              viewBox="0 0 740 225"
+              role="img"
+              [attr.aria-label]="'Prévisions : ' + chart.label"
+            >
+              <g *ngFor="let tick of chartTicks">
+                <line
+                  x1="48"
+                  x2="708"
+                  [attr.y1]="chartY(tick)"
+                  [attr.y2]="chartY(tick)"
+                  stroke="#e3ebea"
+                />
+                <text x="35" [attr.y]="chartY(tick) + 4" text-anchor="end">
+                  {{ tick | number: "1.0-1" }}
+                </text>
+              </g>
+              <path
+                [attr.d]="chartPath()"
+                fill="none"
+                stroke="#007e88"
+                stroke-width="2.5"
+                stroke-linejoin="round"
+              />
+              <g *ngFor="let point of points; let i = index">
+                <circle
+                  [attr.cx]="chartX(i)"
+                  [attr.cy]="chartY(point.value)"
+                  r="4"
+                  fill="white"
+                  stroke="#007e88"
+                  stroke-width="2"
+                >
+                  <title>
+                    {{ chartTime(point.time) }} : {{ point.value }}
+                    {{ chart.unit }}
+                  </title>
+                </circle>
+                <text [attr.x]="chartX(i)" y="214" text-anchor="middle">
+                  {{ chartTime(point.time) }}
+                </text>
+              </g>
+            </svg>
+            <details class="chart-table">
+              <summary>Valeurs détaillées</summary>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Échéance</th>
+                    <th>{{ chart.label }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let point of points">
+                    <td>{{ dateLabel(point.time) }}</td>
+                    <td>
+                      {{ point.value | number: "1.0-1" }} {{ chart.unit }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </details>
+          </div>
+          <ng-template #noForecast
+            ><div class="empty-state">
+              <app-icon name="wind" [size]="30" />
+              <h3>Prévisions non disponibles</h3>
+              <p>Aucune série renseignée pour cette mesure.</p>
+            </div></ng-template
+          >
         </section>
-    </ng-container>
+        <section id="communaute" class="community-section">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Les yeux sur le terrain</p>
+              <h2>La communauté sur place</h2>
+            </div>
+            <span class="badge">{{ reports.length }} observations</span>
+          </div>
+          <h3 class="report-prompt">Qu’observez-vous ?</h3>
+          <div class="report-actions">
+            <button
+              class="btn"
+              [disabled]="sending"
+              (click)="signal('jellyfish')"
+            >
+              <app-icon name="water" [size]="17" />Méduses</button
+            ><button
+              class="btn"
+              [disabled]="sending"
+              (click)="signal('pollution')"
+            >
+              <app-icon name="alert" [size]="17" />Pollution</button
+            ><button
+              class="btn"
+              [disabled]="sending"
+              (click)="signal('current')"
+            >
+              <app-icon name="waves" [size]="17" />Courant</button
+            ><button class="btn" [disabled]="sending" (click)="signal('crowd')">
+              <app-icon name="family" [size]="17" />Affluence
+            </button>
+          </div>
+          <details class="flag-report">
+            <summary>
+              <app-icon name="flag" [size]="16" />Signaler un drapeau observé
+            </summary>
+            <div>
+              <button
+                class="btn"
+                [disabled]="sending"
+                (click)="signal('flag', 'green')"
+              >
+                <span class="flag-dot green"></span>Vert</button
+              ><button
+                class="btn"
+                [disabled]="sending"
+                (click)="signal('flag', 'yellow')"
+              >
+                <span class="flag-dot yellow"></span>Jaune</button
+              ><button
+                class="btn"
+                [disabled]="sending"
+                (click)="signal('flag', 'red')"
+              >
+                <span class="flag-dot red"></span>Rouge
+              </button>
+            </div>
+          </details>
+          <p *ngIf="reportMessage" class="notice" role="status">
+            {{ reportMessage }}
+          </p>
+          <p *ngIf="reportError" class="notice error" role="alert">
+            {{ reportError }}
+          </p>
+          <p class="empty-reports" *ngIf="!reports.length">
+            {{
+              reportsUnavailable
+                ? "Observations indisponibles pour le moment."
+                : "Aucune observation récente. Le littoral a besoin de regards attentifs."
+            }}
+          </p>
+          <div class="report-row" *ngFor="let report of reports">
+            <app-icon
+              [name]="report.type === 'flag' ? 'flag' : 'message'"
+              [size]="18"
+            />
+            <div>
+              <strong
+                >{{ reportLabel(report.type) }}
+                <span *ngIf="report.value?.flag"
+                  >· {{ flagLabel(report.value?.flag) }}</span
+                ></strong
+              ><span>Observation communautaire, non officielle</span>
+            </div>
+            <time>{{ dateLabel(report.created_at) }}</time>
+          </div>
+        </section>
+      </div>
+      <aside class="detail-aside" id="sur-place">
+        <div class="section-heading">
+          <h2>Sur place</h2>
+          <app-icon name="compass" />
+        </div>
+        <app-coast-map
+          [detail]="true"
+          [beaches]="[beach]"
+          [selected]="beach.id"
+          [amenities]="realAmenities"
+        /><a
+          class="coordinates"
+          [href]="
+            'https://www.openstreetmap.org/?mlat=' +
+            beach.lat +
+            '&mlon=' +
+            beach.lon +
+            '#map=16/' +
+            beach.lat +
+            '/' +
+            beach.lon
+          "
+          target="_blank"
+          rel="noopener"
+          ><app-icon name="pin" [size]="14" />{{ beach.lat | number: "1.4-4" }},
+          {{ beach.lon | number: "1.4-4"
+          }}<app-icon name="external" [size]="13"
+        /></a>
+        <div class="amenities">
+          <h3>Accès & équipements</h3>
+          <app-loading
+            *ngIf="loadingAmenities"
+            label="Recherche à proximité…"
+          />
+          <p class="caption" *ngIf="amenitiesUnavailable">
+            Services à proximité indisponibles.
+          </p>
+          <div class="amenity-group" *ngFor="let group of groups">
+            <h4>
+              <app-icon [name]="group.icon" [size]="17" />{{ group.name }}
+            </h4>
+            <p *ngFor="let item of amenitiesBy(group.category)">
+              {{ item.name
+              }}<span>{{ item.distanceKm | number: "1.0-1" }} km · OSM</span>
+            </p>
+            <small
+              *ngIf="!amenitiesBy(group.category).length && !loadingAmenities"
+              >Non renseigné</small
+            >
+          </div>
+        </div>
+        <div class="on-site-note">
+          <app-icon name="flag" [size]="22" />
+          <p>Sur place, le drapeau et les consignes des sauveteurs font foi.</p>
+        </div>
+      </aside>
+    </div>
+    <section id="sources" class="sources-section">
+      <div>
+        <p class="eyebrow">Derrière les données</p>
+        <h2>Sources & disponibilité</h2>
+        <p>Une donnée absente ne signifie pas une absence de risque.</p>
+      </div>
+      <dl>
+        <div>
+          <dt>Météo</dt>
+          <dd>{{ providerLabel(score?.providers?.["weather"]) }}</dd>
+        </div>
+        <div>
+          <dt>Mer</dt>
+          <dd>{{ providerLabel(score?.providers?.["marine"]) }}</dd>
+        </div>
+        <div>
+          <dt>Marées</dt>
+          <dd>{{ providerLabel(score?.providers?.["tides"]) }}</dd>
+        </div>
+        <div>
+          <dt>Qualité de l’eau</dt>
+          <dd>{{ providerLabel(score?.providers?.["waterQuality"]) }}</dd>
+        </div>
+        <div>
+          <dt>Communauté</dt>
+          <dd>Observations des visiteurs, non vérifiées</dd>
+        </div>
+      </dl>
+    </section>
+  </ng-container>
 </main>

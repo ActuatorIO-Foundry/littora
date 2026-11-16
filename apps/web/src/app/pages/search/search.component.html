@@ -1,285 +1,312 @@
-<main class="home-shell search-shell">
-    <div class="ambient-waves" aria-hidden="true">
-        <span></span>
-        <span></span>
-        <span></span>
+<main class="search-page container">
+  <div class="search-heading">
+    <div>
+      <p class="eyebrow">Votre prochaine escale</p>
+      <h1>Explorer les plages</h1>
+      <p class="muted">Un lieu, une envie. À vous de choisir.</p>
     </div>
-
-    <section class="hero">
-        <div>
-            <p class="brand">RECHERCHE</p>
-            <h1>Trouver une plage selon tes critères.</h1>
-            <p class="subtitle">
-                Choisis une zone sur la carte, affine par usage, équipements, drapeau estimé et conditions météo.
-            </p>
-        </div>
-
-        <aside class="hero-status">
-            <span class="status-dot"></span>
-            <div>
-                <strong>Vue recherche</strong>
-                <span>Les cartes restent sélectionnables pour l’overview. Seul le bouton détail ouvre l’analyse complète.</span>
-            </div>
-        </aside>
+    <button class="btn" (click)="useMyPosition()" [disabled]="locating">
+      <app-icon name="locate" [size]="18" />{{
+        locating ? "Localisation…" : "Autour de moi"
+      }}
+    </button>
+  </div>
+  <div class="search-tools">
+    <label class="search-field"
+      ><app-icon name="search" /><input
+        [(ngModel)]="query"
+        (ngModelChange)="syncFilters()"
+        placeholder="Une plage, une ville…"
+        aria-label="Rechercher dans les plages"
+    /></label>
+    <label class="zone-select"
+      ><span class="sr-only">Façade géographique</span
+      ><select
+        [ngModel]="selectedZone?.id || ''"
+        (ngModelChange)="chooseZone($event)"
+      >
+        <option value="">Tout le littoral</option>
+        <option *ngFor="let zone of coastalZones" [value]="zone.id">
+          {{ zone.name }}
+        </option>
+      </select></label
+    >
+    <button
+      class="btn filter-toggle"
+      (click)="filtersOpen = !filtersOpen"
+      [class.is-open]="filtersOpen"
+      [attr.aria-expanded]="filtersOpen"
+      aria-controls="search-filters"
+    >
+      <app-icon name="filters" [size]="18" />Filtres
+      <span class="filter-count" *ngIf="filterCount()">{{
+        filterCount()
+      }}</span>
+    </button>
+  </div>
+  <section
+    id="search-filters"
+    class="filter-panel"
+    [hidden]="!filtersOpen"
+    aria-label="Critères de recherche"
+  >
+    <label class="field"
+      >Type d’eau<select
+        [(ngModel)]="waterType"
+        (ngModelChange)="syncFilters()"
+      >
+        <option value="all">Tous les milieux</option>
+        <option value="sea">Mer</option>
+        <option value="river">Rivière</option>
+        <option value="lake">Lac</option>
+      </select></label
+    >
+    <fieldset>
+      <legend>Équipements référencés</legend>
+      <label class="check-field"
+        ><input
+          type="checkbox"
+          [(ngModel)]="requireParking"
+          (ngModelChange)="syncFilters()"
+        />Parking</label
+      ><label class="check-field"
+        ><input
+          type="checkbox"
+          [(ngModel)]="requireToilets"
+          (ngModelChange)="syncFilters()"
+        />Toilettes</label
+      ><label class="check-field"
+        ><input
+          type="checkbox"
+          [(ngModel)]="requireLifeguard"
+          (ngModelChange)="syncFilters()"
+        />Poste de secours</label
+      >
+    </fieldset>
+    <label class="field"
+      >Drapeau renseigné<select
+        [(ngModel)]="requiredFlag"
+        (ngModelChange)="syncFilters()"
+      >
+        <option value="all">Tous les statuts</option>
+        <option value="green">Vert</option>
+        <option value="yellow">Jaune</option>
+        <option value="red">Rouge</option>
+      </select></label
+    >
+    <fieldset>
+      <legend>Température de l’eau</legend>
+      <div class="temperature-inputs">
+        <label
+          ><span>Min. °C</span
+          ><input
+            type="number"
+            min="0"
+            max="45"
+            [(ngModel)]="minWaterTemp"
+            (ngModelChange)="syncFilters()"
+            placeholder="0" /></label
+        ><span>à</span
+        ><label
+          ><span>Max. °C</span
+          ><input
+            type="number"
+            min="0"
+            max="45"
+            [(ngModel)]="maxWaterTemp"
+            (ngModelChange)="syncFilters()"
+            placeholder="45"
+        /></label>
+      </div>
+    </fieldset>
+    <button class="text-link reset-filters" (click)="resetFilters()">
+      <app-icon name="reset" [size]="15" />Réinitialiser
+    </button>
+  </section>
+  <div class="usage-row">
+    <div class="usage-tabs" role="group" aria-label="Usage recherché">
+      <button
+        *ngFor="let usage of usages"
+        [class.active]="selectedUsage === usage.id"
+        [attr.aria-pressed]="selectedUsage === usage.id"
+        (click)="selectedUsage = usage.id; syncFilters()"
+      >
+        <app-icon [name]="usage.icon" [size]="18" />{{ usage.label }}
+      </button>
+    </div>
+    <span class="catalogue-note"
+      ><app-icon name="info" [size]="14" />Catalogue en cours
+      d’enrichissement</span
+    >
+  </div>
+  <div *ngIf="message" class="notice" role="status">
+    <app-icon name="info" [size]="18" />{{ message }}
+  </div>
+  <div *ngIf="error" class="notice error" role="alert">
+    <app-icon name="alert" [size]="18" />{{ error
+    }}<button
+      class="text-link"
+      (click)="selectedZone ? exploreZone(selectedZone) : loadBeaches()"
+    >
+      Réessayer
+    </button>
+  </div>
+  <div class="mobile-view segmented" aria-label="Vue des résultats">
+    <button
+      [class.active]="mobileView === 'list'"
+      (click)="mobileView = 'list'"
+    >
+      <app-icon name="list" [size]="17" />Liste</button
+    ><button [class.active]="mobileView === 'map'" (click)="mobileView = 'map'">
+      <app-icon name="map" [size]="17" />Carte
+    </button>
+  </div>
+  <div class="explorer-grid" [class.map-view]="mobileView === 'map'">
+    <section class="map-column">
+      <app-coast-map
+        [beaches]="displayedBeaches()"
+        [selected]="selectedBeach?.id || null"
+        [zoneId]="selectedZone?.id || null"
+        (zoneSelect)="exploreZone($event)"
+        (beachSelect)="fromMap($event)"
+      />
+      <div class="map-caption">
+        <span><i></i>Plage référencée</span
+        ><span><i class="selected-dot"></i>Plage sélectionnée</span>
+      </div>
     </section>
-
-    <section class="freshness-panel">
-        <div>
-            <p class="eyebrow">Actualisation</p>
-            <h2>Données quasi temps réel quand la source le permet</h2>
-        </div>
-        <div class="freshness-grid">
-            <span><strong>15 min</strong>Météo, vent, UV, vagues Open-Meteo</span>
-            <span><strong>24 h</strong>Référentiel plages OpenStreetMap</span>
-            <span><strong>Live</strong>Signalements communautaires</span>
-            <span><strong>Officiel</strong>SHOM, ARS, Météo-France dès clés/datasets branchés</span>
-        </div>
-    </section>
-
-    <section class="explorer-panel">
-        <div class="map-copy">
-            <p class="eyebrow">Exploration littorale</p>
-            <h2>Choisis une façade maritime</h2>
-            <p>
-                Littora interroge OpenStreetMap via Overpass puis Nominatim pour enrichir le référentiel de plages de la zone,
-                puis calcule les scores avec les conditions météo et marines disponibles. Les positions suivent les grandes façades
-                françaises plutôt qu’une grille abstraite.
-            </p>
-        </div>
-
-        <div class="france-map" aria-label="Carte de France littorale">
-            <svg class="map-wave-lines" viewBox="0 0 720 260" aria-hidden="true">
-                <path d="M0 76 C90 26 150 126 240 76 S390 26 480 76 S630 126 720 76" />
-                <path d="M0 145 C90 95 150 195 240 145 S390 95 480 145 S630 195 720 145" />
-                <path d="M0 214 C90 164 150 264 240 214 S390 164 480 214 S630 264 720 214" />
-            </svg>
-
-            <svg viewBox="0 0 360 380" role="img" aria-label="Carte stylisée de la France">
-                <defs>
-                    <linearGradient id="land" x1="0" x2="1" y1="0" y2="1">
-                        <stop offset="0%" stop-color="#fff9e9" />
-                        <stop offset="100%" stop-color="#e4f3ef" />
-                    </linearGradient>
-                </defs>
-                <path class="sea-shape" d="M20 34 L330 34 C354 108 356 214 320 308 C250 364 142 370 48 316 C14 226 10 118 20 34Z" />
-                <path class="france-shape" d="M132 38 L178 30 L219 45 L252 73 L285 95 L302 136 L294 174 L310 214 L286 243 L282 286 L242 314 L215 348 L177 330 L146 347 L115 316 L82 306 L67 268 L40 247 L55 217 L45 184 L58 151 L42 125 L76 95 L92 62 Z" />
-                <path class="corsica-shape" d="M293 292 C310 304 314 328 303 355 C284 345 279 313 293 292Z" />
-                <path *ngFor="let emprise of coastalEmprises"
-                    class="coast-emprise"
-                    [class.active]="selectedZone?.id === emprise.id"
-                    [attr.d]="emprise.path" />
-                <path class="france-coast" d="M92 62 C86 83 68 86 76 95 C62 105 48 114 42 125 C56 139 62 151 58 151 C52 166 44 174 45 184 C57 201 60 211 55 217 C48 230 40 247 40 247 C55 260 67 268 67 268 C73 286 82 306 82 306 M115 316 C129 327 137 338 146 347 M177 330 C194 330 205 343 215 348 M242 314 C254 295 271 290 282 286 M286 243 C294 229 303 220 310 214" />
-            </svg>
-
-            <button *ngFor="let zone of coastalZones" type="button" class="zone-marker"
-                [class.active]="selectedZone?.id === zone.id"
-                [style.left.%]="zone.marker.x"
-                [style.top.%]="zone.marker.y"
-                (click)="exploreZone(zone)">
-                <span></span>
-                {{ zone.name }}
-            </button>
-        </div>
-    </section>
-
-    <section class="toolbar">
-        <div class="usage-tabs" aria-label="Usage">
-            <button type="button" [class.active]="selectedUsage === 'bathing'" (click)="changeUsage('bathing')">Baignade</button>
-            <button type="button" [class.active]="selectedUsage === 'family'" (click)="changeUsage('family')">Famille</button>
-            <button type="button" [class.active]="selectedUsage === 'paddle'" (click)="changeUsage('paddle')">Paddle</button>
-            <button type="button" [class.active]="selectedUsage === 'boat'" (click)="changeUsage('boat')">Bateau</button>
-        </div>
-
-        <button type="button" class="locate-button" (click)="useMyPosition()" [disabled]="loadingRecommendations">
-            {{ loadingRecommendations ? 'Recherche...' : 'Autour de moi' }}
+    <section
+      class="results-column"
+      aria-label="Plages proposées"
+      [attr.aria-busy]="loading"
+    >
+      <div class="results-heading">
+        <h2>
+          {{
+            loading
+              ? "Recherche en cours"
+              : displayedBeaches().length +
+                (displayedBeaches().length === 1 ? " plage" : " plages")
+          }}<span>{{ selectedZone?.name || "Le littoral français" }}</span>
+        </h2>
+        <label
+          ><span class="sr-only">Trier les plages</span
+          ><select [(ngModel)]="sort">
+            <option value="name">Nom A–Z</option>
+            <option value="score">Score indicatif</option>
+            <option value="distance">Distance</option>
+          </select></label
+        >
+      </div>
+      <app-loading
+        *ngIf="loading"
+        label="À la recherche de votre prochaine escale…"
+      />
+      <div *ngIf="!loading && !displayedBeaches().length" class="empty-state">
+        <app-icon name="compass" [size]="35" />
+        <h3>Aucune plage pour ces critères</h3>
+        <p>Essayez une autre zone ou élargissez votre recherche.</p>
+        <button class="btn" (click)="resetFilters()">
+          Effacer les filtres
         </button>
-    </section>
-
-    <section class="filters-panel">
-        <div>
-            <p class="eyebrow">Filtres</p>
-            <h2>Critères de sortie</h2>
+      </div>
+      <article
+        *ngFor="let beach of visibleBeaches(); trackBy: trackByBeachId"
+        class="beach-result"
+        [class.selected]="selectedBeach?.id === beach.id"
+        [attr.id]="'beach-' + beach.id"
+      >
+        <div class="beach-row">
+          <div class="water-symbol">
+            <app-icon
+              [name]="beach.waterType === 'river' ? 'water' : 'waves'"
+              [size]="25"
+            />
+          </div>
+          <div class="beach-name">
+            <button
+              (click)="loadScore(beach)"
+              [attr.aria-expanded]="selectedBeach?.id === beach.id"
+            >
+              {{ beach.name }}
+            </button>
+            <p>
+              {{ beach.city
+              }}<span *ngIf="beach.city && beach.department"> · </span
+              >{{ beach.department }}
+            </p>
+            <div class="beach-tags">
+              <span>{{ waterLabel(beach.waterType) }}</span><span
+                *ngIf="beach.has_parking"
+                ><app-icon name="parking" [size]="13" />Parking</span
+              ><span *ngIf="beach.has_toilets"
+                ><app-icon name="toilets" [size]="13" />Toilettes</span
+              ><span *ngIf="beach.distanceKm != null"
+                >{{ beach.distanceKm | number: "1.0-1" }} km</span
+              >
+            </div>
+          </div>
+          <a
+            [routerLink]="['/plages', beach.id]"
+            [queryParams]="queryParams"
+            class="details-link"
+            >Détails <app-icon name="arrow" [size]="15"
+          /></a>
         </div>
-
-        <label>
-            Type d’eau
-            <select [(ngModel)]="waterType">
-                <option value="all">Tout</option>
-                <option value="sea">Mer</option>
-                <option value="river">Rivière</option>
-                <option value="lake">Lac / étang</option>
-            </select>
-        </label>
-
-        <label>
-            Drapeau estimé
-            <select [(ngModel)]="requiredFlag">
-                <option value="all">Tous</option>
-                <option value="green">Vert</option>
-                <option value="yellow">Jaune</option>
-                <option value="red">Rouge</option>
-            </select>
-        </label>
-
-        <label class="check-filter">
-            <input type="checkbox" [(ngModel)]="requireParking">
-            Parking
-        </label>
-        <label class="check-filter">
-            <input type="checkbox" [(ngModel)]="requireToilets">
-            Toilettes
-        </label>
-        <label class="check-filter">
-            <input type="checkbox" [(ngModel)]="requireLifeguard">
-            Surveillée
-        </label>
-
-        <div class="range-filter">
-            <span>Eau souhaitée</span>
-            <label>Min <input type="number" [(ngModel)]="minWaterTemp" min="0" max="40"></label>
-            <label>Max <input type="number" [(ngModel)]="maxWaterTemp" min="0" max="40"></label>
+        <div class="beach-overview" *ngIf="selectedBeach?.id === beach.id">
+          <app-loading
+            *ngIf="loadingScore"
+            label="Chargement des conditions…"
+          />
+          <p *ngIf="scoreError" class="notice error">{{ scoreError }}</p>
+          <ng-container *ngIf="score && !loadingScore"
+            ><div class="overview-metrics">
+              <div>
+                <app-icon name="sun" /><span>Air</span
+                ><strong
+                  >{{ metricValue(score.current?.weather, "temperature_2m")
+                  }}<small> °C</small></strong
+                >
+              </div>
+              <div>
+                <app-icon name="waves" /><span>Eau</span
+                ><strong
+                  >{{
+                    metricValue(
+                      score.current?.marine,
+                      "sea_surface_temperature"
+                    )
+                  }}<small> °C</small></strong
+                >
+              </div>
+              <div>
+                <app-icon name="wind" /><span>Vent</span
+                ><strong
+                  >{{ metricValue(score.current?.weather, "wind_speed_10m")
+                  }}<small> km/h</small></strong
+                >
+              </div>
+            </div>
+            <p class="overview-source">
+              {{ providerLabel(score.providers?.["weather"]) }} ·
+              {{ providerLabel(score.providers?.["marine"]) }}
+            </p>
+            <div class="overview-flag">
+              <app-icon name="flag" [size]="15" />Drapeau officiel non renseigné
+            </div>
+            <p class="caption" *ngIf="score.safety?.alerts?.length">
+              {{ score.safety?.alerts?.join(" · ") }}
+            </p></ng-container
+          >
         </div>
+      </article>
+      <button
+        class="btn load-more"
+        *ngIf="!loading && displayedBeaches().length > resultLimit"
+        (click)="resultLimit = resultLimit + 20"
+      >
+        Voir plus de plages <app-icon name="down" [size]="16" />
+      </button>
     </section>
-
-    <section class="context-strip" *ngIf="lastPosition || locationMessage">
-        <div>
-            <strong>{{ lastPosition ? lastPosition.label : 'Position' }}</strong>
-            <span *ngIf="lastPosition">{{ lastPosition.lat | number:'1.2-2' }}, {{ lastPosition.lon | number:'1.2-2' }}</span>
-            <span *ngIf="locationMessage">{{ locationMessage }}</span>
-            <span *ngIf="discoveryMessage">{{ discoveryMessage }}</span>
-        </div>
-        <button type="button" *ngIf="lastPosition" (click)="resetRecommendations()">Réinitialiser</button>
-    </section>
-
-    <section class="content-grid">
-        <section class="panel beaches-panel">
-            <div class="section-header">
-                <p class="eyebrow">{{ recommendations.length ? 'Recommandations API' : 'Référentiel' }}</p>
-                <h2>{{ recommendations.length ? 'Meilleures plages pour ' + usageLabel() : 'Plages disponibles' }}</h2>
-                <p>{{ recommendations.length ? 'Tri calculé par le backend avec distance, météo, mer, qualité d’eau et sécurité.' : 'Choisis une zone ou active ta position pour recalculer les recommandations.' }} {{ displayedBeaches().length }} plage(s) affichée(s).</p>
-            </div>
-
-            <div *ngIf="loading || loadingRecommendations || loadingDiscovery" class="wave-loader" aria-live="polite">
-                <span></span>
-                <strong>{{ loadingDiscovery ? 'Découverte des plages...' : loadingRecommendations ? 'Calcul des recommandations...' : 'Chargement des plages...' }}</strong>
-            </div>
-            <div *ngIf="error" class="state-card error">{{ error }}</div>
-
-            <div *ngIf="!loading && !loadingRecommendations && !loadingDiscovery && !error" class="beach-grid">
-                <article *ngFor="let beach of displayedBeaches(); trackBy: trackByBeachId"
-                    class="beach-card" [class.active]="selectedBeach?.id === beach.id" (click)="loadScore(beach)" tabindex="0">
-                    <div class="beach-card__top">
-                        <div>
-                            <h3>{{ beach.name }}</h3>
-                            <p>{{ beach.city }} · {{ beach.department }}</p>
-                        </div>
-                        <span class="coastline">{{ beach.coastline }}</span>
-                        <span class="water-type">{{ beach.waterType === 'sea' ? 'Mer' : beach.waterType === 'river' ? 'Rivière' : beach.waterType === 'lake' ? 'Lac / étang' : 'À classer' }}</span>
-                    </div>
-
-                    <div class="beach-card__meta">
-                        <span *ngIf="beach.has_lifeguard">Surveillée</span>
-                        <span *ngIf="beach.has_parking">Parking</span>
-                        <span *ngIf="beach.has_toilets">Toilettes</span>
-                    </div>
-
-                    <div class="beach-card__footer">
-                        <span *ngIf="beach.distanceKm !== null && beach.distanceKm !== undefined">{{ beach.distanceKm | number:'1.1-1' }} km</span>
-                        <strong *ngIf="scoreFor(beach) !== null">{{ scoreFor(beach) }}/100</strong>
-                        <a [routerLink]="['/plages', beach.id]" (click)="$event.stopPropagation()">Détail</a>
-                    </div>
-                </article>
-            </div>
-        </section>
-
-        <aside class="panel score-panel">
-            <div class="section-header">
-                <p class="eyebrow">Analyse live</p>
-                <h2>{{ selectedBeach?.name || 'Score plage' }}</h2>
-                <p *ngIf="selectedBeach">{{ selectedBeach.city }} · {{ selectedBeach.coastline }}</p>
-            </div>
-
-            <div *ngIf="loadingScore" class="wave-loader compact" aria-live="polite">
-                <span></span>
-                <strong>Calcul du score...</strong>
-            </div>
-            <div *ngIf="score?.error" class="state-card error">{{ score?.error }}</div>
-
-            <div *ngIf="score && !score.error" class="score-stack">
-                <div class="flag-card" [class.green]="score.safety?.flag === 'green'" [class.yellow]="score.safety?.flag === 'yellow'" [class.red]="score.safety?.flag === 'red'">
-                    <span>{{ flagLabel(score.safety?.flag) }}</span>
-                    <strong>{{ score.summary?.bathing }}</strong>
-                </div>
-
-                <div class="score-grid">
-                    <div class="score-tile" [class.primary]="selectedUsage === 'bathing'"><span>Baignade</span><strong>{{ score.scores.bathing }}</strong></div>
-                    <div class="score-tile" [class.primary]="selectedUsage === 'family'"><span>Famille</span><strong>{{ score.scores.family }}</strong></div>
-                    <div class="score-tile" [class.primary]="selectedUsage === 'paddle'"><span>Paddle</span><strong>{{ score.scores.paddle }}</strong></div>
-                    <div class="score-tile" [class.primary]="selectedUsage === 'boat'"><span>Bateau</span><strong>{{ score.scores.boat }}</strong></div>
-                </div>
-
-                <div class="metrics-card">
-                    <h3>Conditions</h3>
-                    <div class="metrics-grid">
-                        <span [ngClass]="metricClass('air', score.current?.weather, 'temperature_2m')">Air {{ metricValue(score.current?.weather, 'temperature_2m') }}°C</span>
-                        <span [ngClass]="metricClass('water', score.current?.marine, 'sea_surface_temperature')">Eau {{ metricValue(score.current?.marine, 'sea_surface_temperature') }}°C</span>
-                        <span [ngClass]="metricClass('wind', score.current?.weather, 'wind_speed_10m')">Vent {{ metricValue(score.current?.weather, 'wind_speed_10m') }} km/h</span>
-                        <span>Rafales {{ metricValue(score.current?.weather, 'wind_gusts_10m') }} km/h</span>
-                        <span [ngClass]="metricClass('wave', score.current?.marine, 'wave_height')">Vagues {{ metricValue(score.current?.marine, 'wave_height') }} m</span>
-                        <span>Courant {{ metricValue(score.current?.marine, 'ocean_current_velocity') }} m/s</span>
-                        <span [ngClass]="metricClass('uv', score.current?.weather, 'uv_index')">UV {{ metricValue(score.current?.weather, 'uv_index') }}</span>
-                        <span [ngClass]="metricClass('salinity', score.current?.marine, 'salinity_ppt')">Salinité {{ metricValue(score.current?.marine, 'salinity_ppt') }} ppt</span>
-                    </div>
-                </div>
-
-                <div *ngIf="score.safety?.alerts?.length" class="alerts">
-                    <span *ngFor="let alert of score.safety?.alerts">{{ alert }}</span>
-                </div>
-
-                <div class="providers-card">
-                    <h3>Sources utilisées</h3>
-                    <span>Météo : {{ providerLabel(score.providers?.weather) }}</span>
-                    <span>Dernière météo : {{ timeLabel(score.current?.weather?.['time']) }}</span>
-                    <span>Mer : {{ providerLabel(score.providers?.marine) }}</span>
-                    <span>Dernière mer : {{ timeLabel(score.current?.marine?.['time']) }}</span>
-                    <span>Marées : {{ providerLabel(score.providers?.tides) }}</span>
-                    <span>Qualité eau : {{ providerLabel(score.providers?.waterQuality) }}</span>
-                </div>
-
-                <div class="report-box">
-                    <h3>Signalement rapide</h3>
-                    <div class="report-actions">
-                        <button type="button" (click)="signalFlag('green')">Drapeau vert</button>
-                        <button type="button" (click)="signalFlag('yellow')">Drapeau jaune</button>
-                        <button type="button" (click)="signalFlag('red')">Drapeau rouge</button>
-                        <button type="button" (click)="signal('jellyfish')">Méduse</button>
-                        <button type="button" (click)="signal('current')">Courant</button>
-                        <button type="button" (click)="signal('pollution')">Pollution</button>
-                    </div>
-                    <div class="flag-history" *ngIf="score.safety?.communityFlag?.history?.length">
-                        <span *ngFor="let item of score.safety?.communityFlag?.history">
-                            {{ flagLabel(item.flag === 'green' ? 'green' : item.flag === 'yellow' ? 'yellow' : 'red') }} · {{ timeLabel(item.time) }}
-                        </span>
-                    </div>
-                    <small *ngIf="reportMessage">{{ reportMessage }}</small>
-                </div>
-
-                <small class="disclaimer" *ngIf="score.disclaimer">{{ score.disclaimer }}</small>
-            </div>
-        </aside>
-    </section>
-
-    <section class="strategy-section">
-        <div>
-            <p class="eyebrow">Catalogue régional</p>
-            <h2>Des plages par façade, puis par centre d’intérêt</h2>
-            <p>La page d’accueil sert à choisir une zone. Les cartes ouvrent désormais une page dédiée avec carte, services proches, score expliqué, hub communautaire et tendances.</p>
-        </div>
-        <div class="strategy-grid">
-            <span>Famille: surveillance, toilettes, parking, eau calme.</span>
-            <span>Sports nautiques: vent, houle, rafales, courant, location.</span>
-            <span>Plaisance: mer, marées, courant, accès portuaire.</span>
-            <span>Baignade: qualité d’eau, UV, drapeau estimé et alertes.</span>
-        </div>
-    </section>
+  </div>
 </main>

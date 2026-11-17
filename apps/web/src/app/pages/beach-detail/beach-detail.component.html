@@ -389,6 +389,13 @@
           <p class="caption" *ngIf="amenitiesUnavailable">
             Services à proximité indisponibles.
           </p>
+          <p class="caption" *ngIf="amenities?.fetchedAt">
+            OSM · {{ amenities?.fetchedAt | date: 'dd/MM/yyyy HH:mm' }}
+            <span *ngIf="amenities?.status === 'stale'"> · Relevé ancien</span>
+          </p>
+          <p class="caption" *ngIf="realAmenities.length">
+            Points référencés à moins de 2,5 km. Ouverture et surveillance en service non confirmées.
+          </p>
           <div class="amenity-group" *ngFor="let group of groups">
             <h4>
               <app-icon [name]="group.icon" [size]="17" />{{ group.name }}

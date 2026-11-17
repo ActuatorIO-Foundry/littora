@@ -4,6 +4,7 @@ import { PG } from '../../database/database.module';
 import { haversineKm } from '../../shared/geo';
 import { fetchJson, fetchNominatimJson } from '../../shared/http';
 import { WaterType } from './water-classification';
+import { AmenitiesService } from './amenities.service';
 
 type BeachRow = {
   id: string;
@@ -14,6 +15,7 @@ type BeachRow = {
   coastline: string;
   water_type?: WaterType;
   water_classification?: Record<string, unknown> | null;
+  facility_facts?: Record<string, any> | null;
   lat: number;
   lon: number;
   has_lifeguard: boolean | null;
@@ -23,13 +25,14 @@ type BeachRow = {
   distanceKm?: number | null;
   distancekm?: number | null;
 };
-const catalogueColumns = 'id,name,city,department,region,coastline,lat,lon,has_lifeguard,has_parking,has_toilets,osm_id,water_type,water_classification';
+const catalogueColumns = 'id,name,city,department,region,coastline,lat,lon,has_lifeguard,has_parking,has_toilets,osm_id,water_type,water_classification,facility_facts';
 
 @Injectable()
 export class BeachesService {
   constructor(
     @Inject(PG) private db: any,
     private cache: CacheService,
+    private amenities: AmenitiesService,
   ) {}
 
   async list(lat?: number, lon?: number, limit = 180) {
@@ -38,7 +41,7 @@ export class BeachesService {
     if (Number.isFinite(lat) && Number.isFinite(lon)) {
       try {
         const { rows } = await this.db.query(
-          `select id,name,city,department,region,coastline,lat,lon,has_lifeguard,has_parking,has_toilets,osm_id,water_type,water_classification,
+          `select id,name,city,department,region,coastline,lat,lon,has_lifeguard,has_parking,has_toilets,osm_id,water_type,water_classification,facility_facts,
             ST_Distance(geom, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography) / 1000 as "distanceKm"
           from beach_catalogue
           order by geom <-> ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography
@@ -166,31 +169,7 @@ export class BeachesService {
   }
 
   async nearbyAmenities(id: string) {
-    const beach = await this.get(id);
-    const cacheKey = `osm:amenities:v4:${id}`;
-    const cached = await this.cache.getJson<any>(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const amenities = await this.fetchNearbyAmenities(beach);
-      const response = {
-        beachId: id,
-        provider: this.amenitiesProvider(amenities),
-        radiusMeters: 2500,
-        amenities,
-      };
-      await this.cache.setJson(cacheKey, response, 60 * 60 * 6);
-      return response;
-    } catch {
-      const response = {
-        beachId: id,
-        provider: 'local-beach-flags-fallback',
-        radiusMeters: 2500,
-        amenities: this.fallbackAmenities(beach),
-      };
-      await this.cache.setJson(cacheKey, response, 60 * 20);
-      return response;
-    }
+    return this.amenities.get(id);
   }
 
   private parseBbox(bbox: string) {
@@ -211,7 +190,7 @@ export class BeachesService {
       );
       out center;
     `;
-    const endpoint = process.env.OVERPASS_API_URL || 'https://overpass.osm.ch/api/interpreter';
+    const endpoint = process.env.OVERPASS_API_URL || 'https://overpass-api.de/api/interpreter';
     const raw = await fetchJson(endpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -227,186 +206,19 @@ export class BeachesService {
     return this.fetchNominatimBeaches([south, west, north, east], limit);
   }
 
-  private async fetchNearbyAmenities(beach: BeachRow) {
-    const query = `
-      [out:json][timeout:18];
-      (
-        node(around:2500,${beach.lat},${beach.lon})["amenity"~"parking|parking_space|toilets|restaurant|cafe|ice_cream|fast_food|boat_rental"];
-        way(around:2500,${beach.lat},${beach.lon})["amenity"~"parking|parking_space|toilets|restaurant|cafe|ice_cream|fast_food|boat_rental"];
-        relation(around:2500,${beach.lat},${beach.lon})["amenity"~"parking|parking_space|toilets|restaurant|cafe|ice_cream|fast_food|boat_rental"];
-        node(around:2500,${beach.lat},${beach.lon})["parking"];
-        way(around:2500,${beach.lat},${beach.lon})["parking"];
-        node(around:2500,${beach.lat},${beach.lon})["shop"~"rental|sports|boat|ice_cream|convenience"];
-        way(around:2500,${beach.lat},${beach.lon})["shop"~"rental|sports|boat|ice_cream|convenience"];
-        node(around:2500,${beach.lat},${beach.lon})["sport"~"canoe|paddle|surf|sailing|diving|swimming"];
-        way(around:2500,${beach.lat},${beach.lon})["sport"~"canoe|paddle|surf|sailing|diving|swimming"];
-        node(around:2500,${beach.lat},${beach.lon})["leisure"~"marina|sports_centre|water_park"];
-        way(around:2500,${beach.lat},${beach.lon})["leisure"~"marina|sports_centre|water_park"];
-        node(around:1800,${beach.lat},${beach.lon})["emergency"~"lifeguard|rescue_station"];
-        way(around:1800,${beach.lat},${beach.lon})["emergency"~"lifeguard|rescue_station"];
-      );
-      out center tags;
-    `;
-    const endpoint = process.env.OVERPASS_API_URL || 'https://overpass.osm.ch/api/interpreter';
-    const raw = await fetchJson(endpoint, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ data: query }),
-    });
-
-    const amenities = (raw.elements ?? [])
-      .map((element: any) => this.osmElementToAmenity(element, beach))
-      .filter(Boolean)
-      .filter((amenity: any, index: number, all: any[]) => all.findIndex((item) => item.category === amenity.category && item.name === amenity.name && Math.abs(item.lat - amenity.lat) < 0.0004 && Math.abs(item.lon - amenity.lon) < 0.0004) === index)
-      .sort((a: any, b: any) => a.distanceKm - b.distanceKm)
-      .slice(0, 36);
-    if (amenities.length) return this.completeAmenities(beach, amenities);
-
-    const nominatim = await this.fetchNominatimAmenities(beach);
-    return nominatim.length ? this.completeAmenities(beach, nominatim) : this.fallbackAmenities(beach);
-  }
-
-  private async fetchNominatimAmenities(beach: BeachRow) {
-    const endpoint = process.env.NOMINATIM_API_URL || 'https://nominatim.openstreetmap.org/search';
-    const delta = 0.035;
-    const viewbox = `${beach.lon - delta},${beach.lat + delta},${beach.lon + delta},${beach.lat - delta}`;
-    const searches = [
-      { q: 'parking', category: 'parking' },
-      { q: 'toilettes publiques', category: 'toilets' },
-      { q: 'poste de secours plage', category: 'rescue' },
-      { q: 'location paddle kayak bateau', category: 'rental' },
-      { q: 'restaurant cafe glacier', category: 'food' },
-    ];
-    const amenities: any[] = [];
-
-    for (const search of searches) {
-      try {
-        const url = `${endpoint}?format=json&q=${encodeURIComponent(search.q)}&bounded=1&viewbox=${viewbox}&limit=8&addressdetails=0`;
-        const raw = await fetchNominatimJson(url);
-        for (const place of Array.isArray(raw) ? raw : []) {
-          const lat = Number(place.lat);
-          const lon = Number(place.lon);
-          if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-          amenities.push({
-            id: `nominatim/${place.osm_type}/${place.osm_id}`,
-            name: place.name || place.display_name?.split(',')[0] || this.amenityFallbackName(search.category),
-            category: search.category,
-            lat,
-            lon,
-            distanceKm: Math.round(haversineKm(beach.lat, beach.lon, lat, lon) * 10) / 10,
-            source: 'openstreetmap-nominatim',
-          });
-        }
-      } catch {
-        // Keep the amenity response resilient; other searches may still work.
-      }
-    }
-
-    return amenities
-      .filter((amenity, index, all) => all.findIndex((item) => item.category === amenity.category && item.name === amenity.name) === index)
-      .sort((a, b) => a.distanceKm - b.distanceKm)
-      .slice(0, 36);
-  }
-
-  private osmElementToAmenity(element: any, beach: BeachRow) {
-    const lat = element.lat ?? element.center?.lat;
-    const lon = element.lon ?? element.center?.lon;
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-
-    const tags = element.tags ?? {};
-    const category = this.amenityCategory(tags);
-    return {
-      id: `${element.type}/${element.id}`,
-      name: tags.name || this.amenityFallbackName(category),
-      category,
-      lat,
-      lon,
-      distanceKm: Math.round(haversineKm(beach.lat, beach.lon, lat, lon) * 10) / 10,
-      source: 'openstreetmap',
-    };
-  }
-
-  private amenityCategory(tags: Record<string, string>) {
-    if (tags.amenity === 'parking' || tags.amenity === 'parking_space' || tags.parking) return 'parking';
-    if (tags.amenity === 'toilets') return 'toilets';
-    if (tags.emergency || tags.lifeguard) return 'rescue';
-    if (tags.shop === 'ice_cream' || ['restaurant', 'cafe', 'ice_cream', 'fast_food'].includes(tags.amenity)) return 'food';
-    if (tags.shop || tags.sport || tags.leisure === 'marina' || tags.leisure === 'sports_centre') return 'rental';
-    return 'other';
-  }
-
-  private amenityFallbackName(category: string) {
-    const labels: Record<string, string> = {
-      parking: 'Parking',
-      toilets: 'Toilettes publiques',
-      rental: 'Location ou activité nautique',
-      food: 'Restauration',
-      rescue: 'Poste de secours',
-      other: 'Service proche',
-    };
-    return labels[category] ?? 'Service proche';
-  }
-
-  private fallbackAmenities(beach: BeachRow) {
-    const amenities: Array<Record<string, unknown>> = [];
-    const add = (category: string, name: string, distanceKm: number, source: string, offsetLat = 0, offsetLon = 0) => {
-      amenities.push({
-        id: `${beach.id}:${category}:${source}:${amenities.length}`,
-        name,
-        category,
-        lat: Number((beach.lat + offsetLat).toFixed(6)),
-        lon: Number((beach.lon + offsetLon).toFixed(6)),
-        distanceKm,
-        source,
-        verification: source === 'local-hint' ? 'to_verify' : 'listed',
-      });
-    };
-
-    if (beach.has_parking) add('parking', 'Parking indiqué sur la fiche plage', 0, 'local-db');
-    if (beach.has_toilets) add('toilets', 'Toilettes indiquées sur la fiche plage', 0, 'local-db');
-    if (beach.has_lifeguard) add('rescue', 'Surveillance indiquée sur la fiche plage', 0, 'local-db');
-
-    if (!amenities.some((amenity) => amenity.category === 'parking')) {
-      add('parking', 'Stationnement proche à vérifier', 0.4, 'local-hint', 0.0022, 0.0022);
-    }
-    if (!amenities.some((amenity) => amenity.category === 'toilets')) {
-      add('toilets', 'Sanitaires publics à confirmer', 0.3, 'local-hint', -0.0018, 0.0016);
-    }
-    if (!amenities.some((amenity) => amenity.category === 'rescue')) {
-      add('rescue', 'Poste de secours ou surveillance saisonnière à confirmer', 0.5, 'local-hint', 0.0024, -0.0018);
-    }
-
-    add('rental', 'Location nautique saisonnière à vérifier', 0.8, 'local-hint', -0.003, -0.002);
-    add('food', 'Restauration ou glacier proche à vérifier', 0.7, 'local-hint', 0.0016, -0.003);
-    return amenities;
-  }
-
-  private completeAmenities(beach: BeachRow, amenities: any[]) {
-    const completed = [...amenities];
-    for (const hint of this.fallbackAmenities(beach)) {
-      if (!completed.some((amenity) => amenity.category === hint.category)) {
-        completed.push(hint);
-      }
-    }
-
-    return completed
-      .sort((a, b) => Number(a.distanceKm ?? 999) - Number(b.distanceKm ?? 999))
-      .slice(0, 36);
-  }
-
-  private amenitiesProvider(amenities: Array<Record<string, unknown>>) {
-    if (amenities.some((amenity) => amenity.source === 'openstreetmap')) return 'openstreetmap-overpass';
-    if (amenities.some((amenity) => amenity.source === 'openstreetmap-nominatim')) return 'openstreetmap-nominatim';
-    if (amenities.some((amenity) => amenity.source === 'local-db')) return 'local-beach-flags-fallback';
-    return 'local-beach-hints';
-  }
 
   private enrichBeach(beach: BeachRow) {
-    const { water_type, water_classification, ...publicBeach } = beach;
+    const { water_type, water_classification, facility_facts, ...publicBeach } = beach;
+    const unknown = { value: null, status: 'unknown', source: 'unknown', verified: false, fetchedAt: null, scope: 'unknown' };
+    const facilities = facility_facts ?? { parking: unknown, toilets: unknown, lifeguard: unknown, rescueStation: unknown };
     return {
       ...publicBeach,
       waterType: water_type ?? 'unknown',
       waterClassification: water_classification ?? null,
+      facilities,
+      has_parking: facilities.parking.value,
+      has_toilets: facilities.toilets.value,
+      has_lifeguard: facilities.lifeguard.value,
     };
   }
 

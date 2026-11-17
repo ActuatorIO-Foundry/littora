@@ -11,6 +11,7 @@ export interface Beach {
 'lifeguard': FacilityPresence;
 'parking': FacilityPresence;
 'toilets': FacilityPresence;
+'rescueStation'?: FacilityPresence;
 };
   /** @deprecated */has_lifeguard: boolean | null;
   /** @deprecated */has_parking: boolean | null;

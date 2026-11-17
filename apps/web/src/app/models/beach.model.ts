@@ -11,6 +11,7 @@ export interface Beach {
   has_lifeguard: boolean | null;
   has_parking: boolean | null;
   has_toilets: boolean | null;
+  facilities?: import('@littora/api-client/models').Beach['facilities'];
   osm_id: string | null;
   distanceKm: number | null;
 }
@@ -87,6 +88,10 @@ export interface BeachAmenitiesResponse {
   provider: string;
   radiusMeters: number;
   amenities: BeachAmenity[];
+  status?: 'available' | 'stale' | 'unknown';
+  fetchedAt?: string | null;
+  total?: number;
+  coverage?: 'partial';
 }
 
 export type { ReportPayload } from '@littora/api-client/models';

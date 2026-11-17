@@ -32,7 +32,7 @@ export function presentBeach(beach: Row) {
     region: beach.region ?? null, coastline: beach.coastline ?? null, osm_id: beach.osm_id ?? null,
     distanceKm: beach.distanceKm ?? null,
     has_lifeguard: beach.has_lifeguard ?? null, has_parking: beach.has_parking ?? null, has_toilets: beach.has_toilets ?? null,
-    facilities: { lifeguard: presence(beach.has_lifeguard), parking: presence(beach.has_parking), toilets: presence(beach.has_toilets) },
+    facilities: beach.facilities ?? { lifeguard: presence(beach.has_lifeguard), parking: presence(beach.has_parking), toilets: presence(beach.has_toilets) },
   };
 }
 export function presentScore(score: Row) {

@@ -2,6 +2,9 @@ dist/
 node_modules/
 npm/
 *.log
+*.log.*
+logs/
+*.dump
 .DS_Store
 
 # Local configuration and generated files

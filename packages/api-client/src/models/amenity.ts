@@ -4,10 +4,18 @@
 export interface Amenity {
   category: 'parking' | 'toilets' | 'rental' | 'food' | 'rescue' | 'other';
   distanceKm: number;
+  fetchedAt?: string;
   id: string;
+
+  /**
+   * Null unless operational availability is independently verified.
+   */
+  inService?: boolean | null;
   lat: number;
   lon: number;
   name: string;
+  scope?: 'nearby';
   source: string;
+  sourceUpdatedAt?: string | null;
   verification: 'listed' | 'to_verify';
 }

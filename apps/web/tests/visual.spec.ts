@@ -317,6 +317,31 @@ test("detail : series reelles, indisponibilite et equipements", async ({
   );
 });
 
+test('equipements : tous les homonymes restent visibles et la source ancienne est explicite', async ({ page }) => {
+  const points = Array.from({length:8}, (_,i)=>({id:`node/${i+1}`,name:'Parking du port',category:'parking',
+    lat:43.08+i*.0001,lon:6.15,distanceKm:i*.01,source:'openstreetmap',verification:'listed'}));
+  await page.route('**/api/beaches/test-sea/amenities',route=>route.fulfill({json:{beachId:'test-sea',
+    provider:'openstreetmap-overpass',radiusMeters:2500,status:'stale',fetchedAt:'2026-11-16T12:00:00Z',total:8,amenities:points}}));
+  await page.goto('/plages/test-sea');
+  await expect(page.locator('.amenity-group p')).toHaveCount(8);
+  await expect(page.getByText('Relevé ancien',{exact:false})).toBeVisible();
+  await expect(page.getByText('Ouverture et surveillance en service non confirmées.',{exact:false})).toBeVisible();
+  await noOverflow(page);
+});
+
+test('equipements : le filtre poste de secours ne pretend pas confirmer la surveillance', async ({ page }) => {
+  const presence={value:true,status:'present',source:'openstreetmap',verified:false,fetchedAt:'2026-11-17T12:00:00Z',scope:'nearby'};
+  const catalogue=[{...beaches[0],has_lifeguard:null,facilities:{rescueStation:presence}},beaches[1]];
+  await page.route('**/api/beaches/catalogue?*',route=>route.fulfill({json:{beaches:catalogue,nextCursor:null}}));
+  await page.goto('/recherche');
+  await expect(page.locator('.beach-result')).toHaveCount(2);
+  await page.getByRole('button',{name:'Filtres',exact:true}).click();
+  await page.getByLabel('Poste de secours',{exact:true}).check();
+  await expect(page.locator('.beach-result')).toHaveCount(1);
+  await expect(page.locator('.beach-name')).toContainText('Plage des Pins');
+  await noOverflow(page);
+});
+
 test("contact : pas de faux succes et champs accessibles", async ({
   page,
 }, info) => {

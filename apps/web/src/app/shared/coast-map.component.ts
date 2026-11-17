@@ -42,6 +42,9 @@ import { IconComponent } from "./icon.component";
     </button>
     <p class="map-error" *ngIf="failed" role="status">
       Fond de carte indisponible. La liste des plages reste accessible.
+    </p>
+    <p class="map-error" *ngIf="!failed && shorelineFailed" role="status">
+      Limite terre-mer indisponible. Le fond OpenStreetMap reste affiché.
     </p>`,
   styles: [
     `
@@ -88,11 +91,20 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Output() beachSelect = new EventEmitter<Beach>();
   @Output() zoneSelect = new EventEmitter<CoastalZone>();
   failed = false;
+  shorelineFailed = false;
   private L?: typeof Leaflet;
   private map?: Leaflet.Map;
   private markers?: Leaflet.LayerGroup;
   private coasts?: Leaflet.LayerGroup;
-  private lines: number[][][] = [];
+  private shoreline?: Leaflet.TileLayer.WMS;
+  private selectedShoreline?: Leaflet.TileLayer.WMS;
+  private configuration?: {
+    tiles: string;
+    tileAttribution: string;
+    shoreline: string;
+    shorelineLayer: string;
+    shorelineAttribution: string;
+  };
   private observer?: ResizeObserver;
   private destroyed = false;
   private lastZone: string | null = null;
@@ -116,6 +128,12 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
           minZoom: this.detail ? 5 : 4,
           maxZoom: 18,
         });
+        this.map.createPane("fallback-map").style.zIndex = "150";
+        this.map.createPane("shoreline").style.zIndex = "350";
+        this.map.createPane("shoreline-selected").style.zIndex = "351";
+        this.map.getPane("shoreline")!.style.pointerEvents = "none";
+        this.map.getPane("shoreline-selected")!.style.pointerEvents = "none";
+        this.map.on("move zoom resize", () => this.clipSelectedShoreline());
         this.markers = L.layerGroup().addTo(this.map);
         this.coasts = L.layerGroup().addTo(this.map);
         this.reset();
@@ -130,24 +148,35 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
         });
         this.observer.observe(this.el.nativeElement);
       });
-      if (this.detail) {
-        L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-          maxZoom: 19,
+      const configResponse = await fetch("/data/map-config.json", {
+        signal: this.abort.signal,
+      });
+      if (!configResponse.ok) throw new Error("Map configuration unavailable");
+      this.configuration = await configResponse.json();
+      if (this.destroyed) return;
+      const config = this.configuration!;
+      L.tileLayer(config.tiles, {
+        attribution: config.tileAttribution,
+        maxZoom: 19,
+        updateWhenIdle: true,
+        keepBuffer: 1,
+        className: "basemap-tiles",
+      })
+        .on("tileerror", () => {
+          this.failed = true;
+          this.cdr.markForCheck();
         })
-          .on("tileerror", () => {
-            this.failed = true;
-            this.cdr.markForCheck();
-          })
-          .on("tileload", () => {
-            if (this.failed) {
-              this.failed = false;
-              this.cdr.markForCheck();
-            }
-          })
-          .addTo(this.map!);
-      } else {
+        .on("tileload", () => {
+          this.failed = false;
+          this.cdr.markForCheck();
+        })
+        .addTo(this.map!);
+      if (!this.detail) {
+        this.shoreline = this.createShoreline("shoreline", "shoreline-tiles");
+        this.map!.attributionControl.addAttribution(
+          config.shorelineAttribution,
+        );
+        // A low-detail land layer remains underneath the online tiles during an outage.
         const response = await fetch("/data/europe.geojson", {
           signal: this.abort.signal,
         });
@@ -155,6 +184,7 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
         const land = (await response.json()) as GeoJsonObject;
         if (this.destroyed) return;
         L.geoJSON(land, {
+          pane: "fallback-map",
           interactive: false,
           style: () => ({
             color: "#bdccca",
@@ -168,33 +198,6 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
         this.map!.attributionControl.addAttribution(
           '<a href="https://www.naturalearthdata.com/">Natural Earth</a>',
         );
-        for (const [label, lat, lon] of [
-          ["Paris", 48.86, 2.35],
-          ["Bordeaux", 44.84, -0.58],
-          ["Lyon", 45.76, 4.84],
-          ["Marseille", 43.29, 5.37],
-          ["Nantes", 47.22, -1.55],
-        ] as [string, number, number][]) {
-          L.circleMarker([lat, lon], {
-            radius: 2,
-            color: "#61767a",
-            weight: 0,
-            fillOpacity: 1,
-          })
-            .bindTooltip(label, {
-              permanent: true,
-              direction: "right",
-              className: "map-label",
-              offset: [4, 0],
-            })
-            .addTo(this.map!);
-        }
-        const coastResponse = await fetch("/data/coasts.geojson", {
-          signal: this.abort.signal,
-        });
-        if (!coastResponse.ok) throw new Error("Coasts unavailable");
-        this.lines = (await coastResponse.json()).geometry.coordinates;
-        if (this.destroyed) return;
       }
       this.ngOnChanges();
     } catch (error) {
@@ -269,34 +272,23 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
     }
   }
   private drawCoasts(): void {
-    if (!this.L || !this.coasts || this.detail || !this.lines.length) return;
+    if (!this.L || !this.coasts || this.detail || !this.configuration) return;
     if (this.renderedCoastZone === this.zoneId) return;
     this.renderedCoastZone = this.zoneId;
     const L = this.L;
     this.coasts.clearLayers();
-    for (const zone of COASTAL_ZONES) {
-      const [s, w, n, e] = zone.bbox.split(",").map(Number);
-      const chosen = zone.id === this.zoneId;
-      const runs: Leaflet.LatLngExpression[][] = [];
-      for (const line of this.lines) {
-        let run: Leaflet.LatLngExpression[] = [];
-        for (const [x, y] of line) {
-          if (x >= w && x <= e && y >= s && y <= n) run.push([y, x]);
-          else {
-            if (run.length > 1) runs.push(run);
-            run = [];
-          }
-        }
-        if (run.length > 1) runs.push(run);
-      }
-      const coast = L.polyline(runs, {
-        color: chosen ? "#d94d3b" : "#058b96",
-        weight: chosen ? 5 : 2.5,
-        opacity: chosen ? 1 : 0.75,
-      }).addTo(this.coasts);
-      coast.on("click", () =>
-        this.ngZone.run(() => this.zoneSelect.emit(zone)),
+    if (this.zoneId && !this.selectedShoreline) {
+      this.selectedShoreline = this.createShoreline(
+        "shoreline-selected",
+        "shoreline-selected-tiles",
       );
+    } else if (!this.zoneId && this.selectedShoreline) {
+      this.selectedShoreline.remove();
+      this.selectedShoreline = undefined;
+    }
+    this.clipSelectedShoreline();
+    for (const zone of COASTAL_ZONES) {
+      const chosen = zone.id === this.zoneId;
       L.circleMarker([zone.center.lat, zone.center.lon], {
         radius: 2,
         opacity: 0,
@@ -323,6 +315,45 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
         .on("click", () => this.ngZone.run(() => this.zoneSelect.emit(zone)))
         .addTo(this.coasts);
     }
+  }
+  private createShoreline(
+    pane: string,
+    className: string,
+  ): Leaflet.TileLayer.WMS {
+    const config = this.configuration!;
+    return this.L!.tileLayer.wms(config.shoreline, {
+      layers: config.shorelineLayer,
+      format: "image/png",
+      transparent: true,
+      version: "1.1.1",
+      pane,
+      className,
+      bounds: [
+        [41.2, -5.4],
+        [51.2, 10],
+      ],
+      updateWhenIdle: true,
+      keepBuffer: 1,
+    })
+      .on("tileerror", () => {
+        this.shorelineFailed = true;
+        this.cdr.markForCheck();
+      })
+      .on("tileload", () => {
+        this.shorelineFailed = false;
+        this.cdr.markForCheck();
+      })
+      .addTo(this.map!);
+  }
+  private clipSelectedShoreline(): void {
+    const zone = COASTAL_ZONES.find((z) => z.id === this.zoneId);
+    if (!this.map || !zone) return;
+    const [south, west, north, east] = zone.bbox.split(",").map(Number);
+    const topLeft = this.map.latLngToLayerPoint([north, west]);
+    const bottomRight = this.map.latLngToLayerPoint([south, east]);
+    // Clip the raster, not the coastline vertices: no artificial gaps or straight joins.
+    this.map.getPane("shoreline-selected")!.style.clipPath =
+      `polygon(${topLeft.x}px ${topLeft.y}px, ${bottomRight.x}px ${topLeft.y}px, ${bottomRight.x}px ${bottomRight.y}px, ${topLeft.x}px ${bottomRight.y}px)`;
   }
   reset(): void {
     if (this.detail && this.beaches[0])

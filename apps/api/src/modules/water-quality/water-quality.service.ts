@@ -9,6 +9,7 @@ export class WaterQualityService {
     if (beachId) {
       const { rows } = await this.db.query(`select * from water_quality
         where beach_id=$1 and is_demo=false
+        and exists(select 1 from beach_catalogue b where b.id=water_quality.beach_id)
         and coalesce(source,'') not in ('local-seed','demo-seed')
         and coalesce(raw->>'demo','false') <> 'true'
         order by sample_date desc limit 1`, [beachId]);

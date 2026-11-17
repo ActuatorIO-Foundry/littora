@@ -1,6 +1,23 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { beach, scoreFixture } = require('./fixtures.cjs');
+const { presentScore } = require('../dist/http/presenters');
+
+test('safety: green observations never cancel calculated danger, pollution or a red history',async()=>{
+  const consensus={flag:'green',confidence:1,counts:{green:5,yellow:0,red:1},history:[],recentRedAt:'2026-07-15T12:00:00Z'};
+  const result=await scoreFixture({consensus,quality:'poor',marine:{current:{wave_height:4,ocean_current_velocity:.5,sea_surface_temperature:22}}}).scoreBeach(beach.id);
+  assert.equal(result.safety.flag,'red');assert.equal(result.safety.estimatedFlag,'red');
+  for(const warning of ['Mer agitée','Courant marqué','Qualité','Drapeau rouge'])assert.ok(result.safety.alerts.some(a=>a.includes(warning)));
+  const wire=presentScore(result);
+  assert.equal(wire.safety.calculatedConditions.level,'unfavorable');
+  assert.equal(wire.safety.communityFlag.flag,'green');
+  assert.equal(wire.safety.officialFlag.value,null);assert.equal(wire.safety.officialFlag.status,'unknown');
+  assert.ok(!wire.safety.source.includes('%'));
+});
+test('safety: a community green cannot fill missing model or official information',async()=>{
+  const result=await scoreFixture({weather:{current:{}},marine:{current:{}},consensus:{flag:'green',confidence:1,counts:{green:1,yellow:0,red:0}}}).scoreBeach(beach.id);
+  assert.equal(result.safety.flag,'unknown');assert.equal(presentScore(result).safety.officialFlag.source,null);
+});
 
 test('scores: finite values within 0..100 when all inputs are available', async () => {
   const result = await scoreFixture().scoreBeach(beach.id);

@@ -272,6 +272,25 @@
             </div>
             <span class="badge">{{ reports.length }} observations</span>
           </div>
+          <div class="community-flags" *ngIf="score?.safety?.communityFlag as community">
+            <div class="notice"><div>
+              <strong>{{ community.flag ? 'Observation majoritaire : ' + flagLabel(community.flag) : 'Pas de majorité suffisamment étayée' }}</strong><br />
+              {{ community.participants ?? 0 }} contributions distinctes sur les 3 dernières heures.
+              Observation communautaire, non officielle.
+            </div></div>
+            <p class="notice" *ngIf="community.status === 'capped'">Volume d’observations trop important pour établir une majorité.</p>
+            <div class="notice" *ngIf="community.recentRedAt"><div>
+              <strong>Dernier rouge signalé</strong> : {{ dateLabel(community.recentRedAt) }}.
+              Les consignes affichées sur place restent prioritaires.
+            </div></div>
+            <details class="flag-report" *ngIf="community.history.length">
+              <summary><app-icon name="flag" [size]="16" />Historique récent des drapeaux</summary>
+              <div class="report-row" *ngFor="let observation of community.history">
+                <strong>{{ flagLabel(observation.flag) }}</strong>
+                <time>{{ dateLabel(observation.time) }}</time>
+              </div>
+            </details>
+          </div>
           <h3 class="report-prompt">Qu’observez-vous ?</h3>
           <div class="report-actions">
             <button
@@ -348,7 +367,7 @@
                 ></strong
               ><span>Observation communautaire, non officielle</span>
             </div>
-            <time>{{ dateLabel(report.created_at) }}</time>
+            <time>{{ dateLabel(report.observed_at ?? report.created_at) }}</time>
           </div>
         </section>
       </div>

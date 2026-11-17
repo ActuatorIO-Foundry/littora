@@ -42,8 +42,12 @@ export interface BeachScore {
     source?: string;
     official?: boolean;
     communityFlag?: {
-      flag: 'green' | 'yellow' | 'red';
+      flag: 'green' | 'yellow' | 'red' | null;
       confidence: number;
+      agreement?: number | null;
+      participants?: number;
+      status?: 'insufficient' | 'consensus' | 'conflicting' | 'capped';
+      recentRedAt?: string | null;
       counts: Record<string, number>;
       history: Array<{ flag: string; time: string; confidence: number }>;
     } | null;

@@ -318,6 +318,33 @@ test("detail : series reelles, indisponibilite et equipements", async ({
   );
 });
 
+test('drapeaux : majorite verte, historique rouge et alertes restent separes', async ({page},info) => {
+  const community={flag:'green',status:'consensus',participants:6,agreement:.83,confidence:.83,counts:{green:5,yellow:0,red:1},
+    recentRedAt:'2026-07-15T12:00:00Z',history:[{flag:'green',time:'2026-07-15T13:00:00Z',confidence:0},{flag:'red',time:'2026-07-15T12:00:00Z',confidence:0}]};
+  await page.route('**/api/score/**',route=>route.fulfill({json:{...score,safety:{flag:'red',official:false,communityFlag:community,alerts:['Mer agitée','Qualité d’eau défavorable']}}}));
+  await page.goto('/plages/test-sea');
+  await expect(page.locator('.community-flags')).toContainText('Observation majoritaire : Vert');
+  await expect(page.locator('.community-flags')).toContainText('Dernier rouge signalé');
+  await expect(page.locator('.community-flags')).not.toContainText('%');
+  await expect(page.locator('.official-status')).toContainText('Non renseigné');
+  await expect(page.locator('.alerts')).toContainText('Mer agitée');
+  await expect(page.locator('.alerts')).toContainText('Qualité d’eau défavorable');
+  await page.getByText('Historique récent des drapeaux',{exact:true}).click();
+  await expect(page.locator('.community-flags .report-row')).toHaveCount(2);
+  await expect(page.locator('.community-flags .report-row').last()).toContainText('Rouge');
+  await noOverflow(page);
+  await page.locator('.community-flags').screenshot({path:info.outputPath('community-flags.png')});
+});
+
+test('drapeaux : un vert isole reste sans majorite',async({page})=>{
+  await page.route('**/api/score/**',route=>route.fulfill({json:{...score,safety:{...score.safety,
+    communityFlag:{flag:null,status:'insufficient',participants:1,agreement:null,confidence:0,counts:{green:1,yellow:0,red:0},history:[]}}}}));
+  await page.goto('/plages/test-sea');
+  await expect(page.locator('.community-flags')).toContainText('Pas de majorité suffisamment étayée');
+  await expect(page.locator('.community-flags')).not.toContainText('%');
+  await noOverflow(page);
+});
+
 test('contributions : session reutilisee, confiance absente et moderation explicite', async ({page}) => {
   let sessions=0;
   const payloads: any[]=[];

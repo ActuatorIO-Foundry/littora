@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Littora API
-  version: 0.5.0
+  version: 0.6.0
   description: >-
     Additive contract for the existing API. Model forecasts are not observations or
     official bathing instructions. Null means unknown, never zero or false.
@@ -524,8 +524,14 @@ components:
       nullable: true
       required: [flag, confidence, counts, history]
       properties:
-        flag: {type: string, enum: [green, yellow, red]}
-        confidence: {type: number, minimum: 0, maximum: 1}
+        flag: {type: string, nullable: true, enum: [green, yellow, red, null]}
+        confidence: {type: number, minimum: 0, maximum: 1, deprecated: true, description: Legacy agreement share only when consensus exists; never a probability of safety.}
+        agreement: {type: number, nullable: true, minimum: 0, maximum: 1, description: Share of recent distinct contribution sessions supporting the leading colour. Not a safety probability.}
+        participants: {type: integer, minimum: 0, description: Distinct contribution sessions after conservative network deduplication. Not verified people.}
+        status: {type: string, enum: [insufficient, consensus, conflicting, capped]}
+        windowHours: {type: integer, enum: [3]}
+        historyHours: {type: integer, enum: [12]}
+        recentRedAt: {type: string, format: date-time, nullable: true}
         counts: {type: object, additionalProperties: {type: integer, minimum: 0}}
         history:
           type: array

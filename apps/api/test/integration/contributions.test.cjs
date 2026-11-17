@@ -62,6 +62,19 @@ test('contributions: real HTTP validation, shared quotas, concurrency, privacy a
   assert.equal((await request('reports/session',{})).status,429);
   await pool.query("update reports set status='verified',confidence=.5 where id=$1",[report.id]);
   assert.equal((await service.list(beach)).length,1);assert.equal((await service.aggregate(beach))[0].count,1);
+  const additional=[];
+  try{
+    for(let i=0;i<5;i++){
+      const actor=(await pool.query('insert into report_contributors(token_hash) values($1) returning id',[randomBytes(32).toString('hex')])).rows[0].id;
+      const row=(await pool.query("insert into reports(beach_id,type,value,status) values($1,'flag','{\"flag\":\"green\"}','verified') returning id",[beach])).rows[0].id;
+      additional.push(row);
+      await pool.query("insert into report_contributions(report_id,contributor_id,network_hash,observed_at,expires_at) values($1,$2,$3,now()-interval '5 minutes',now()+interval '23 hours')",[row,actor,'distinct-network-'+i]);
+    }
+    const consensus=await service.flagConsensus(beach);
+    assert.equal(consensus.flag,'green');assert.equal(consensus.participants,6);
+    assert.equal(consensus.counts.red,1);assert.ok(consensus.recentRedAt);
+    assert.ok(consensus.history.some(r=>r.flag==='red'));
+  }finally{await pool.query('delete from reports where id=any($1::uuid[])',[additional]);}
   await pool.query("update report_contributions set observed_at=now()-interval '25 hours',expires_at=now()-interval '1 hour' where report_id=$1",[report.id]);
   assert.deepEqual(await service.list(beach),[]);assert.deepEqual(await service.aggregate(beach),[]);
   await pool.query("update report_contributors set expires_at=now()-interval '1 minute'");

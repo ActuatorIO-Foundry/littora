@@ -31,7 +31,7 @@ de scores nullables ; il ne doit pas convertir null en zero.
 
 Les autres chantiers sont distincts : normalisation des unites (#12, ci-dessous),
 provenance et couverture des equipements
-(#14), connecteurs officiels (#16 a #19), drapeaux (#20), ponderation et explication
+(#14), connecteurs officiels (#16 a #18), drapeaux (#22), ponderation et explication
 complete des scores (#21). Ce correctif ne vaut pas validation de securite nautique.
 
 ## Normalisation #12

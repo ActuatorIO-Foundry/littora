@@ -76,9 +76,12 @@ test("accueil : ressac visible sur la plage, rochers fixes et pause", async ({
   expect(difference(before.rocks, after.rocks)).toBeLessThan(0.1);
   await page.getByRole("button", { name: "Mettre la mer en pause" }).click();
   await expect(canvas).toHaveAttribute("data-motion", "still");
-  const paused = await canvas.screenshot();
+  const paused = await patches(page);
   await page.waitForTimeout(300);
-  expect(await canvas.screenshot()).toEqual(paused);
+  // Compare the sea pixels, not the controls and text composited above it.
+  const still = await patches(page);
+  expect(difference(paused.shore, still.shore)).toBe(0);
+  expect(difference(paused.rocks, still.rocks)).toBe(0);
   await page
     .locator(".hero")
     .screenshot({ path: info.outputPath("shoreline.png") });

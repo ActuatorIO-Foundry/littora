@@ -8,7 +8,7 @@ const { manifest, status, assertCurrent, seed } = require('../scripts/database.c
 
 test('migrations: consecutive immutable SQL manifest', t => {
   const migrations = manifest();
-  assert.equal(migrations.length, 2);
+  assert.equal(migrations.length, 3);
   for (const item of migrations) {
     assert.equal(item.checksum, createHash('sha256').update(item.sql).digest('hex'));
   }
@@ -24,7 +24,7 @@ test('migrations: status and startup verification are strictly read-only', async
     assert.match(sql, /^select /i);
     return { rows: [{ name: null }] };
   } };
-  assert.equal((await status(client)).filter(m => !m.applied).length, 2);
+  assert.equal((await status(client)).filter(m => !m.applied).length, 3);
   await assert.rejects(assertCurrent(client), /Database migrations required/);
 });
 
@@ -33,7 +33,7 @@ test('migrations: reject changed, missing and nonconsecutive applied history', a
   for (const history of [
     [{ ...migrations[0], checksum: 'changed' }],
     [migrations[1]],
-    [...migrations, { version: 3, name: '0003_unknown.sql', checksum: 'unknown' }],
+    [...migrations, { version: 4, name: '0004_unknown.sql', checksum: 'unknown' }],
   ]) {
     const client = { query: async sql => ({ rows: sql.includes('to_regclass') ? [{ name: 'schema_migrations' }] : history }) };
     await assert.rejects(status(client), /history differs/);

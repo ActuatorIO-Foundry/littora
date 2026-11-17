@@ -7,7 +7,13 @@ const contour = { type: 'Polygon', coordinates: [[[5.72,43.12],[5.78,43.12],[5.7
 const commune = { nom: 'Bandol', code: '83009', centre: { coordinates: [5.75,43.14] },
   bbox: contour, contour, departement: { code: '83', nom: 'Var' }, region: { code: '93', nom: 'Provence' } };
 const osm = { category: 'natural', type: 'beach', osm_type: 'way', osm_id: 1, name: 'Renecros', lat: '43.134', lon: '5.75' };
-function fixture(t, reply) {
+function fixture(t, reply, discovery = true) {
+  const previous = process.env.CATALOGUE_DISCOVERY_ENABLED;
+  process.env.CATALOGUE_DISCOVERY_ENABLED = String(discovery);
+  t.after(() => {
+    if (previous === undefined) delete process.env.CATALOGUE_DISCOVERY_ENABLED;
+    else process.env.CATALOGUE_DISCOVERY_ENABLED = previous;
+  });
   const memory = new Map(), requests = [], imports = [];
   t.mock.method(global, 'fetch', async url => {
     requests.push(new URL(url));
@@ -18,6 +24,19 @@ function fixture(t, reply) {
     upsertDiscoveredBeach: async (...args) => imports.push(args), inGeometry: async () => [{ id: 'local' }] };
   return { service: new PlacesService(cache, beaches), requests, imports };
 }
+
+test('communes: readonly catalogue never requests or imports OSM beaches', async t => {
+  const { service, requests, imports } = fixture(t, url => {
+    assert.equal(url.hostname, 'geo.api.gouv.fr');
+    return commune;
+  }, false);
+  const result = await service.catalogue('83009');
+  assert.equal(result.source, 'local-catalogue');
+  assert.equal(result.coverage, 'partial');
+  assert.deepEqual(result.beaches, [{ id: 'local' }]);
+  assert.equal(imports.length, 0);
+  assert.equal(requests.length, 1);
+});
 
 test('communes: official lookup, metropolitan coverage, cache and validation', async t => {
   const { service, requests } = fixture(t, () => [commune, { ...commune, code: '97411', centre: { coordinates: [55.4,-20.9] } }]);

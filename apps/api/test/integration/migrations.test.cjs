@@ -43,7 +43,7 @@ test('migrations: fresh install, readonly startup guard and idempotent reference
   try {
     await assert.rejects(factory(), /Database migrations required/);
     assert.equal((await pool.query("select to_regclass('public.schema_migrations') as name")).rows[0].name, null);
-    assert.equal((await migrate(pool)).length, 2);
+    assert.equal((await migrate(pool)).length, 3);
     assert.deepEqual(await migrate(pool), []);
     const ready = await factory();
     await ready.end();
@@ -84,7 +84,7 @@ test('migrations: preserve historical UUIDs, duplicates, reports, samples and OS
   assert.equal((await pool.query('select count(*)::int as count from beaches where seed_key is not null')).rows[0].count, 5);
   assert.equal((await pool.query('select count(*)::int as count from water_quality where is_demo')).rows[0].count, 10);
   assert.deepEqual((await pool.query("select extversion from pg_extension where extname='postgis'")).rows, extension);
-  assert.equal((await status(pool)).filter(m => m.applied).length, 2);
+  assert.equal((await status(pool)).filter(m => m.applied).length, 3);
   await assert.rejects(pool.query(`insert into beaches(name,lat,lon,osm_id) select name,lat,lon,osm_id from beaches limit 1`), e => e.code === '23505');
   await assert.rejects(pool.query(`insert into reports(beach_id,type) values($1,'flag')`, [randomUUID()]), e => e.code === '23503');
   await pool.query('set enable_seqscan = off');
@@ -116,7 +116,7 @@ test('migrations: transactional rollback, concurrent lock and checksum protectio
   const { pool } = await isolated(t);
   await migrate(pool);
   const sql = 'CREATE TABLE must_rollback(id int); SELECT 1/0;';
-  const broken = [...manifest(), { version: 3, name: '0003_failure.sql', sql, checksum: createHash('sha256').update(sql).digest('hex') }];
+  const broken = [...manifest(), { version: 4, name: '0004_failure.sql', sql, checksum: createHash('sha256').update(sql).digest('hex') }];
   await assert.rejects(migrate(pool, broken), e => e.code === '22012');
   assert.equal((await pool.query("select to_regclass('public.must_rollback') as name")).rows[0].name, null);
   await assertCurrent(pool);

@@ -1,0 +1,99 @@
+# Classification des milieux aquatiques
+
+Le lot #13 remplace les heuristiques sur les noms par une classification geographique
+persistante. Il ne collecte aucune nouvelle plage. Une region, un departement, la
+salinite ou le mot "lac" dans un nom ne determinent pas le milieu.
+
+## Source et decision
+
+Les extraits BD TOPO de l'IGN sont recuperes en GeoJSON depuis le
+[service WFS de la Geoplateforme](https://cartes.gouv.fr/aide/fr/guides-utilisateur/utiliser-les-services-de-la-geoplateforme/diffusion/wfs/).
+Les couches utilisees sont `BDTOPO_V3:limite_terre_mer` et
+`BDTOPO_V3:surface_hydrographique`. Attribution des references : IGN, BD TOPO.
+
+- `Plus hautes eaux` dans la limite terre-mer : candidat mer.
+- `Lac` en service : candidat lac, independamment de sa salinite.
+- `Ecoulement naturel` en service : candidat riviere.
+- Bassins techniques, canaux, lagunes et natures non reconnues : inconnu.
+
+PostGIS mesure la distance geodesique entre la position de la plage et les geometries.
+La reference la plus proche doit etre a 200 metres maximum. Si un autre milieu,
+y compris non classe, est a moins de 30 metres de difference, le resultat reste
+inconnu. Ces seuils sont une inference de proximite, pas une certification de terrain
+ni une autorisation de baignade. Une grande plage, un estuaire ou une position
+imprecise peuvent necessiter une correction documentee.
+
+Une source incomplete, invalide ou indisponible ne devient jamais "mer" par defaut.
+Un echec de collecte ne remplace pas une classification precedente. Les geometries
+invalides ne doivent pas servir de preuve. Les dates de collecte et de modification
+de la source sont distinctes ; aucune date de mesure meteo n'est deduite de ces dates.
+
+## Persistance et API
+
+La migration `0003_water_classification.sql` ajoute une table distincte et la vue
+`beach_catalogue`. Aucun identifiant, nom, equipement, signalement ou echantillon
+sanitaire existant n'est modifie. Aucune classification n'est fabriquee par le seed.
+
+Le champ public `waterType` reste `sea`, `lake`, `river` ou `unknown`.
+`waterClassification` ajoute methode, source, date, motif et preuves (identifiant
+IGN, couche, nature, type, distance et date de modification). Il vaut `null` tant
+qu'aucune classification n'est disponible ou si les coordonnees ont change.
+Les listes, le catalogue pagine, la commune, le detail et les recommandations lisent
+la meme vue. Les filtres existants utilisent ce type sans modification visuelle.
+
+Les fiches lac, riviere ou de milieu inconnu ne demandent pas de previsions marines
+ni de marees. La temperature de l'eau et les scores qui dependent de mesures marines
+restent inconnus jusqu'a l'integration de sources adaptees aux eaux interieures.
+La meteo atmospherique et les observations communautaires restent consultables.
+
+## Exploitation
+
+Construire l'API avant la commande native. `DATABASE_URL` doit cibler la base voulue.
+Le mode `collect` est en lecture seule sur PostgreSQL ; les extraits et le rapport
+restent dans un dossier local ignore de Git.
+
+```sh
+npm run build:api
+node apps/api/scripts/classify-water.cjs collect .local/water-classification/report.json
+```
+
+La collecte groupe les positions existantes par maille de 0,1 degre, avec marge de
+500 metres environ. Les requetes sont sequentielles, espacees d'au moins 200 ms,
+limitees a 20 s et 16 Mio par page. La pagination est ordonnee et bornee a 5 pages
+de 1000 objets par couche/maille. Une limite atteinte sans completude est une erreur
+explicite. Le cache d'extraits dure 7 jours ; une relance reprend les extraits valides
+et retente les echecs. Le rapport expose progression, echecs, inconnus et preuves.
+
+Apres sauvegarde, restauration de verification et migration, appliquer le rapport
+controle. La transaction refuse un catalogue ou des coordonnees differents. Elle
+n'ecrit que dans `beach_water_classifications` et n'ecrase pas une correction revue.
+
+```sh
+node apps/api/scripts/classify-water.cjs apply .local/water-classification/report.json
+node apps/api/scripts/classify-water.cjs review BEACH_UUID lake https://source-officielle.example/page "Justification documentee du milieu"
+```
+
+La commande `review` est reservee a l'exploitation disposant des acces PostgreSQL ;
+aucune route publique de correction n'est ajoutee. Conserver le rapport applique
+avec la sauvegarde. Les acces et l'historique de moderation restent suivis separement.
+
+Les anciennes routes de decouverte restent en lecture seule par defaut.
+`CATALOGUE_DISCOVERY_ENABLED=true` est une activation explicite des anciens imports,
+qui restent partiels et ne doivent pas etre actives pour cette livraison. Le controle
+des objets OSM refuse les commerces, parkings, acces et resorts sans plage naturelle.
+Les imports par lots, la deduplication spatiale complete et la couverture exhaustive
+restent des travaux distincts ; le catalogue n'est pas presente comme exhaustif.
+
+## Verification et retour arriere
+
+Les tests couvrent La Baule/Pornic, lac sale, riviere, ambiguite d'estuaire, absence
+de source, zero metre, pagination, correction, deplacement et absence de mutation
+du catalogue. Les empreintes des tables historiques doivent etre identiques avant
+et apres migration/application sur la copie restauree puis sur la base locale.
+
+L'ancienne API peut lire le schema additif, mais son garde-fou refuse un historique
+de migrations plus recent. Preparer et tester une image de compatibilite contenant
+l'ancien code et le manifeste complet incluant 0003 ; ne pas effacer une migration
+appliquee. Autre retour possible : restaurer la sauvegarde dans un volume distinct
+et utiliser l'image correspondante. Ne jamais remplacer le volume actif sans verifier
+les ecritures intervenues depuis la sauvegarde.

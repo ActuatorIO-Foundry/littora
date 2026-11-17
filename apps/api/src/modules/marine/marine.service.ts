@@ -2,6 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { CacheService } from '../../cache/cache.service';
 import { fetchJson } from '../../shared/http';
 import { forecastData, ForecastData } from '../../shared/forecast-data';
+import { forecastUnits } from '../../shared/forecast-units';
+
+export function unavailableMarine(): ForecastData {
+  return { provider: 'unknown', kind: 'forecast', status: 'unknown', fetchedAt: null, validAt: null,
+    ageSeconds: null, producedAt: null,
+    units: Object.fromEntries(marineKeys.map(key => [key, forecastUnits[key].unit])),
+    current: Object.fromEntries(['time', ...marineKeys, 'salinity_ppt', 'jellyfish_risk'].map(key => [key, null])),
+    warning: 'Marine forecasts require a geographically classified sea beach. Inland water measurements are not connected.' };
+}
 
 const marineKeys = [
   'wave_height', 'wave_direction', 'wave_period', 'swell_wave_height', 'swell_wave_direction',

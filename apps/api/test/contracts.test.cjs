@@ -34,7 +34,10 @@ let app, url, calls = 0, fail = false, corrupt = false, receivedReport;
 const modules = [
   ['beaches', 'Beaches', { list: async () => { calls++; if (fail) throw new Error('SQL password=secret'); return [{ ...row, lat: corrupt ? 'bad' : row.lat }]; },
     get: async () => row, catalogue: async () => ({ beaches: [row], nextCursor: null }),
-    nearbyAmenities: async () => ({ beachId: id, provider: 'openstreetmap', radiusMeters: 1800, amenities: [] }),
+    nearbyAmenities: async () => ({ beachId: id, provider: 'openstreetmap', radiusMeters: 1800, amenities: [
+      { id: 'node/1', name: 'Parking', category: 'parking', lat: 43, lon: 6, distanceKm: 0.2, source: 'openstreetmap' },
+      { id: 'hint', name: 'To verify', category: 'toilets', lat: 43, lon: 6, distanceKm: 0.2, source: 'local-hint', verification: 'to_verify' },
+    ] }),
     discoverFromOpenStreetMap: async () => ({ provider: 'openstreetmap', imported: 0, beaches: [row] }) }],
   ['places', 'Places', { search: async () => [commune], catalogue: async () => ({ commune, beaches: [row], source: 'local-catalogue', collectedAt: null, coverage: 'partial', capped: false }) }],
   ['weather', 'Weather', { get: async () => forecast }], ['marine', 'Marine', { get: async () => forecast }],
@@ -137,6 +140,8 @@ test('contract: all public data routes return schema-conformant JSON', async () 
   const result = await fetch(`${url}/api/beaches/catalogue?limit=1`).then(r => r.json());
   assert.deepEqual(result.items, result.beaches);
   assert.deepEqual(result.pageInfo, { nextCursor: null, hasNextPage: false, limit: 1 });
+  const amenities = await fetch(`${url}/api/beaches/${id}/amenities`).then(r => r.json());
+  assert.deepEqual(amenities.amenities.map(item => item.verification), ['listed', 'to_verify']);
 });
 
 test('contract: invalid query/path/body never reaches a business service', async () => {

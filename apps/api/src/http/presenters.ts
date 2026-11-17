@@ -64,6 +64,10 @@ export function present(operation: string, data: any, query: Row): unknown {
   switch (operation) {
     case 'listBeaches': case 'getRecommendations': return data.map(presentBeach);
     case 'getBeach': return presentBeach(data);
+    case 'getBeachAmenities': return { ...data, amenities: data.amenities.map((amenity: Row) => ({
+      ...amenity, verification: amenity.verification ??
+        (['openstreetmap', 'openstreetmap-nominatim'].includes(amenity.source) ? 'listed' : 'to_verify'),
+    })) };
     case 'getCatalogue': {
       const items = data.beaches.map(presentBeach);
       return { beaches: items, nextCursor: data.nextCursor, items,

@@ -11,12 +11,14 @@ import { Report } from '../../models/report';
 import { ReportPayload } from '../../models/report-payload';
 
 export interface CreateReport$Params {
+  Authorization: string;
       body: ReportPayload
 }
 
 export function createReport(http: HttpClient, rootUrl: string, params: CreateReport$Params, context?: HttpContext): Observable<StrictHttpResponse<Report>> {
   const rb = new RequestBuilder(rootUrl, createReport.PATH, 'post');
   if (params) {
+    rb.header('Authorization', params.Authorization, {});
     rb.body(params.body, 'application/json');
   }
 

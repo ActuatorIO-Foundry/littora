@@ -33,6 +33,8 @@ export type { GetReports$Params as GetReports$Params } from './fn/littora/get-re
 export { getReports as getReports } from './fn/littora/get-reports';
 export type { CreateReport$Params as CreateReport$Params } from './fn/littora/create-report';
 export { createReport as createReport } from './fn/littora/create-report';
+export type { CreateContributionSession$Params as CreateContributionSession$Params } from './fn/littora/create-contribution-session';
+export { createContributionSession as createContributionSession } from './fn/littora/create-contribution-session';
 export type { GetAuthStatus$Params as GetAuthStatus$Params } from './fn/littora/get-auth-status';
 export { getAuthStatus as getAuthStatus } from './fn/littora/get-auth-status';
 export type { GetFavorites$Params as GetFavorites$Params } from './fn/littora/get-favorites';

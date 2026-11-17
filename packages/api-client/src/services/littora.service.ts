@@ -19,6 +19,9 @@ import { BeachPage } from '../models/beach-page';
 import { BeachScore } from '../models/beach-score';
 import { Commune } from '../models/commune';
 import { CommuneCatalogue } from '../models/commune-catalogue';
+import { ContributionSession } from '../models/contribution-session';
+import { createContributionSession } from '../fn/littora/create-contribution-session';
+import { CreateContributionSession$Params } from '../fn/littora/create-contribution-session';
 import { createReport } from '../fn/littora/create-report';
 import { CreateReport$Params } from '../fn/littora/create-report';
 import { discoverBeaches } from '../fn/littora/discover-beaches';
@@ -475,7 +478,7 @@ export class LittoraService extends BaseService {
   static readonly GetReportsPath = '/reports';
 
   /**
-   * Legacy list, newest 50 contributions. Not an official source.
+   * Newest 50 verified, unexpired, non-demo contributions. Not an official source.
    *
    * This method provides access to the full `HttpResponse`, allowing access to response headers.
    * To access only the response body, use `getReports()` instead.
@@ -488,7 +491,7 @@ export class LittoraService extends BaseService {
   }
 
   /**
-   * Legacy list, newest 50 contributions. Not an official source.
+   * Newest 50 verified, unexpired, non-demo contributions. Not an official source.
    *
    * This method provides access only to the response body.
    * To access the full response (for headers, for example), `getReports$Response()` instead.
@@ -506,6 +509,8 @@ export class LittoraService extends BaseService {
   static readonly CreateReportPath = '/reports';
 
   /**
+   * Anonymous contribution. Client confidence is ignored; server sets zero trust and pending moderation. Duplicate beach/type within 15 minutes returns 409; quota exhaustion returns 429.
+   *
    * This method provides access to the full `HttpResponse`, allowing access to response headers.
    * To access only the response body, use `createReport()` instead.
    *
@@ -517,6 +522,8 @@ export class LittoraService extends BaseService {
   }
 
   /**
+   * Anonymous contribution. Client confidence is ignored; server sets zero trust and pending moderation. Duplicate beach/type within 15 minutes returns 409; quota exhaustion returns 429.
+   *
    * This method provides access only to the response body.
    * To access the full response (for headers, for example), `createReport$Response()` instead.
    *
@@ -526,6 +533,37 @@ export class LittoraService extends BaseService {
     const resp = this.createReport$Response(params, context);
     return resp.pipe(
       map((r: StrictHttpResponse<Report>): Report => r.body)
+    );
+  }
+
+  /** Path part for operation `createContributionSession()` */
+  static readonly CreateContributionSessionPath = '/reports/session';
+
+  /**
+   * Issues an anonymous, non-account token valid for 30 days. Limited to 3 sessions/hour and 8/day per network address; no raw address is stored. Requires server REPORT_IP_HASH_KEY configuration.
+   *
+   * This method provides access to the full `HttpResponse`, allowing access to response headers.
+   * To access only the response body, use `createContributionSession()` instead.
+   *
+   * This method doesn't expect any request body.
+   */
+  createContributionSession$Response(params?: CreateContributionSession$Params, context?: HttpContext): Observable<StrictHttpResponse<ContributionSession>> {
+    const obs = createContributionSession(this.http, this.rootUrl, params, context);
+    return obs;
+  }
+
+  /**
+   * Issues an anonymous, non-account token valid for 30 days. Limited to 3 sessions/hour and 8/day per network address; no raw address is stored. Requires server REPORT_IP_HASH_KEY configuration.
+   *
+   * This method provides access only to the response body.
+   * To access the full response (for headers, for example), `createContributionSession$Response()` instead.
+   *
+   * This method doesn't expect any request body.
+   */
+  createContributionSession(params?: CreateContributionSession$Params, context?: HttpContext): Observable<ContributionSession> {
+    const resp = this.createContributionSession$Response(params, context);
+    return resp.pipe(
+      map((r: StrictHttpResponse<ContributionSession>): ContributionSession => r.body)
     );
   }
 

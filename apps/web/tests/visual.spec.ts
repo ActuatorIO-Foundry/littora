@@ -58,6 +58,7 @@ const score = {
 async function mockApi(page: Page) {
   await page.route("**/api/**", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith('/reports/session')) return route.fulfill({status:201,json:{token:'a'.repeat(64),expiresAt:'2099-01-01T00:00:00Z'}});
     if (url.pathname.startsWith('/api/places/')) return route.fulfill({ json: [] });
     if (url.pathname.includes("/score/")) return route.fulfill({ json: score });
     if (url.pathname.endsWith("/amenities"))
@@ -315,6 +316,40 @@ test("detail : series reelles, indisponibilite et equipements", async ({
   await expect(page.getByRole("alert")).toContainText(
     "n’a pas pu être envoyée",
   );
+});
+
+test('contributions : session reutilisee, confiance absente et moderation explicite', async ({page}) => {
+  let sessions=0;
+  const payloads: any[]=[];
+  await page.route('**/api/reports/session',route=>{
+    sessions++;
+    return route.fulfill({status:201,json:{token:'b'.repeat(64),expiresAt:'2099-01-01T00:00:00Z'}});
+  });
+  await page.route('**/api/reports',route=>{
+    payloads.push(route.request().postDataJSON());
+    expect(route.request().headers()['authorization']).toBe('Bearer '+'b'.repeat(64));
+    return route.fulfill({status:201,json:{status:'pending',confidence:0}});
+  });
+  await page.goto('/plages/test-sea');
+  await page.getByRole('button',{name:'Méduses',exact:true}).click();
+  await expect(page.getByText('Observation reçue, en attente de modération. Merci.')).toBeVisible();
+  await page.getByRole('button',{name:'Pollution',exact:true}).click();
+  await expect.poll(()=>payloads.length).toBe(2);
+  expect(sessions).toBe(1);
+  expect(payloads.every(p=>p.confidence===undefined&&p.value.source===undefined&&p.observedAt)).toBeTruthy();
+  await noOverflow(page);
+});
+
+test('contributions : doublon et quota produisent des erreurs actionnables', async ({page}) => {
+  let status=409;
+  await page.route('**/api/reports',route=>route.fulfill({status,json:{code:status===409?'CONFLICT':'RATE_LIMITED'}}));
+  await page.goto('/plages/test-sea');
+  await page.getByRole('button',{name:'Méduses',exact:true}).click();
+  await expect(page.getByRole('alert')).toContainText('déjà été reçue');
+  status=429;
+  await page.getByRole('button',{name:'Méduses',exact:true}).click();
+  await expect(page.getByRole('alert')).toContainText('Veuillez patienter');
+  await noOverflow(page);
 });
 
 test('equipements : tous les homonymes restent visibles et la source ancienne est explicite', async ({ page }) => {

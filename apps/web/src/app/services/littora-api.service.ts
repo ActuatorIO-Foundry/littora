@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
 import { LittoraService } from '@littora/api-client';
-import type { Beach as ApiBeach, Commune as ApiCommune } from '@littora/api-client/models';
+import type { Beach as ApiBeach, Commune as ApiCommune, ContributionSession } from '@littora/api-client/models';
 import { Commune, CommuneCatalogue } from '../models/commune.model';
-import { EMPTY, Observable, expand, map, reduce } from 'rxjs';
+import { EMPTY, Observable, catchError, expand, finalize, map, of, reduce, shareReplay, switchMap, tap, throwError } from 'rxjs';
 import { Beach, BeachAmenitiesResponse, BeachScore, ReportPayload } from '../models/beach.model';
 
 // Preserve display models while the wire contract makes unknown values explicit.
@@ -16,6 +16,27 @@ const communeView = (commune: ApiCommune): Commune => ({ ...commune,
 })
 export class LittoraApiService {
     constructor(private readonly client: LittoraService) { }
+    private contributionSession?: ContributionSession;
+    private pendingSession?: Observable<ContributionSession>;
+
+    private session(): Observable<ContributionSession> {
+        if (!this.contributionSession) {
+            try { this.contributionSession = JSON.parse(localStorage.getItem('littora.contribution') ?? 'null') ?? undefined; } catch { }
+        }
+        const saved = this.contributionSession;
+        if (saved && /^[a-f0-9]{64}$/.test(saved.token) && Date.parse(saved.expiresAt) > Date.now() + 60000) return of(saved);
+        if (!this.pendingSession) {
+            this.pendingSession = this.client.createContributionSession().pipe(
+                tap(session => {
+                    this.contributionSession = session;
+                    try { localStorage.setItem('littora.contribution', JSON.stringify(session)); } catch { }
+                }),
+                finalize(() => { this.pendingSession = undefined; }),
+                shareReplay({bufferSize: 1, refCount: false}),
+            );
+        }
+        return this.pendingSession;
+    }
 
     searchCommunes(query: string): Observable<Commune[]> {
         return this.client.searchCommunes({ q: query }).pipe(map(rows => rows.map(communeView)));
@@ -65,7 +86,15 @@ export class LittoraApiService {
     }
 
     createReport(payload: ReportPayload): Observable<unknown> {
-        return this.client.createReport({ body: payload });
+        return this.session().pipe(switchMap(session => this.client.createReport({
+            body: payload, Authorization: `Bearer ${session.token}`,
+        })), catchError(error => {
+            if (error.status === 401) {
+                this.contributionSession = undefined;
+                try { localStorage.removeItem('littora.contribution'); } catch { }
+            }
+            return throwError(() => error);
+        }));
     }
 
     getReports(beachId: string): Observable<unknown[]> {

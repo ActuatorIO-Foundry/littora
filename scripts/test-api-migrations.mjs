@@ -76,8 +76,8 @@ try {
   assert.match(logs.stdout + logs.stderr, /Database migrations required/);
   assert.equal(sql("select to_regclass('public.schema_migrations')"), '', 'Startup must not modify the schema');
 
-  assert.equal(JSON.parse(command('status')).filter(row => !row.applied).length, 4);
-  assert.equal(JSON.parse(command('migrate')).applied.length, 4);
+  assert.equal(JSON.parse(command('status')).filter(row => !row.applied).length, 5);
+  assert.equal(JSON.parse(command('migrate')).applied.length, 5);
   assert.deepEqual(JSON.parse(command('migrate')).applied, []);
   assert.ok(JSON.parse(command('status')).every(row => row.applied));
   command('seed');
@@ -114,7 +114,7 @@ try {
     await until(() => request(previous, '/api/beaches?limit=1').status === 200, 'previous API compatibility');
     assert.equal(request(previous, `/api/beaches/${id}`).body.id, id);
   }
-  console.log(JSON.stringify({ verified: true, readonlyStartup: true, migrations: 3,
+  console.log(JSON.stringify({ verified: true, readonlyStartup: true, migrations: 5,
     seedIdempotent: true, beaches: 5, sanitarySamples: 0, http: true, offlineScoreContract: true,
     previousImage: Boolean(process.env.PREVIOUS_API_IMAGE) }));
 } finally {

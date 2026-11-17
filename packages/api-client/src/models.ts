@@ -14,6 +14,7 @@ export type { Bounds } from './models/bounds';
 export type { Commune } from './models/commune';
 export type { CommuneCatalogue } from './models/commune-catalogue';
 export type { CommunityFlag } from './models/community-flag';
+export type { ContributionSession } from './models/contribution-session';
 export type { DataStatus } from './models/data-status';
 export type { Discovery } from './models/discovery';
 export type { FacilityPresence } from './models/facility-presence';

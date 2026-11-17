@@ -55,7 +55,9 @@ export function presentScore(score: Row) {
     },
   };
 }
-export const presentReport = (row: Row) => ({ ...row, confidence: row.confidence == null ? null : Number(row.confidence),
+export const presentReport = (row: Row) => ({ id:row.id,beach_id:row.beach_id,type:row.type,value:row.value,
+  status:row.status,created_at:row.created_at,observed_at:date(row.observed_at),expires_at:date(row.expires_at),
+  confidence: row.confidence == null ? null : Number(row.confidence),
   provenance: { kind: 'contribution', source: 'littora-reports',
     isDemo: row.is_demo === true || row.value?.demo === true || row.value?.demo === 'true', verified: row.status === 'verified' },
 });

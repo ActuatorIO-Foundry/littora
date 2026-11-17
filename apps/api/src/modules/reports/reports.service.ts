@@ -1,23 +1,26 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PG } from '../../database/database.module';
+import { ContributionsService, ContributionIdentity } from './contributions.service';
+import { normalizeReport, ReportInput } from './report-input';
 
 type Flag = 'green' | 'yellow' | 'red';
 
 @Injectable()
 export class ReportsService {
-  constructor(@Inject(PG) private db: any) {}
+  constructor(@Inject(PG) private db: any, private contributions: ContributionsService) {}
 
-  async create(dto: any) {
-    const { rows } = await this.db.query(
-      'insert into reports(beach_id,type,value,confidence) values($1,$2,$3,$4) returning *',
-      [dto.beachId, dto.type, dto.value ?? {}, dto.confidence ?? 0.5],
-    );
-    return rows[0];
+  session(address?: string) { return this.contributions.session(address); }
+
+  create(dto: ReportInput, identity: ContributionIdentity) {
+    return this.contributions.submit(normalizeReport(dto), identity);
   }
 
   async list(beachId: string) {
     const { rows } = await this.db.query(
-      'select * from reports where beach_id=$1 order by created_at desc limit 50',
+      `select r.*,c.observed_at,c.expires_at from reports r left join report_contributions c on c.report_id=r.id
+       where beach_id=$1 and status='verified' and coalesce(r.value->>'demo','false')<>'true'
+       and coalesce(c.expires_at,r.created_at+interval '24 hours')>now()
+       order by created_at desc limit 50`,
       [beachId],
     );
     return rows;
@@ -28,7 +31,8 @@ export class ReportsService {
       `select type,count(*)::int as count,avg(confidence)::float as confidence
        from reports
        where beach_id=$1
-       and status in ('pending','verified')
+       and status='verified' and coalesce(value->>'demo','false')<>'true'
+       and coalesce((select expires_at from report_contributions where report_id=reports.id),created_at+interval '24 hours')>now()
        and created_at > now() - interval '24 hours'
        group by type`,
       [beachId],
@@ -42,7 +46,8 @@ export class ReportsService {
        from reports
        where beach_id=$1
        and type='flag'
-       and status in ('pending','verified')
+       and status='verified' and coalesce(value->>'demo','false')<>'true'
+       and coalesce((select expires_at from report_contributions where report_id=reports.id),created_at+interval '24 hours')>now()
        and created_at > now() - interval '12 hours'
        order by created_at desc
        limit 80`,

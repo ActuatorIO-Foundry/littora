@@ -8,7 +8,7 @@ const { manifest, status, assertCurrent, seed } = require('../scripts/database.c
 
 test('migrations: consecutive immutable SQL manifest', t => {
   const migrations = manifest();
-  assert.equal(migrations.length, 4);
+  assert.equal(migrations.length, 5);
   for (const item of migrations) {
     assert.equal(item.checksum, createHash('sha256').update(item.sql).digest('hex'));
   }
@@ -24,7 +24,7 @@ test('migrations: status and startup verification are strictly read-only', async
     assert.match(sql, /^select /i);
     return { rows: [{ name: null }] };
   } };
-  assert.equal((await status(client)).filter(m => !m.applied).length, 4);
+  assert.equal((await status(client)).filter(m => !m.applied).length, 5);
   await assert.rejects(assertCurrent(client), /Database migrations required/);
 });
 

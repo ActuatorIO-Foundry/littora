@@ -31,10 +31,15 @@ export type ReportPayload = ({
 };
 
 /**
- * Legacy client weight. Trust and anti-abuse policy is tracked separately.
+ * Ignored. The server assigns zero trust pending moderation.
  *
  * @deprecated
  */
 'confidence'?: number;
+
+/**
+ * Within the preceding 24 hours. Defaults to receipt time; future values beyond 30 seconds are rejected.
+ */
+'observedAt'?: string;
 };
 

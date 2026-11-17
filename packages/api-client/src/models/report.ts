@@ -5,7 +5,9 @@ export interface Report {
   beach_id: string;
   confidence: number | null;
   created_at: string;
+  expires_at?: string | null;
   id: string;
+  observed_at?: string | null;
   provenance: {
 'kind': 'contribution';
 'source': 'littora-reports';

@@ -15,7 +15,7 @@ export class AmenitiesService {
   }
 
   private async load(id:string) {
-    const beach=(await this.db.query('select id,lat,lon from beaches where id=$1',[id])).rows[0];
+    const beach=(await this.db.query('select id,lat,lon from beach_catalogue where id=$1',[id])).rows[0];
     if(!beach)throw new NotFoundException('Beach not found');
     const collection=(await this.db.query('select * from beach_amenity_collections where beach_id=$1',[id])).rows[0];
     const samePosition=collection?.lat===beach.lat&&collection?.lon===beach.lon;

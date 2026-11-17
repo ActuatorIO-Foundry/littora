@@ -43,7 +43,7 @@ test('migrations: fresh install, readonly startup guard and idempotent reference
   try {
     await assert.rejects(factory(), /Database migrations required/);
     assert.equal((await pool.query("select to_regclass('public.schema_migrations') as name")).rows[0].name, null);
-    assert.equal((await migrate(pool)).length, 5);
+    assert.equal((await migrate(pool)).length, 6);
     assert.deepEqual(await migrate(pool), []);
     const ready = await factory();
     await ready.end();
@@ -84,7 +84,7 @@ test('migrations: preserve historical UUIDs, duplicates, reports, samples and OS
   assert.equal((await pool.query('select count(*)::int as count from beaches where seed_key is not null')).rows[0].count, 5);
   assert.equal((await pool.query('select count(*)::int as count from water_quality where is_demo')).rows[0].count, 10);
   assert.deepEqual((await pool.query("select extversion from pg_extension where extname='postgis'")).rows, extension);
-  assert.equal((await status(pool)).filter(m => m.applied).length, 5);
+  assert.equal((await status(pool)).filter(m => m.applied).length, 6);
   await assert.rejects(pool.query(`insert into beaches(name,lat,lon,osm_id) select name,lat,lon,osm_id from beaches limit 1`), e => e.code === '23505');
   await assert.rejects(pool.query(`insert into reports(beach_id,type) values($1,'flag')`, [randomUUID()]), e => e.code === '23503');
   await pool.query('set enable_seqscan = off');

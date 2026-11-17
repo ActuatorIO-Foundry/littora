@@ -33,11 +33,11 @@ test('isolated PostGIS catalogue, reports and Redis cache', { timeout: 30000 }, 
     assert.ok(Number(result[0].distanceKm) < 0.01);
     assert.equal(result[0].waterType, 'unknown', 'Seed coordinates alone are not classification evidence');
 
-    const outline = { type: 'Polygon', coordinates: [[[0,0],[1,0],[0,1],[0,0]]] };
+    const outline = { type: 'Polygon', coordinates: [[[2,48],[3,48],[2,49],[2,48]]] };
     const features = [
-      { osmId: `test/${randomUUID()}`, name: 'Inside commune', city: 'Test', lat: 0.2, lon: 0.2 },
-      { osmId: `test/${randomUUID()}`, name: 'On boundary', city: 'Test', lat: 0, lon: 0.5 },
-      { osmId: `test/${randomUUID()}`, name: 'Outside commune', city: 'Test', lat: 0.9, lon: 0.9 },
+      { osmId: `test/${randomUUID()}`, name: 'Inside commune', city: 'Test', lat: 48.2, lon: 2.2 },
+      { osmId: `test/${randomUUID()}`, name: 'On boundary', city: 'Test', lat: 48, lon: 2.5 },
+      { osmId: `test/${randomUUID()}`, name: 'Outside commune', city: 'Test', lat: 48.9, lon: 2.9 },
     ];
     assert.deepEqual((await beaches.featuresInGeometry(features, outline)).map(f => f.name), ['Inside commune', 'On boundary']);
     try {

@@ -81,7 +81,8 @@ export class ContributionsService {
     return this.transaction(async client => {
       const actor = (await client.query('select id from report_contributors where token_hash=$1 and expires_at>now() for share', [tokenHash])).rows[0];
       if (!actor) throw new UnauthorizedException();
-      if (!(await client.query('select id from beaches where id=$1 for key share', [dto.beachId])).rows.length) throw new NotFoundException();
+      if (!(await client.query(`select id from beaches where id=$1
+        and exists(select 1 from beach_catalogue c where c.id=beaches.id) for key share`, [dto.beachId])).rows.length) throw new NotFoundException();
       // Serialise both network and actor, including submissions from different API instances.
       for (const key of [network, actor.id].sort()) await client.query('select pg_advisory_xact_lock(hashtextextended($1,23))', [key]);
       const duplicate = await client.query(`select r.id from reports r join report_contributions c on c.report_id=r.id

@@ -267,11 +267,14 @@ export class BeachesService {
   }
 
   async upsertDiscoveredBeach(feature: { osmId: string; name: string; city?: string | null; lat: number; lon: number }, region: string, coastline: string, department = region) {
+    if (!Number.isFinite(feature.lat) || !Number.isFinite(feature.lon) || Math.abs(feature.lat)>90 || Math.abs(feature.lon)>180) return null;
+    const eligibility = await this.db.query('select catalogue_in_metropolitan_france($1,$2) as included', [feature.lat,feature.lon]);
+    if (eligibility.rows[0]?.included !== true) return null;
     const existing = await this.db.query(
-      `select ${catalogueColumns} from beach_catalogue where osm_id=$1 limit 1`,
+      `select id,catalogue_in_metropolitan_france(lat,lon) as included from beaches where osm_id=$1 limit 1`,
       [feature.osmId],
     );
-    if (existing.rows[0]) return this.enrichBeach({ ...existing.rows[0], distanceKm: null });
+    if (existing.rows[0]) return existing.rows[0].included ? this.get(existing.rows[0].id) : null;
 
     const duplicate = await this.db.query(
       `select ${catalogueColumns} from beach_catalogue
@@ -294,7 +297,7 @@ export class BeachesService {
       const concurrent = await this.db.query(`select ${catalogueColumns} from beach_catalogue where osm_id=$1`, [feature.osmId]);
       return concurrent.rows[0] ? this.enrichBeach({ ...concurrent.rows[0], distanceKm: null }) : null;
     }
-    return this.enrichBeach({ ...rows[0], distanceKm: null });
+    return this.get(rows[0].id);
   }
 
 }

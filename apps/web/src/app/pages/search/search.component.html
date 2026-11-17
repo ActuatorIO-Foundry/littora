@@ -12,13 +12,49 @@
     </button>
   </div>
   <div class="search-tools">
-    <label class="search-field"
-      ><app-icon name="search" /><input
-        [(ngModel)]="query"
-        (ngModelChange)="syncFilters()"
-        placeholder="Une plage, une ville…"
-        aria-label="Rechercher dans les plages"
-    /></label>
+    <div class="place-search">
+      <label class="search-field"
+        ><app-icon name="search" /><input
+          [(ngModel)]="query"
+          (ngModelChange)="onQueryChange()"
+          (keydown)="onPlaceKey($event)"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-controls="commune-suggestions"
+          [attr.aria-expanded]="communeSuggestions.length > 0"
+          [attr.aria-activedescendant]="
+            activeSuggestion >= 0 ? 'commune-option-' + activeSuggestion : null
+          "
+          placeholder="Une plage, une ville…"
+          aria-label="Rechercher dans les plages"
+      /></label>
+      <ul
+        *ngIf="communeSuggestions.length"
+        id="commune-suggestions"
+        class="commune-suggestions"
+        role="listbox"
+        aria-label="Communes"
+      >
+        <li
+          *ngFor="let commune of communeSuggestions; let i = index"
+          role="presentation"
+        >
+          <button
+            type="button"
+            role="option"
+            [id]="'commune-option-' + i"
+            [attr.aria-selected]="i === activeSuggestion"
+            (click)="chooseCommune(commune.code)"
+          >
+            <strong>{{ commune.name }}</strong><span
+              >{{ commune.department.name }} ({{
+                commune.department.code
+              }})</span
+            >
+          </button>
+        </li>
+      </ul>
+    </div>
     <label class="zone-select"
       ><span class="sr-only">Façade géographique</span
       ><select
@@ -42,6 +78,21 @@
       <span class="filter-count" *ngIf="filterCount()">{{
         filterCount()
       }}</span>
+    </button>
+  </div>
+  <div class="commune-selection" *ngIf="selectedCommune">
+    <app-icon name="locate" [size]="16" />
+    <span
+      >{{ selectedCommune.name }} · {{ selectedCommune.department.name }}</span
+    >
+    <button
+      class="icon-button"
+      type="button"
+      (click)="clearCommune()"
+      aria-label="Retirer la commune"
+      title="Retirer la commune"
+    >
+      <app-icon name="close" [size]="16" />
     </button>
   </div>
   <section
@@ -164,10 +215,11 @@
   <div class="explorer-grid" [class.map-view]="mobileView === 'map'">
     <section class="map-column">
       <app-coast-map
+        [commune]="selectedCommune"
         [beaches]="displayedBeaches()"
         [selected]="selectedBeach?.id || null"
         [zoneId]="selectedZone?.id || null"
-        (zoneSelect)="exploreZone($event)"
+        (zoneSelect)="chooseZone($event.id)"
         (beachSelect)="fromMap($event)"
       />
       <div class="map-caption">
@@ -187,7 +239,7 @@
               ? "Recherche en cours"
               : displayedBeaches().length +
                 (displayedBeaches().length === 1 ? " plage" : " plages")
-          }}<span>{{ selectedZone?.name || "Le littoral français" }}</span>
+          }}<span>{{ selectedCommune?.name || selectedZone?.name || "Le littoral français" }}</span>
         </h2>
         <label
           ><span class="sr-only">Trier les plages</span

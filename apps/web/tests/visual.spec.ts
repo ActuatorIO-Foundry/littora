@@ -58,6 +58,7 @@ const score = {
 async function mockApi(page: Page) {
   await page.route("**/api/**", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.startsWith('/api/places/')) return route.fulfill({ json: [] });
     if (url.pathname.includes("/score/")) return route.fulfill({ json: score });
     if (url.pathname.endsWith("/amenities"))
       return route.fulfill({
@@ -132,7 +133,7 @@ test('recherche : catalogue complet au-dela de 180 et 500 plages', async ({ page
   await page.goto('/recherche');
   await expect(page.locator('.results-heading h2')).toContainText('602 plages');
   expect(cursors).toEqual([0, 200, 400, 600]);
-  await page.getByRole('textbox', { name: 'Rechercher dans les plages' }).fill('Escale 0601');
+  await page.getByRole('combobox', { name: 'Rechercher dans les plages' }).fill('Escale 0601');
   await expect(page.locator('.results-heading h2')).toContainText('1 plage');
   await expect(page.getByRole('button', { name: 'Escale 0601', exact: true })).toBeVisible();
 });

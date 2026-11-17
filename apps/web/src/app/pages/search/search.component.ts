@@ -4,6 +4,7 @@ import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { map, Subscription, switchMap, timeout } from "rxjs";
 import { Beach, BeachScore } from "../../models/beach.model";
+import { Commune } from "../../models/commune.model";
 import { LittoraApiService } from "../../services/littora-api.service";
 import { IconComponent } from "../../shared/icon.component";
 import { LoadingComponent } from "../../shared/loading.component";
@@ -36,6 +37,9 @@ export class SearchComponent implements OnInit, OnDestroy {
   score: BeachScore | null = null;
   readonly coastalZones = COASTAL_ZONES;
   selectedZone: CoastalZone | null = null;
+  selectedCommune: Commune | null = null;
+  communeSuggestions: Commune[] = [];
+  activeSuggestion = -1;
   selectedUsage = "bathing";
   query = "";
   waterType = "all";
@@ -65,6 +69,9 @@ export class SearchComponent implements OnInit, OnDestroy {
   readonly providerLabel = providerLabel;
   private listRequest?: Subscription;
   private scoreRequest?: Subscription;
+  private placeRequest?: Subscription;
+  private placeTimer?: ReturnType<typeof setTimeout>;
+  private communePending = false;
   private destroyed = false;
   constructor(
     private readonly api: LittoraApiService,
@@ -96,11 +103,134 @@ export class SearchComponent implements OnInit, OnDestroy {
         ? Number(p.get("max"))
         : null;
     const zone = this.coastalZones.find((z) => z.id === p.get("zone"));
-    if (zone) this.exploreZone(zone);
-    else this.loadBeaches();
+    const commune = p.get("commune");
+    if (commune) this.chooseCommune(commune);
+    else {
+      if (zone) this.exploreZone(zone);
+      else this.loadBeaches();
+      if (this.query.trim().length >= 2) this.findCommunes();
+    }
+  }
+  onQueryChange(): void {
+    this.message = "";
+    clearTimeout(this.placeTimer);
+    this.placeRequest?.unsubscribe();
+    this.communeSuggestions = [];
+    this.activeSuggestion = -1;
+    if (this.selectedCommune || this.communePending) {
+      this.selectedCommune = null;
+      this.selectedBeach = null;
+      this.score = null;
+      this.loadBeaches();
+    }
+    this.resultLimit = 20;
+    this.syncFilters();
+    if (this.query.trim().length >= 2)
+      this.placeTimer = setTimeout(() => this.findCommunes(), 350);
+  }
+  private findCommunes(): void {
+    const query = this.query.trim();
+    this.placeRequest?.unsubscribe();
+    this.placeRequest = this.api
+      .searchCommunes(query)
+      .pipe(timeout(12000))
+      .subscribe({
+        next: (communes) => {
+          if (query !== this.query.trim()) return;
+          this.communeSuggestions = communes;
+          const normalize = (value: string) =>
+            value
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .toLocaleLowerCase("fr");
+          const exact = communes.filter(
+            (c) => normalize(c.name) === normalize(query),
+          );
+          if (exact.length === 1) this.chooseCommune(exact[0].code);
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          this.message =
+            "Recherche de commune indisponible. Résultats du catalogue local affichés.";
+          this.cdr.markForCheck();
+        },
+      });
+  }
+  onPlaceKey(event: KeyboardEvent): void {
+    if (event.key === "Escape") {
+      this.communeSuggestions = [];
+      this.activeSuggestion = -1;
+      return;
+    }
+    if (!this.communeSuggestions.length) return;
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const length = this.communeSuggestions.length;
+      this.activeSuggestion =
+        (this.activeSuggestion +
+          (event.key === "ArrowDown" ? 1 : -1) +
+          length) %
+        length;
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      this.chooseCommune(
+        this.communeSuggestions[Math.max(0, this.activeSuggestion)].code,
+      );
+    }
+  }
+  chooseCommune(code: string): void {
+    clearTimeout(this.placeTimer);
+    this.placeRequest?.unsubscribe();
+    this.listRequest?.unsubscribe();
+    this.scoreRequest?.unsubscribe();
+    this.communeSuggestions = [];
+    this.activeSuggestion = -1;
+    this.selectedZone = null;
+    this.selectedCommune = null;
+    this.selectedBeach = null;
+    this.score = null;
+    this.loadingScore = false;
+    this.communePending = true;
+    this.beaches = [];
+    this.loading = true;
+    this.error = "";
+    this.message = "";
+    this.resultLimit = 20;
+    this.listRequest = this.api
+      .getCommuneCatalogue(code)
+      .pipe(timeout(25000))
+      .subscribe({
+        next: (result) => {
+          this.communePending = false;
+          this.selectedCommune = result.commune;
+          this.query = result.commune.name;
+          this.beaches = result.beaches;
+          this.message =
+            result.warning ??
+            "Plages référencées dans la commune. Inventaire non exhaustif.";
+          this.loading = false;
+          this.syncFilters();
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          this.communePending = false;
+          this.loading = false;
+          this.error = "Cette commune ne peut pas être chargée actuellement.";
+          this.cdr.markForCheck();
+        },
+      });
+  }
+  clearCommune(): void {
+    this.selectedCommune = null;
+    this.query = "";
+    this.message = "";
+    this.onQueryChange();
+    this.loadBeaches();
   }
   loadBeaches(): void {
     this.listRequest?.unsubscribe();
+    this.communePending = false;
+    this.clearPreview();
     this.loading = true;
     this.error = "";
     this.listRequest = this.api
@@ -120,6 +250,12 @@ export class SearchComponent implements OnInit, OnDestroy {
       });
   }
   exploreZone(zone: CoastalZone): void {
+    clearTimeout(this.placeTimer);
+    this.placeRequest?.unsubscribe();
+    this.selectedCommune = null;
+    this.communePending = false;
+    this.clearPreview();
+    this.communeSuggestions = [];
     this.selectedZone = zone;
     this.loading = true;
     this.error = "";
@@ -133,9 +269,11 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.listRequest = this.api
       .discoverBeaches(zone)
       .pipe(
-        switchMap((discovery) => this.api.getCatalogue(zone.bbox).pipe(
-          map((beaches) => ({ ...discovery, beaches })),
-        )),
+        switchMap((discovery) =>
+          this.api
+            .getCatalogue(zone.bbox)
+            .pipe(map((beaches) => ({ ...discovery, beaches }))),
+        ),
         timeout(30000),
       )
       .subscribe({
@@ -155,6 +293,11 @@ export class SearchComponent implements OnInit, OnDestroy {
       });
   }
   chooseZone(id: string): void {
+    clearTimeout(this.placeTimer);
+    this.placeRequest?.unsubscribe();
+    this.communeSuggestions = [];
+    this.query = "";
+    this.selectedCommune = null;
     const zone = this.coastalZones.find((z) => z.id === id);
     if (zone) this.exploreZone(zone);
     else {
@@ -177,6 +320,13 @@ export class SearchComponent implements OnInit, OnDestroy {
         this.loading = true;
         this.error = "";
         this.selectedZone = null;
+        this.selectedCommune = null;
+        this.communePending = false;
+        this.communeSuggestions = [];
+        this.clearPreview();
+        this.query = "";
+        this.placeRequest?.unsubscribe();
+        clearTimeout(this.placeTimer);
         this.listRequest?.unsubscribe();
         this.syncFilters();
         this.listRequest = this.api
@@ -233,6 +383,13 @@ export class SearchComponent implements OnInit, OnDestroy {
         },
       });
   }
+  private clearPreview(): void {
+    this.scoreRequest?.unsubscribe();
+    this.selectedBeach = null;
+    this.score = null;
+    this.loadingScore = false;
+    this.scoreError = "";
+  }
   fromMap(beach: Beach): void {
     this.resultLimit = Math.max(
       this.resultLimit,
@@ -255,6 +412,7 @@ export class SearchComponent implements OnInit, OnDestroy {
       .filter((b) => {
         if (
           q &&
+          !this.selectedCommune &&
           !`${b.name} ${b.city} ${b.region}`.toLocaleLowerCase("fr").includes(q)
         )
           return false;
@@ -301,6 +459,12 @@ export class SearchComponent implements OnInit, OnDestroy {
     return this.displayedBeaches().slice(0, this.resultLimit);
   }
   resetFilters(): void {
+    const hadCommune = !!this.selectedCommune || this.communePending;
+    clearTimeout(this.placeTimer);
+    this.placeRequest?.unsubscribe();
+    this.communeSuggestions = [];
+    this.activeSuggestion = -1;
+    this.selectedCommune = null;
     this.query = "";
     this.waterType = "all";
     this.requiredFlag = "all";
@@ -310,6 +474,7 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.minWaterTemp = null;
     this.maxWaterTemp = null;
     this.syncFilters();
+    if (hadCommune) this.loadBeaches();
   }
   filterCount(): number {
     return (
@@ -326,6 +491,7 @@ export class SearchComponent implements OnInit, OnDestroy {
       relativeTo: this.route,
       queryParams: {
         q: this.query || null,
+        commune: this.selectedCommune?.code ?? null,
         zone: this.selectedZone?.id ?? null,
         usage: this.selectedUsage,
         water: this.waterType === "all" ? null : this.waterType,
@@ -358,5 +524,7 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.destroyed = true;
     this.listRequest?.unsubscribe();
     this.scoreRequest?.unsubscribe();
+    this.placeRequest?.unsubscribe();
+    clearTimeout(this.placeTimer);
   }
 }

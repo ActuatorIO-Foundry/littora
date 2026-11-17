@@ -28,6 +28,34 @@ sans solliciter OSM/Shom. La recette visuelle controle aussi les vraies tuiles.
 
 ## Recherche geographique
 
-Le recentrage sur les contours communaux et l'enrichissement du catalogue local
-sont suivis dans #34, distincts du correctif de rendu #24. Le nombre de plages
-referencees ne doit jamais etre presente comme un inventaire officiel exhaustif.
+La recherche de commune (#34) utilise l'API Geo du service public, ses codes
+INSEE et ses contours administratifs. Les homonymes sont proposes avec leur
+departement. La carte affiche le vrai polygone et ajuste sa vue. Le code INSEE
+est conserve dans l'URL (`/recherche?commune=83009`).
+
+- `GET /api/places/communes?q=Bandol` : suggestions, cache 24 heures.
+- `GET /api/places/communes/83009/beaches` : contour (cache 7 jours), catalogue
+  local et enrichissement ponctuel OpenStreetMap (cache 24 heures).
+- `ST_Covers` selectionne les points dans le polygone reel, pas seulement dans
+  son rectangle englobant. Les points sur la limite sont inclus.
+- Les sites nouveaux conservent leur identifiant OSM. Les equipements non
+  renseignes sont `null`, sans modifier ceux des fiches existantes.
+
+La recherche OSM est bornee a une commune et 40 resultats. Elle n'est ni un
+recensement exhaustif ni un service d'autocompletion. La reponse expose
+`coverage: partial`, `capped`, `source` et `collectedAt`. Une panne de collecte
+conserve les resultats locaux avec avertissement. L'absence de contour valide
+empeche la selection communale au lieu d'inventer une emprise.
+
+Nominatim utilise `NOMINATIM_API_URL` et une file commune a tous ses appels dans
+le processus API : requetes serialisees, intervalle minimum 1,1 seconde,
+4 requetes en attente maximum, delai reseau 10 secondes. Respecter sa
+[politique d'utilisation](https://operations.osmfoundation.org/policies/nominatim/).
+Avant de multiplier les instances ou d'importer toute la France, utiliser un
+fournisseur adapte ou un import OSM dedie avec les jobs centralises (#13/#15).
+Ce connecteur ponctuel ne remplace pas ce chantier de catalogue.
+
+La classification historique mer/lac/riviere reste a remplacer par les donnees
+source (#13). Les sections separees et les indicateurs propres a l'eau douce
+sont suivis dans #35. Aucun classement sanitaire ne decoule de la presence
+d'un lieu dans OpenStreetMap.

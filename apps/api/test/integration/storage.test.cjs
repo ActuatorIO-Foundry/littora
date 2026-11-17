@@ -30,7 +30,7 @@ test('isolated PostGIS catalogue, reports and Redis cache', { timeout: 30000 }, 
     assert.equal(result.length, 2);
     assert.equal(result[0].name, 'Plage de Pampelonne');
     assert.ok(Number(result[0].distanceKm) < 0.01);
-    assert.equal(result[0].waterType, 'sea');
+    assert.equal(result[0].waterType, 'unknown', 'Seed coordinates alone are not classification evidence');
 
     const outline = { type: 'Polygon', coordinates: [[[0,0],[1,0],[0,1],[0,0]]] };
     const features = [

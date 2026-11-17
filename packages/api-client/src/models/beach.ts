@@ -21,5 +21,23 @@ export interface Beach {
   name: string;
   osm_id: string | null;
   region: string | null;
+
+  /**
+   * Geographic classification evidence, not bathing authorization. Null until classified or after a position change.
+   */
+  waterClassification?: {
+'method': 'ign-proximity-v1' | 'reviewed';
+'sourceUrl': string;
+'classifiedAt': string;
+'reason': string;
+'evidence': Array<{
+'referenceId': string;
+'layer': string;
+'nature': string;
+'waterType': 'sea' | 'lake' | 'river' | 'unknown';
+'distanceMeters': number | null;
+'sourceUpdatedAt': string | null;
+}>;
+};
   waterType: 'sea' | 'river' | 'lake' | 'unknown';
 }

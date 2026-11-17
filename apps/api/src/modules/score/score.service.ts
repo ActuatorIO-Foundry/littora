@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { BeachesService } from '../beaches/beaches.service';
-import { MarineService } from '../marine/marine.service';
+import { MarineService, unavailableMarine } from '../marine/marine.service';
 import { ReportsService } from '../reports/reports.service';
-import { TidesService } from '../tides/tides.service';
+import { TidesService, unavailableTides } from '../tides/tides.service';
 import { WaterQualityService } from '../water-quality/water-quality.service';
 import { WeatherService } from '../weather/weather.service';
 import { finiteMetric } from '../../shared/forecast-data';
@@ -24,8 +24,8 @@ export class ScoreService {
     const beach = await this.beaches.get(id);
     const [weather, marine, tides, waterQuality, community, flagConsensus] = await Promise.all([
       this.weather.get(beach.lat, beach.lon),
-      this.marine.get(beach.lat, beach.lon),
-      this.tides.get(beach.lat, beach.lon),
+      beach.waterType === 'sea' ? this.marine.get(beach.lat, beach.lon) : unavailableMarine(),
+      beach.waterType === 'sea' ? this.tides.get(beach.lat, beach.lon) : unavailableTides(),
       this.water.get(id, beach.lat, beach.lon),
       this.reports.aggregate(id),
       this.reports.flagConsensus(id),

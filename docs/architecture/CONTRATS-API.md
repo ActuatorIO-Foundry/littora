@@ -1,7 +1,7 @@
 # Contrats API et provenance
 
 Decision #7, dans la continuite de [ADR-001](ADR-001-monolithe-modulaire.md).
-Le contrat externe est `contracts/openapi.yaml` (OpenAPI 3.0.3, version 0.2.0).
+Le contrat externe est `contracts/openapi.yaml` (OpenAPI 3.0.3, version 0.3.0).
 Il est consultable en JSON sur `/api/openapi.json`, sans secret ni appel fournisseur.
 
 ## Frontiere HTTP
@@ -42,6 +42,9 @@ Les equipements exposent `facilities.*.value` et `status` : `present`, `absent`,
 `unknown`. Les anciens indicateurs du catalogue ne sont pas une verification de
 terrain : `source: legacy-catalogue`, `verified: false`, `fetchedAt: null`.
 La provenance des POI et leur validation terrain restent le perimetre de #14.
+
+`waterType` vient de la classification geographique persistante, sans analyse du nom.
+`waterClassification` expose sa preuve ou `null` : voir [classification des milieux](CLASSIFICATION-EAU.md).
 
 ## Securite de baignade
 

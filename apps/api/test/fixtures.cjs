@@ -6,6 +6,7 @@ const beach = {
   name: 'Plage de test', city: 'Hyères', department: 'Var', region: 'Provence',
   coastline: 'Méditerranée', lat: 43.08, lon: 6.15,
   has_lifeguard: true, has_parking: true, has_toilets: true, osm_id: null,
+  water_type: 'sea', waterType: 'sea',
 };
 
 function scoreFixture({ weather = {}, marine = {}, quality = 'good', reports = [] } = {}) {

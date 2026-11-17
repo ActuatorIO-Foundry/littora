@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Littora API
-  version: 0.2.0
+  version: 0.3.0
   description: >-
     Additive contract for the existing API. Model forecasts are not observations or
     official bathing instructions. Null means unknown, never zero or false.
@@ -298,6 +298,28 @@ components:
       required: [id, name, city, department, region, coastline, waterType, lat, lon, has_lifeguard, has_parking, has_toilets, osm_id, distanceKm, facilities]
       properties:
         id: {type: string, format: uuid}
+        waterClassification:
+          type: object
+          nullable: true
+          description: Geographic classification evidence, not bathing authorization. Null until classified or after a position change.
+          required: [method, sourceUrl, classifiedAt, reason, evidence]
+          properties:
+            method: {type: string, enum: [ign-proximity-v1, reviewed]}
+            sourceUrl: {type: string, format: uri}
+            classifiedAt: {type: string, format: date-time}
+            reason: {type: string}
+            evidence:
+              type: array
+              items:
+                type: object
+                required: [referenceId, layer, nature, waterType, distanceMeters, sourceUpdatedAt]
+                properties:
+                  referenceId: {type: string}
+                  layer: {type: string}
+                  nature: {type: string}
+                  waterType: {type: string, enum: [sea, lake, river, unknown]}
+                  distanceMeters: {type: number, minimum: 0, nullable: true}
+                  sourceUpdatedAt: {type: string, format: date-time, nullable: true}
         name: {type: string}
         city: {type: string, nullable: true}
         department: {type: string, nullable: true}

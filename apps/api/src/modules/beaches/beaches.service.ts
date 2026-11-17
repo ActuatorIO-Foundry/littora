@@ -3,6 +3,7 @@ import { CacheService } from '../../cache/cache.service';
 import { PG } from '../../database/database.module';
 import { haversineKm } from '../../shared/geo';
 import { fetchJson, fetchNominatimJson } from '../../shared/http';
+import { WaterType } from './water-classification';
 
 type BeachRow = {
   id: string;
@@ -11,7 +12,8 @@ type BeachRow = {
   department: string;
   region: string;
   coastline: string;
-  water_type?: string;
+  water_type?: WaterType;
+  water_classification?: Record<string, unknown> | null;
   lat: number;
   lon: number;
   has_lifeguard: boolean | null;
@@ -21,6 +23,7 @@ type BeachRow = {
   distanceKm?: number | null;
   distancekm?: number | null;
 };
+const catalogueColumns = 'id,name,city,department,region,coastline,lat,lon,has_lifeguard,has_parking,has_toilets,osm_id,water_type,water_classification';
 
 @Injectable()
 export class BeachesService {
@@ -35,9 +38,9 @@ export class BeachesService {
     if (Number.isFinite(lat) && Number.isFinite(lon)) {
       try {
         const { rows } = await this.db.query(
-          `select id,name,city,department,region,coastline,lat,lon,has_lifeguard,has_parking,has_toilets,osm_id,
+          `select id,name,city,department,region,coastline,lat,lon,has_lifeguard,has_parking,has_toilets,osm_id,water_type,water_classification,
             ST_Distance(geom, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography) / 1000 as "distanceKm"
-          from beaches
+          from beach_catalogue
           order by geom <-> ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography
           limit $3`,
           [lat, lon, boundedLimit],
@@ -45,7 +48,7 @@ export class BeachesService {
         return rows.map((beach: BeachRow) => this.enrichBeach(beach));
       } catch {
         const { rows } = await this.db.query(
-          'select id,name,city,department,region,coastline,lat,lon,has_lifeguard,has_parking,has_toilets,osm_id from beaches limit 500',
+          `select ${catalogueColumns} from beach_catalogue order by id limit 500`,
         );
         return rows
           .map((beach: BeachRow) => this.enrichBeach({ ...beach, distanceKm: this.distanceFrom(beach, lat, lon) }))
@@ -55,7 +58,7 @@ export class BeachesService {
     }
 
     const { rows } = await this.db.query(
-      'select id,name,city,department,region,coastline,lat,lon,has_lifeguard,has_parking,has_toilets,osm_id from beaches order by coastline,name limit $1',
+      `select ${catalogueColumns} from beach_catalogue order by coastline,name,id limit $1`,
       [boundedLimit],
     );
     return rows.map((beach: BeachRow) => this.enrichBeach({ ...beach, distanceKm: null }));
@@ -63,7 +66,7 @@ export class BeachesService {
 
   async get(id: string) {
     const { rows } = await this.db.query(
-      'select id,name,city,department,region,coastline,lat,lon,has_lifeguard,has_parking,has_toilets,osm_id from beaches where id=$1',
+      `select ${catalogueColumns} from beach_catalogue where id=$1`,
       [id],
     );
     if (!rows[0]) throw new NotFoundException('Beach not found');
@@ -85,8 +88,7 @@ export class BeachesService {
     }
     // A UUID cursor keeps subsequent pages stable when another beach is deleted.
     const { rows } = await this.db.query(
-      `select id,name,city,department,region,coastline,lat,lon,has_lifeguard,has_parking,has_toilets,osm_id
-       from beaches where ($1::uuid is null or id > $1::uuid)
+      `select ${catalogueColumns} from beach_catalogue where ($1::uuid is null or id > $1::uuid)
        and lat between $3 and $5 and lon between $4 and $6
        order by id limit $2`,
       [after || null, limit + 1, ...bounds],
@@ -99,7 +101,7 @@ export class BeachesService {
   }
 
   async inGeometry(contour: unknown) {
-    const { rows } = await this.db.query(`select b.* from beaches b
+    const { rows } = await this.db.query(`select ${catalogueColumns} from beach_catalogue b
       where ST_Covers(ST_SetSRID(ST_GeomFromGeoJSON($1),4326),
         coalesce(b.geom::geometry, ST_SetSRID(ST_MakePoint(b.lon,b.lat),4326))) order by b.name,b.id`, [JSON.stringify(contour)]);
     return rows.map((row: BeachRow) => this.enrichBeach({ ...row, distanceKm: null }));
@@ -116,7 +118,11 @@ export class BeachesService {
   async discoverFromOpenStreetMap(bbox: string, region: string, coastline: string, limit = 140) {
     const boundedLimit = Math.min(Math.max(Number(limit) || 140, 1), 200);
     const parsedBbox = this.parseBbox(bbox);
-    const cacheKey = `osm:beaches:v3:${parsedBbox.join(',')}:${boundedLimit}`;
+    if (process.env.CATALOGUE_DISCOVERY_ENABLED !== 'true') {
+      const page = await this.catalogue(undefined, boundedLimit, bbox);
+      return { provider: 'local-catalogue', imported: 0, beaches: page.beaches };
+    }
+    const cacheKey = `osm:beaches:v4:${parsedBbox.join(',')}:${boundedLimit}`;
     const cached = await this.cache.getJson<any[]>(cacheKey);
 
     try {
@@ -202,11 +208,6 @@ export class BeachesService {
         node["natural"="beach"](${south},${west},${north},${east});
         way["natural"="beach"](${south},${west},${north},${east});
         relation["natural"="beach"](${south},${west},${north},${east});
-        node["leisure"="beach_resort"](${south},${west},${north},${east});
-        way["leisure"="beach_resort"](${south},${west},${north},${east});
-        node["name"~"plage",i](${south},${west},${north},${east});
-        way["name"~"plage",i](${south},${west},${north},${east});
-        relation["name"~"plage",i](${south},${west},${north},${east});
       );
       out center;
     `;
@@ -401,18 +402,12 @@ export class BeachesService {
   }
 
   private enrichBeach(beach: BeachRow) {
+    const { water_type, water_classification, ...publicBeach } = beach;
     return {
-      ...beach,
-      waterType: this.deriveWaterType(beach),
+      ...publicBeach,
+      waterType: water_type ?? 'unknown',
+      waterClassification: water_classification ?? null,
     };
-  }
-
-  private deriveWaterType(beach: BeachRow): 'sea' | 'river' | 'lake' | 'unknown' {
-    const text = `${beach.name} ${beach.city} ${beach.department} ${beach.region} ${beach.coastline}`.toLowerCase();
-    if (/(lac|étang|etang|apigné|apigne|base nautique|plan d'eau|plan d’eau|réservoir|reservoir)/.test(text)) return 'lake';
-    if (/(rivière|riviere|fleuve|gorge|verdon|tarn|loire|dordogne|garonne|allier|ardèche|ardeche)/.test(text)) return 'river';
-    if (/(méditerranée|mediterranee|atlantique|manche|corse|opale|côte|cote|littoral|plage de mer)/.test(text)) return 'sea';
-    return 'unknown';
   }
 
   private osmElementToBeach(element: any) {
@@ -421,6 +416,7 @@ export class BeachesService {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
 
     const tags = element.tags ?? {};
+    if (tags.natural !== 'beach' || tags.amenity || tags.shop || tags.highway) return null;
     const name = tags.name || tags['name:fr'] || tags['official_name'];
     if (!name || String(name).length < 3) return null;
 
@@ -441,6 +437,7 @@ export class BeachesService {
 
     return (Array.isArray(raw) ? raw : [])
       .map((place: any) => {
+        if ((place.category ?? place.class) !== 'natural' || place.type !== 'beach') return null;
         const lat = Number(place.lat);
         const lon = Number(place.lon);
         if (!Number.isFinite(lat) || !Number.isFinite(lon) || !place.name) return null;
@@ -459,14 +456,13 @@ export class BeachesService {
 
   async upsertDiscoveredBeach(feature: { osmId: string; name: string; city?: string | null; lat: number; lon: number }, region: string, coastline: string, department = region) {
     const existing = await this.db.query(
-      'select id,name,city,department,region,coastline,lat,lon,has_lifeguard,has_parking,has_toilets,osm_id from beaches where osm_id=$1 limit 1',
+      `select ${catalogueColumns} from beach_catalogue where osm_id=$1 limit 1`,
       [feature.osmId],
     );
     if (existing.rows[0]) return this.enrichBeach({ ...existing.rows[0], distanceKm: null });
 
     const duplicate = await this.db.query(
-      `select id,name,city,department,region,coastline,lat,lon,has_lifeguard,has_parking,has_toilets,osm_id
-       from beaches
+      `select ${catalogueColumns} from beach_catalogue
        where lower(name)=lower($1)
        and abs(lat - $2) < 0.025
        and abs(lon - $3) < 0.025
@@ -483,7 +479,7 @@ export class BeachesService {
       [feature.name, feature.city ?? 'Commune à préciser', department, region, coastline, feature.lat, feature.lon, feature.osmId],
     );
     if (!rows[0]) {
-      const concurrent = await this.db.query('select * from beaches where osm_id=$1', [feature.osmId]);
+      const concurrent = await this.db.query(`select ${catalogueColumns} from beach_catalogue where osm_id=$1`, [feature.osmId]);
       return concurrent.rows[0] ? this.enrichBeach({ ...concurrent.rows[0], distanceKm: null }) : null;
     }
     return this.enrichBeach({ ...rows[0], distanceKm: null });

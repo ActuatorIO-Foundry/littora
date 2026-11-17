@@ -233,6 +233,27 @@ test("accueil : scene, carte et navigation responsive", async ({
   expect(errors).toEqual([]);
 });
 
+test('recherche : mer, lac, riviere et inconnu restent distincts', async ({ page }) => {
+  const catalogue = [
+    { ...beaches[0], name: 'Plage de La Baule', city: 'La Baule', department: 'Loire-Atlantique', region: 'Pays de la Loire' },
+    { ...beaches[1], name: 'Berge de test' },
+    { ...beaches[0], id: 'test-lake', name: 'Plage du lac sale', waterType: 'lake', coastline: 'Atlantique' },
+    { ...beaches[0], id: 'test-unknown', name: 'Site non classe', waterType: 'unknown' },
+  ];
+  await page.route('**/api/beaches/catalogue?*', route => route.fulfill({ json: { beaches: catalogue, nextCursor: null } }));
+  await page.goto('/recherche');
+  await expect(page.locator('.beach-result')).toHaveCount(4);
+  await page.getByRole('button', { name: 'Filtres', exact: true }).click();
+  for (const [type, name] of [['sea', 'Plage de La Baule'], ['lake', 'Plage du lac sale'], ['river', 'Berge de test']]) {
+    await page.getByLabel('Type d’eau').selectOption(type);
+    await expect(page.locator('.beach-result')).toHaveCount(1);
+    await expect(page.locator('.beach-name').getByRole('button', { name, exact: true })).toBeVisible();
+  }
+  await page.getByLabel('Type d’eau').selectOption('all');
+  await expect(page.locator('.beach-result')).toHaveCount(4);
+  await noOverflow(page);
+});
+
 test("recherche : filtres, apercu distinct et retour", async ({
   page,
 }, info) => {

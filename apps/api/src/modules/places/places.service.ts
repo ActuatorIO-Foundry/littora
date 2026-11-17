@@ -66,10 +66,12 @@ export class PlacesService {
     const commune = await this.get(code);
     let collection: Collection | null = null;
     let warning: string | undefined;
-    try {
-      collection = await this.collect(commune);
-    } catch {
-      warning = 'Source OSM indisponible. Catalogue local uniquement, couverture partielle.';
+    if (process.env.CATALOGUE_DISCOVERY_ENABLED === 'true') {
+      try {
+        collection = await this.collect(commune);
+      } catch {
+        warning = 'Source OSM indisponible. Catalogue local uniquement, couverture partielle.';
+      }
     }
     if (collection) {
       const inside = await this.beaches.featuresInGeometry(collection.features, commune.contour);

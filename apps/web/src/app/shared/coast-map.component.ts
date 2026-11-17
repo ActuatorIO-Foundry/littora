@@ -15,6 +15,7 @@ import { CommonModule } from "@angular/common";
 import type * as Leaflet from "leaflet";
 import type { GeoJsonObject } from "geojson";
 import { Beach, BeachAmenity } from "../models/beach.model";
+import { Commune } from "../models/commune.model";
 import { COASTAL_ZONES, CoastalZone } from "./coastal-zones";
 import { IconComponent } from "./icon.component";
 
@@ -88,6 +89,7 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input() zoneId: string | null = null;
   @Input() detail = false;
   @Input() amenities: BeachAmenity[] = [];
+  @Input() commune: Commune | null = null;
   @Output() beachSelect = new EventEmitter<Beach>();
   @Output() zoneSelect = new EventEmitter<CoastalZone>();
   failed = false;
@@ -109,6 +111,8 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
   private destroyed = false;
   private lastZone: string | null = null;
   private renderedCoastZone: string | null | undefined;
+  private boundary?: Leaflet.GeoJSON;
+  private lastCommune: string | null = null;
   private readonly abort = new AbortController();
   constructor(
     private readonly ngZone: NgZone,
@@ -248,6 +252,31 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
         .addTo(this.markers);
     }
     this.drawCoasts();
+    const communeCode = this.commune?.code ?? null;
+    if (communeCode !== this.lastCommune) {
+      this.boundary?.remove();
+      this.boundary = undefined;
+      if (this.commune?.contour) {
+        const label = document.createElement("span");
+        label.textContent = this.commune.name;
+        this.boundary = L.geoJSON(this.commune.contour, {
+          style: {
+            color: "#007e88",
+            weight: 2,
+            fillColor: "#007e88",
+            fillOpacity: 0.08,
+            className: "commune-boundary",
+          },
+          interactive: false,
+        })
+          .bindTooltip(label, { sticky: true })
+          .addTo(this.map);
+        this.boundary.bringToBack();
+      }
+      this.lastCommune = communeCode;
+      this.fitCurrent();
+    }
+    if (this.commune) return;
     if (this.detail && this.beaches[0])
       this.map.setView([this.beaches[0].lat, this.beaches[0].lon], 14, {
         animate: false,
@@ -356,7 +385,13 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
       `polygon(${topLeft.x}px ${topLeft.y}px, ${bottomRight.x}px ${topLeft.y}px, ${bottomRight.x}px ${bottomRight.y}px, ${topLeft.x}px ${bottomRight.y}px)`;
   }
   reset(): void {
-    if (this.detail && this.beaches[0])
+    if (this.commune && this.boundary) {
+      this.map?.fitBounds(this.boundary.getBounds(), {
+        padding: [25, 25],
+        maxZoom: 14,
+        animate: false,
+      });
+    } else if (this.detail && this.beaches[0])
       this.map?.setView([this.beaches[0].lat, this.beaches[0].lon], 14);
     else
       this.map?.fitBounds(
@@ -368,6 +403,10 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
       );
   }
   private fitCurrent(): void {
+    if (this.commune && this.boundary) {
+      this.reset();
+      return;
+    }
     const zone = COASTAL_ZONES.find((z) => z.id === this.zoneId);
     if (!this.detail && zone) {
       const [s, w, n, e] = zone.bbox.split(",").map(Number);

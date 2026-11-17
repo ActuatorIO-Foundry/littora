@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Commune, CommuneCatalogue } from '../models/commune.model';
 import { EMPTY, Observable, expand, reduce } from 'rxjs';
 import { Beach, BeachAmenitiesResponse, BeachScore, ReportPayload } from '../models/beach.model';
 
@@ -10,6 +11,14 @@ export class LittoraApiService {
     private readonly apiUrl = this.resolveApiUrl();
 
     constructor(private readonly http: HttpClient) { }
+
+    searchCommunes(query: string): Observable<Commune[]> {
+        return this.http.get<Commune[]>(`${this.apiUrl}/places/communes`, { params: { q: query } });
+    }
+
+    getCommuneCatalogue(code: string): Observable<CommuneCatalogue> {
+        return this.http.get<CommuneCatalogue>(`${this.apiUrl}/places/communes/${encodeURIComponent(code)}/beaches`);
+    }
 
     getBeaches(limit = 180): Observable<Beach[]> {
         return this.http.get<Beach[]>(`${this.apiUrl}/beaches?limit=${limit}`);

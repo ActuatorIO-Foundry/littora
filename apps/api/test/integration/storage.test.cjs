@@ -32,6 +32,25 @@ test('isolated PostGIS catalogue, reports and Redis cache', { timeout: 30000 }, 
     assert.ok(Number(result[0].distanceKm) < 0.01);
     assert.equal(result[0].waterType, 'sea');
 
+    const outline = { type: 'Polygon', coordinates: [[[0,0],[1,0],[0,1],[0,0]]] };
+    const features = [
+      { osmId: `test/${randomUUID()}`, name: 'Inside commune', city: 'Test', lat: 0.2, lon: 0.2 },
+      { osmId: `test/${randomUUID()}`, name: 'On boundary', city: 'Test', lat: 0, lon: 0.5 },
+      { osmId: `test/${randomUUID()}`, name: 'Outside commune', city: 'Test', lat: 0.9, lon: 0.9 },
+    ];
+    assert.deepEqual((await beaches.featuresInGeometry(features, outline)).map(f => f.name), ['Inside commune', 'On boundary']);
+    try {
+      for (const feature of features) await beaches.upsertDiscoveredBeach(feature, 'Test', 'Unknown', 'Test');
+      const inside = await beaches.inGeometry(outline);
+      assert.equal(inside.length, 2);
+      assert.equal(inside[0].has_parking, null, 'Missing amenities must remain unknown');
+      assert.ok(!inside.some(row => row.name === 'Outside commune'));
+      const again = await beaches.upsertDiscoveredBeach(features[0], 'Test', 'Unknown');
+      assert.equal(again.id, inside.find(row => row.name === 'Inside commune').id);
+    } finally {
+      await pool.query('delete from beaches where osm_id = any($1::text[])', [features.map(f => f.osmId)]);
+    }
+
     await pool.query(`insert into beaches(id,name,lat,lon,geom)
       select ('10000000-0000-4000-8000-' || lpad(n::text,12,'0'))::uuid,
       'Catalogue fixture ' || n,43.1,6.3,ST_SetSRID(ST_MakePoint(6.3,43.1),4326)::geography

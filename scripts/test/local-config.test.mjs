@@ -46,13 +46,15 @@ test('Compose: alternate loopback ports preserve internal ports and the data vol
   const dir = fixture(t);
   const envFile = join(dir, '.env');
   writeFileSync(envFile, readFileSync(join(root, '.env.example')));
-  const result = execFileSync('docker', [
+  const args = [
     'compose', '--project-directory', dir, '--env-file', envFile,
     '-f', join(root, 'docker-compose.local.yml'), 'config', '--format', 'json',
-  ], {
+  ];
+  const options = {
     encoding: 'utf8', env: { ...process.env, API_PORT: '3001', WEB_PORT: '4201', POSTGRES_PORT: '15432', REDIS_PORT: '16379' },
     stdio: 'pipe',
-  });
+  };
+  const result = execFileSync('docker', args, options);
   const config = JSON.parse(result);
   for (const [service, published, target] of [['api', '3001', 3000], ['web', '4201', 4200], ['postgres', '15432', 5432], ['redis', '16379', 6379]]) {
     const port = config.services[service].ports[0];
@@ -62,4 +64,11 @@ test('Compose: alternate loopback ports preserve internal ports and the data vol
   }
   assert.equal(String(config.services.api.environment.API_PORT), '3000');
   assert.ok(config.services.postgres.volumes.some(v => v.source === 'pgdata' && v.target === '/var/lib/postgresql/data'));
+  assert.ok(!config.services.postgres.volumes.some(v => v.target.startsWith('/docker-entrypoint-initdb.d')));
+  assert.equal(config.services.migrate, undefined, 'Migrations are excluded from ordinary startup');
+  const withTools = JSON.parse(execFileSync('docker', ['compose', '--profile', 'tools', ...args.slice(1)], options));
+  assert.deepEqual(withTools.services.migrate.profiles, ['tools']);
+  assert.deepEqual(withTools.services.migrate.command, ['node', 'scripts/database.cjs', 'migrate']);
+  assert.equal(config.services.api.depends_on.postgres.condition, 'service_healthy');
+  assert.equal(config.services.api.depends_on.migrate, undefined, 'Migration requires an explicit operation');
 });

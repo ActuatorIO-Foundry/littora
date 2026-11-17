@@ -10,7 +10,7 @@ test('development: native watch starts the TypeScript API without the Nest CLI',
   await new Promise((done) => reservation.listen(0, '127.0.0.1', done));
   const port = reservation.address().port;
   await new Promise((done) => reservation.close(done));
-  const child = spawn(process.execPath, ['--watch', '--require', 'ts-node/register', 'src/main.ts'], {
+  const child = spawn(process.execPath, ['--watch', '--require', resolve(__dirname, 'fixtures/database-ready.cjs'), '--require', 'ts-node/register', 'src/main.ts'], {
     cwd: resolve(__dirname, '..'),
     env: {
       ...process.env, NODE_ENV: 'test', API_PORT: String(port), ADMIN_API_TOKEN: '', REDIS_URL: '',

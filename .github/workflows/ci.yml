@@ -46,6 +46,8 @@ jobs:
           package-manager-cache: false
       - name: Validate reverse proxy routing
         run: node scripts/test-caddy.mjs
+      - name: Validate API migrations and startup on isolated storage
+        run: node scripts/test-api-migrations.mjs
       - name: Install verified scanner
         run: |
           curl --fail --location --retry 3 --output /tmp/trivy.tar.gz https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_Linux-64bit.tar.gz

@@ -13,6 +13,9 @@ RUN npm ci --omit=dev --no-audit --no-fund \
     && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /root/.npm
 RUN apk add --no-cache --upgrade zlib=1.4-r0
 COPY --from=build /app/dist ./dist
+COPY scripts/database.cjs ./scripts/database.cjs
+COPY migrations ./migrations
+COPY seeds ./seeds
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \

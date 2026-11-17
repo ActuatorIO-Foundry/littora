@@ -11,6 +11,17 @@ test('distance: zero, symmetry and kilometres', () => {
   assert.equal(distance, haversineKm(0, 1, 0, 0));
 });
 
+test('catalogue: discovery never executes schema or backfill statements', async () => {
+  const statements = [];
+  const service = new BeachesService({ query: async sql => {
+    statements.push(sql);
+    assert.match(sql, /^select /i);
+    return { rows: [beach] };
+  } }, { getJson: async () => [] });
+  await service.discoverFromOpenStreetMap('43,6,44,7', 'Region', 'Sea');
+  assert.ok(statements.length > 0);
+});
+
 test('catalogue: identifiers are SQL parameters and missing beaches return 404', async () => {
   const id = "unknown' OR true --";
   const service = new BeachesService({ query: async (sql, values) => {

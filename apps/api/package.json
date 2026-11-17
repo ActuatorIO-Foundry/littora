@@ -12,7 +12,11 @@
   },
   "scripts": {
     "test": "npm run build && node --test test/*.test.cjs",
-    "test:integration": "npm run build && node --test test/integration/*.test.cjs",
+    "test:integration": "npm run build && node --test --test-concurrency=1 test/integration/*.test.cjs",
+    "db:status": "node scripts/database.cjs status",
+    "db:migrate": "node scripts/database.cjs migrate",
+    "db:seed": "node scripts/database.cjs seed",
+    "db:seed:demo": "node scripts/database.cjs seed-demo",
     "start:dev": "node --watch --require ts-node/register src/main.ts",
     "start:prod": "node dist/main.js",
     "build": "tsc -p tsconfig.json",

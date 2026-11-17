@@ -42,11 +42,14 @@ Les ports exposes sont configurables via `API_PORT`, `WEB_PORT`,
 
 ```bash
 nvm use
-npm --prefix apps/web ci
-npm --prefix apps/web run start:local
+npm ci
+npm run start:local --workspace apps/web
 ```
 
 Le lanceur lit les ports dans `.env`, avec priorite aux variables du shell.
+Le monorepo utilise un lockfile racine et un client Angular genere depuis OpenAPI.
+Voir [contrats et provenance](docs/architecture/CONTRATS-API.md) pour les commandes
+de generation, la validation et la compatibilite front/back.
 Les ports internes Docker restent fixes ; ne pas arreter une autre application
 pour liberer un port, choisir par exemple `API_PORT=3001`.
 

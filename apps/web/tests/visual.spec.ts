@@ -186,6 +186,23 @@ test('recherche : catalogue complet au-dela de 180 et 500 plages', async ({ page
   await expect(page.getByRole('button', { name: 'Escale 0601', exact: true })).toBeVisible();
 });
 
+test('contrat : pagination canonique et localisation inconnue restent consultables', async ({ page }) => {
+  const cursors: Array<string | null> = [];
+  await page.route('**/api/beaches/catalogue?*', route => {
+    const after = new URL(route.request().url()).searchParams.get('after');
+    cursors.push(after);
+    return route.fulfill({ json: {
+      items: [{ ...beaches[after ? 1 : 0], city: null, department: null }],
+      pageInfo: { nextCursor: after ? null : 'next-page', hasNextPage: !after, limit: 200 },
+    } });
+  });
+  await page.goto('/recherche');
+  await expect(page.getByRole('button', { name: 'Plage des Pins', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Berge des Saules', exact: true })).toBeVisible();
+  expect(cursors).toEqual([null, 'next-page']);
+  await noOverflow(page);
+});
+
 test("accueil : scene, carte et navigation responsive", async ({
   page,
 }, info) => {

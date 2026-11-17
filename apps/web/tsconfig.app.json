@@ -1,1 +1,1 @@
-{"extends":"./tsconfig.json","compilerOptions":{"outDir":"./out-tsc/app","types":[]},"files":["src/main.ts"],"include":["src/**/*.d.ts"]}
+{"extends":"./tsconfig.json","compilerOptions":{"outDir":"./out-tsc/app","types":[],"paths":{"@littora/api-client":["../../packages/api-client/src/index.ts"],"@littora/api-client/models":["../../packages/api-client/src/models.ts"]}},"files":["src/main.ts"],"include":["src/**/*.d.ts","../../packages/api-client/src/**/*.ts"]}

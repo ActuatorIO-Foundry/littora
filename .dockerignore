@@ -1,0 +1,15 @@
+.git
+**/node_modules
+**/dist
+**/.angular
+**/coverage
+**/test-results
+**/playwright-report
+**/.env
+**/.env.*
+.local
+.codex
+.agents
+apps/nova
+**/.DS_Store
+**/npm-debug.log

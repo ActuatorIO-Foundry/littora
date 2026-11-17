@@ -67,7 +67,7 @@ Depuis la racine :
 
 ```sh
 docker compose -f docker-compose.local.yml up -d postgres redis api
-npm --prefix apps/web ci
+npm ci
 npm --prefix apps/web run start:local
 ```
 

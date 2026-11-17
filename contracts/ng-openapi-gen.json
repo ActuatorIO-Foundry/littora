@@ -1,0 +1,9 @@
+{
+  "input": "contracts/openapi.yaml",
+  "output": "packages/api-client/src",
+  "services": true,
+  "promises": false,
+  "indexFile": true,
+  "enumStyle": "alias",
+  "modelType": "interface"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@littora/api-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.22.3 <25", "npm": "11.19.1" },
+  "packageManager": "npm@11.19.1",
+  "exports": { ".": "./src/index.ts", "./models": "./src/models.ts" },
+  "peerDependencies": { "@angular/core": "21.2.26", "@angular/common": "21.2.26", "rxjs": "7.8.2" }
+}

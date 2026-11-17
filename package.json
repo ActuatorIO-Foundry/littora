@@ -4,17 +4,34 @@
   "private": true,
   "engines": { "node": ">=24.22.3 <25", "npm": "11.19.1" },
   "packageManager": "npm@11.19.1",
+  "workspaces": ["apps/api", "apps/web", "packages/api-client"],
+  "allowScripts": {
+    "@parcel/watcher@2.6.0": false,
+    "esbuild@0.28.1": true,
+    "fsevents@2.3.3": false,
+    "lmdb@3.5.1": false,
+    "msgpackr-extract@3.0.7": false
+  },
+  "overrides": {
+    "ajv@>=8 <9": "8.20.0",
+    "glob@>=9 <=14.0.1": "14.0.6",
+    "minimatch@>=7 <11.0.1": "11.0.5",
+    "sockjs": { "uuid": "11.1.1" }
+  },
+  "devDependencies": { "ng-openapi-gen": "1.1.0" },
   "scripts": {
     "check:toolchain": "node scripts/check-toolchain.mjs",
-    "audit": "npm --prefix apps/api audit --audit-level=low && npm --prefix apps/web audit --audit-level=low",
-    "install:ci": "npm --prefix apps/api ci && npm --prefix apps/web ci",
-    "test:api": "npm --prefix apps/api test",
+    "audit": "npm audit --audit-level=low",
+    "install:ci": "npm ci",
+    "generate:api": "ng-openapi-gen --config contracts/ng-openapi-gen.json",
+    "check:contracts": "npm run generate:api && node scripts/check-contracts.mjs",
+    "test:api": "npm test --workspace apps/api",
     "test:ops": "node --test scripts/test/*.test.mjs",
-    "test:integration": "npm --prefix apps/api run test:integration",
-    "test:ui": "npm --prefix apps/web run test:ui",
+    "test:integration": "npm run test:integration --workspace apps/api",
+    "test:ui": "npm run test:ui --workspace apps/web",
     "docker:local": "docker compose -f docker-compose.local.yml up --build",
     "docker:prod": "node scripts/start-production.mjs",
-    "build:api": "npm --prefix apps/api run build",
-    "build:web": "npm --prefix apps/web run build"
+    "build:api": "npm run build --workspace apps/api",
+    "build:web": "npm run build --workspace apps/web"
   }
 }

@@ -1,0 +1,647 @@
+openapi: 3.0.3
+info:
+  title: Littora API
+  version: 0.2.0
+  description: >-
+    Additive contract for the existing API. Model forecasts are not observations or
+    official bathing instructions. Null means unknown, never zero or false.
+    Routes marked deprecated remain available during the 0.x transition.
+servers:
+  - url: /api
+tags:
+  - name: Littora
+paths:
+  /beaches:
+    get:
+      operationId: listBeaches
+      tags: [Littora]
+      deprecated: true
+      description: Legacy bounded list. Use the cursor catalogue for a complete result.
+      parameters:
+        - {$ref: '#/components/parameters/OptionalLatitude'}
+        - {$ref: '#/components/parameters/OptionalLongitude'}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 180}}
+      responses:
+        '200': {description: Beaches, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/Beach'}}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /beaches/catalogue:
+    get:
+      operationId: getCatalogue
+      tags: [Littora]
+      parameters:
+        - {name: after, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 200}}
+        - {$ref: '#/components/parameters/Bounds'}
+      responses:
+        '200': {description: Stable UUID cursor page, content: {application/json: {schema: {$ref: '#/components/schemas/BeachPage'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /beaches/discover:
+    get:
+      operationId: discoverBeaches
+      tags: [Littora]
+      description: Legacy synchronous OSM discovery. May persist catalogue entries; coverage is partial. Replaced by jobs in a later release.
+      parameters:
+        - {name: bbox, in: query, required: true, schema: {$ref: '#/components/schemas/Bounds'}}
+        - {name: region, in: query, schema: {type: string, minLength: 1, maxLength: 100}}
+        - {name: coastline, in: query, schema: {type: string, minLength: 1, maxLength: 100}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500}}
+      responses:
+        '200': {description: Partial discovery result, content: {application/json: {schema: {$ref: '#/components/schemas/Discovery'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /beaches/{id}:
+    get:
+      operationId: getBeach
+      tags: [Littora]
+      parameters: [{$ref: '#/components/parameters/BeachId'}]
+      responses:
+        '200': {description: Beach, content: {application/json: {schema: {$ref: '#/components/schemas/Beach'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /beaches/{id}/amenities:
+    get:
+      operationId: getBeachAmenities
+      tags: [Littora]
+      parameters: [{$ref: '#/components/parameters/BeachId'}]
+      responses:
+        '200': {description: Nearby facilities with verification status, content: {application/json: {schema: {$ref: '#/components/schemas/Amenities'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /places/communes:
+    get:
+      operationId: searchCommunes
+      tags: [Littora]
+      parameters:
+        - {name: q, in: query, required: true, schema: {type: string, maxLength: 80}}
+      responses:
+        '200': {description: Metropolitan communes, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/Commune'}}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /places/communes/{code}/beaches:
+    get:
+      operationId: getCommuneCatalogue
+      tags: [Littora]
+      description: Commune boundary and partial catalogue. May collect and persist OSM entries.
+      parameters:
+        - {name: code, in: path, required: true, schema: {type: string, pattern: '^(?:[0-9]{2}|2[AB])[0-9]{3}$'}}
+      responses:
+        '200': {description: Partial commune catalogue, content: {application/json: {schema: {$ref: '#/components/schemas/CommuneCatalogue'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /weather:
+    get:
+      operationId: getWeather
+      tags: [Littora]
+      parameters: [{$ref: '#/components/parameters/Latitude'}, {$ref: '#/components/parameters/Longitude'}]
+      responses:
+        '200': {description: Weather model forecast, content: {application/json: {schema: {$ref: '#/components/schemas/Forecast'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /marine:
+    get:
+      operationId: getMarine
+      tags: [Littora]
+      parameters: [{$ref: '#/components/parameters/Latitude'}, {$ref: '#/components/parameters/Longitude'}]
+      responses:
+        '200': {description: Marine model forecast, content: {application/json: {schema: {$ref: '#/components/schemas/Forecast'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /tides:
+    get:
+      operationId: getTides
+      tags: [Littora]
+      parameters:
+        - {$ref: '#/components/parameters/Latitude'}
+        - {$ref: '#/components/parameters/Longitude'}
+        - {name: harbor, in: query, schema: {type: string, maxLength: 100}}
+      responses:
+        '200': {description: Unknown until an official adapter is connected, content: {application/json: {schema: {$ref: '#/components/schemas/Tides'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /water-quality:
+    get:
+      operationId: getWaterQuality
+      tags: [Littora]
+      parameters:
+        - {name: beachId, in: query, schema: {type: string, format: uuid}}
+        - {$ref: '#/components/parameters/OptionalLatitude'}
+        - {$ref: '#/components/parameters/OptionalLongitude'}
+      responses:
+        '200': {description: Latest verified sample or explicit unknown, content: {application/json: {schema: {$ref: '#/components/schemas/WaterQuality'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /alerts:
+    get:
+      operationId: getAlerts
+      tags: [Littora]
+      description: Official alert adapter is not connected. An empty array is not a declaration of safety.
+      parameters:
+        - {name: department, in: query, schema: {type: string, pattern: '^(?:[0-9]{2,3}|2[AB])$'}}
+      responses:
+        '200': {description: Adapter availability, content: {application/json: {schema: {$ref: '#/components/schemas/Alerts'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /score/beach/{id}:
+    get:
+      operationId: getBeachScore
+      tags: [Littora]
+      parameters: [{$ref: '#/components/parameters/BeachId'}]
+      responses:
+        '200': {description: Indicative scores and independent safety sources, content: {application/json: {schema: {$ref: '#/components/schemas/BeachScore'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /recommendations:
+    get:
+      operationId: getRecommendations
+      tags: [Littora]
+      parameters:
+        - {$ref: '#/components/parameters/Latitude'}
+        - {$ref: '#/components/parameters/Longitude'}
+        - {name: usage, in: query, schema: {type: string, enum: [bathing, family, paddle, boat], default: bathing}}
+      responses:
+        '200': {description: Up to 30 nearby scored beaches, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/Recommendation'}}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /reports:
+    get:
+      operationId: getReports
+      tags: [Littora]
+      description: Legacy list, newest 50 contributions. Not an official source.
+      parameters:
+        - {name: beachId, in: query, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: Community reports, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/Report'}}}}}
+        default: {$ref: '#/components/responses/Error'}
+    post:
+      operationId: createReport
+      tags: [Littora]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/ReportPayload'}}}
+      responses:
+        '201': {description: Pending contribution, content: {application/json: {schema: {$ref: '#/components/schemas/Report'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /auth/status:
+    get:
+      operationId: getAuthStatus
+      tags: [Littora]
+      description: Legacy scaffold status; registration and login are not implemented.
+      responses:
+        '200': {description: Scaffold status, content: {application/json: {schema: {$ref: '#/components/schemas/AuthStatus'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /favorites:
+    get:
+      operationId: getFavorites
+      tags: [Littora]
+      description: Placeholder, always empty; persistent favorites are not implemented.
+      responses:
+        '200': {description: Empty list, content: {application/json: {schema: {type: array, maxItems: 0, items: {$ref: '#/components/schemas/Beach'}}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /admin/health:
+    get:
+      operationId: getAdminHealth
+      tags: [Littora]
+      security: [{InternalKey: []}]
+      description: Internal scaffold health; moderationQueue is not a live queue measurement.
+      responses:
+        '200': {description: Internal health, content: {application/json: {schema: {$ref: '#/components/schemas/AdminHealth'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /ingestion/water-quality:
+    post:
+      operationId: ingestWaterQuality
+      tags: [Littora]
+      security: [{InternalKey: []}]
+      description: Internal queue entrypoint. Does not confirm successful data ingestion.
+      responses:
+        '201': {description: Queue receipt or unconfigured source, content: {application/json: {schema: {$ref: '#/components/schemas/IngestionReceipt'}}}}
+        default: {$ref: '#/components/responses/Error'}
+components:
+  securitySchemes:
+    InternalKey: {type: http, scheme: bearer, description: Internal ADMIN_API_TOKEN; not a user JWT.}
+  parameters:
+    Latitude: {name: lat, in: query, required: true, schema: {type: number, minimum: -90, maximum: 90}}
+    Longitude: {name: lon, in: query, required: true, schema: {type: number, minimum: -180, maximum: 180}}
+    OptionalLatitude: {name: lat, in: query, schema: {type: number, minimum: -90, maximum: 90}}
+    OptionalLongitude: {name: lon, in: query, schema: {type: number, minimum: -180, maximum: 180}}
+    BeachId: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    Bounds: {name: bbox, in: query, schema: {$ref: '#/components/schemas/Bounds'}}
+  responses:
+    Error:
+      description: Normalized error; no stack trace, SQL or provider credentials exposed.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ApiError'}}}
+  schemas:
+    Bounds:
+      type: string
+      maxLength: 100
+      pattern: '^-?[0-9]+(?:\.[0-9]+)?,-?[0-9]+(?:\.[0-9]+)?,-?[0-9]+(?:\.[0-9]+)?,-?[0-9]+(?:\.[0-9]+)?$'
+      description: south,west,north,east in WGS84. Must be ordered and within coordinate bounds.
+    ApiError:
+      type: object
+      required: [statusCode, code, message, requestId, details]
+      additionalProperties: false
+      properties:
+        statusCode: {type: integer, minimum: 400, maximum: 599}
+        code: {type: string, enum: [VALIDATION_ERROR, BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, RATE_LIMITED, UNAVAILABLE, INTERNAL_ERROR]}
+        message: {type: string}
+        requestId: {type: string, format: uuid}
+        details:
+          type: array
+          items:
+            type: object
+            required: [path, message]
+            additionalProperties: false
+            properties: {path: {type: string}, message: {type: string}}
+    Source:
+      type: object
+      required: [provider, product]
+      additionalProperties: false
+      properties:
+        provider: {type: string}
+        product: {type: string, nullable: true, description: Exact product when known; no inferred model name.}
+    Measurement:
+      type: object
+      required: [value, unit, source, kind, status, fetchedAt, validAt, validUntil, producedAt, resolution, isDemo]
+      additionalProperties: false
+      description: A single measure. Collection time is not model production time. Unknown metadata is null. Stale values remain visible but must not be used as fresh input.
+      oneOf:
+        - properties:
+            status: {enum: [unknown]}
+            value: {enum: [null]}
+        - properties:
+            status: {enum: [available, stale]}
+            value: {type: number}
+      properties:
+        value: {type: number, nullable: true}
+        unit: {type: string, nullable: true}
+        source: {$ref: '#/components/schemas/Source'}
+        kind: {type: string, enum: [observation, forecast, contribution, calculation]}
+        status: {type: string, enum: [available, stale, unknown]}
+        fetchedAt: {type: string, format: date-time, nullable: true}
+        validAt: {type: string, format: date-time, nullable: true}
+        validUntil: {type: string, format: date-time, nullable: true}
+        producedAt: {type: string, format: date-time, nullable: true}
+        resolution:
+          type: object
+          required: [spatialMeters, temporalSeconds]
+          additionalProperties: false
+          properties:
+            spatialMeters: {type: number, minimum: 0, nullable: true}
+            temporalSeconds: {type: number, minimum: 0, nullable: true}
+        isDemo: {type: boolean}
+    MeasurementMap:
+      type: object
+      additionalProperties: {$ref: '#/components/schemas/Measurement'}
+    FacilityPresence:
+      type: object
+      required: [value, status, source, verified, fetchedAt]
+      additionalProperties: false
+      oneOf:
+        - properties: {status: {enum: [present]}, value: {enum: [true]}}
+        - properties: {status: {enum: [absent]}, value: {enum: [false]}}
+        - properties: {status: {enum: [unknown]}, value: {enum: [null]}}
+      properties:
+        value: {type: boolean, nullable: true}
+        status: {type: string, enum: [present, absent, unknown]}
+        source: {type: string, enum: [legacy-catalogue]}
+        verified: {type: boolean, enum: [false]}
+        fetchedAt: {type: string, format: date-time, nullable: true}
+    Beach:
+      type: object
+      required: [id, name, city, department, region, coastline, waterType, lat, lon, has_lifeguard, has_parking, has_toilets, osm_id, distanceKm, facilities]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        city: {type: string, nullable: true}
+        department: {type: string, nullable: true}
+        region: {type: string, nullable: true}
+        coastline: {type: string, nullable: true}
+        waterType: {type: string, enum: [sea, river, lake, unknown]}
+        lat: {type: number, minimum: -90, maximum: 90}
+        lon: {type: number, minimum: -180, maximum: 180}
+        has_lifeguard: {type: boolean, nullable: true, deprecated: true}
+        has_parking: {type: boolean, nullable: true, deprecated: true}
+        has_toilets: {type: boolean, nullable: true, deprecated: true}
+        osm_id: {type: string, nullable: true}
+        distanceKm: {type: number, minimum: 0, nullable: true}
+        facilities:
+          type: object
+          required: [lifeguard, parking, toilets]
+          additionalProperties: false
+          properties:
+            lifeguard: {$ref: '#/components/schemas/FacilityPresence'}
+            parking: {$ref: '#/components/schemas/FacilityPresence'}
+            toilets: {$ref: '#/components/schemas/FacilityPresence'}
+    PageInfo:
+      type: object
+      required: [nextCursor, hasNextPage, limit]
+      additionalProperties: false
+      properties:
+        nextCursor: {type: string, format: uuid, nullable: true}
+        hasNextPage: {type: boolean}
+        limit: {type: integer, minimum: 1, maximum: 500}
+    BeachPage:
+      type: object
+      required: [items, pageInfo, beaches, nextCursor]
+      additionalProperties: false
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Beach'}}
+        pageInfo: {$ref: '#/components/schemas/PageInfo'}
+        beaches: {type: array, items: {$ref: '#/components/schemas/Beach'}, deprecated: true}
+        nextCursor: {type: string, format: uuid, nullable: true, deprecated: true}
+    Discovery:
+      type: object
+      required: [provider, imported, beaches]
+      properties:
+        provider: {type: string}
+        imported: {type: integer, minimum: 0}
+        warning: {type: string}
+        beaches: {type: array, items: {$ref: '#/components/schemas/Beach'}}
+    Amenity:
+      type: object
+      required: [id, name, category, lat, lon, distanceKm, source, verification]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        category: {type: string, enum: [parking, toilets, rental, food, rescue, other]}
+        lat: {type: number, minimum: -90, maximum: 90}
+        lon: {type: number, minimum: -180, maximum: 180}
+        distanceKm: {type: number, minimum: 0}
+        source: {type: string}
+        verification: {type: string, enum: [listed, to_verify]}
+    Amenities:
+      type: object
+      required: [beachId, provider, radiusMeters, amenities]
+      properties:
+        beachId: {type: string, format: uuid}
+        provider: {type: string}
+        radiusMeters: {type: number, minimum: 0}
+        amenities: {type: array, items: {$ref: '#/components/schemas/Amenity'}}
+    Commune:
+      type: object
+      required: [code, name, department, region, center, bbox]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        department: {$ref: '#/components/schemas/NamedArea'}
+        region: {$ref: '#/components/schemas/NamedArea'}
+        center:
+          type: object
+          required: [lat, lon]
+          properties: {lat: {type: number}, lon: {type: number}}
+        bbox: {type: array, items: {type: number}, minItems: 4, maxItems: 4, description: 'south,west,north,east'}
+        contour: {$ref: '#/components/schemas/Outline'}
+    NamedArea:
+      type: object
+      required: [code, name]
+      properties: {code: {type: string}, name: {type: string}}
+    Outline:
+      oneOf:
+        - type: object
+          required: [type, coordinates]
+          properties:
+            type: {type: string, enum: [Polygon]}
+            coordinates: {type: array, items: {type: array, items: {type: array, minItems: 2, items: {type: number}}}}
+        - type: object
+          required: [type, coordinates]
+          properties:
+            type: {type: string, enum: [MultiPolygon]}
+            coordinates: {type: array, items: {type: array, items: {type: array, items: {type: array, minItems: 2, items: {type: number}}}}}
+    CommuneCatalogue:
+      type: object
+      required: [commune, beaches, source, collectedAt, coverage, capped]
+      properties:
+        commune: {$ref: '#/components/schemas/Commune'}
+        beaches: {type: array, items: {$ref: '#/components/schemas/Beach'}}
+        source: {type: string}
+        collectedAt: {type: string, format: date-time, nullable: true}
+        coverage: {type: string, enum: [partial]}
+        capped: {type: boolean}
+        warning: {type: string}
+    DataStatus:
+      type: object
+      required: [status, provider, kind, fetchedAt, validAt, ageSeconds, producedAt, units]
+      properties:
+        status: {type: string, enum: [available, partial, stale, unknown]}
+        provider: {type: string}
+        kind: {type: string, enum: [forecast]}
+        fetchedAt: {type: string, format: date-time, nullable: true}
+        validAt: {type: string, format: date-time, nullable: true}
+        ageSeconds: {type: number, minimum: 0, nullable: true}
+        producedAt: {type: string, format: date-time, nullable: true}
+        units: {type: object, additionalProperties: {type: string}}
+        warning: {type: string, nullable: true}
+    Forecast:
+      allOf:
+        - {$ref: '#/components/schemas/DataStatus'}
+        - type: object
+          required: [current, measurements, isDemo]
+          properties:
+            current: {$ref: '#/components/schemas/LegacyMetrics'}
+            measurements: {$ref: '#/components/schemas/MeasurementMap'}
+            isDemo: {type: boolean, enum: [false]}
+            raw: {type: object, description: Legacy provider payload. Not a stable public model. Prefer measurements., additionalProperties: true, deprecated: true}
+    LegacyMetrics:
+      type: object
+      additionalProperties:
+        anyOf: [{type: number, nullable: true}, {type: string}]
+    Tides:
+      type: object
+      required: [provider, status, reliability, fetchedAt, validAt, ageSeconds, harbor, events, warning]
+      properties:
+        provider: {type: string}
+        status: {type: string, enum: [unknown]}
+        reliability: {type: string, enum: [unknown]}
+        fetchedAt: {type: string, nullable: true, format: date-time}
+        validAt: {type: string, nullable: true, format: date-time}
+        ageSeconds: {type: number, nullable: true}
+        harbor: {type: string, nullable: true}
+        events: {type: array, maxItems: 0, items: {type: object}}
+        warning: {type: string}
+    WaterQuality:
+      type: object
+      required: [provider, status, isDemo]
+      properties:
+        provider: {type: string}
+        status: {type: string}
+        classification: {type: string, nullable: true}
+        sample_date: {type: string, nullable: true, description: Legacy sample date; not a forecast validity time.}
+        reliability: {type: string}
+        warning: {type: string}
+        isDemo: {type: boolean, enum: [false]}
+    Alerts:
+      type: object
+      required: [provider, alerts, warning, status]
+      properties:
+        provider: {type: string}
+        department: {type: string}
+        status: {type: string, enum: [unknown]}
+        alerts: {type: array, maxItems: 0, items: {type: object}}
+        warning: {type: string}
+    Scores:
+      type: object
+      required: [bathing, family, paddle, boat]
+      additionalProperties: false
+      properties:
+        bathing: {type: integer, nullable: true, minimum: 0, maximum: 100}
+        family: {type: integer, nullable: true, minimum: 0, maximum: 100}
+        paddle: {type: integer, nullable: true, minimum: 0, maximum: 100}
+        boat: {type: integer, nullable: true, minimum: 0, maximum: 100}
+    CommunityFlag:
+      type: object
+      nullable: true
+      required: [flag, confidence, counts, history]
+      properties:
+        flag: {type: string, enum: [green, yellow, red]}
+        confidence: {type: number, minimum: 0, maximum: 1}
+        counts: {type: object, additionalProperties: {type: integer, minimum: 0}}
+        history:
+          type: array
+          items:
+            type: object
+            required: [flag, time, confidence]
+            properties:
+              flag: {type: string, enum: [green, yellow, red]}
+              time: {type: string, format: date-time}
+              confidence: {type: number, minimum: 0, maximum: 1}
+    Safety:
+      type: object
+      required: [flag, source, official, communityFlag, officialFlag, calculatedConditions, alerts]
+      properties:
+        flag: {type: string, enum: [green, yellow, red, unknown], deprecated: true, description: Legacy display estimate. Not an official flag.}
+        source: {type: string, deprecated: true}
+        official: {type: boolean, enum: [false], deprecated: true}
+        communityFlag: {$ref: '#/components/schemas/CommunityFlag'}
+        officialFlag:
+          type: object
+          required: [value, status, source, validAt]
+          properties:
+            value: {type: string, nullable: true, enum: [null]}
+            status: {type: string, enum: [unknown]}
+            source: {type: string, nullable: true, enum: [null]}
+            validAt: {type: string, format: date-time, nullable: true, enum: [null]}
+        calculatedConditions:
+          type: object
+          required: [level, source]
+          properties:
+            level: {type: string, enum: [favorable, caution, unfavorable, unknown]}
+            source: {type: string, enum: [littora-score-v1]}
+        alerts: {type: array, items: {type: string}}
+    MetricPoint:
+      type: object
+      required: [time, value]
+      properties:
+        time: {type: string, format: date-time}
+        value: {type: number, nullable: true}
+    BeachScore:
+      type: object
+      required: [beach, current, scores, safety, summary, forecast, reliability, dataStatus, providers, disclaimer, measurements]
+      properties:
+        beach: {$ref: '#/components/schemas/Beach'}
+        current:
+          type: object
+          required: [weather, marine, tides, waterQuality, community]
+          properties:
+            weather: {$ref: '#/components/schemas/LegacyMetrics'}
+            marine: {$ref: '#/components/schemas/LegacyMetrics'}
+            tides: {$ref: '#/components/schemas/Tides'}
+            waterQuality: {$ref: '#/components/schemas/WaterQuality'}
+            community:
+              type: array
+              items:
+                type: object
+                required: [type, count, confidence]
+                properties: {type: {type: string}, count: {type: integer}, confidence: {type: number}}
+        scores: {$ref: '#/components/schemas/Scores'}
+        safety: {$ref: '#/components/schemas/Safety'}
+        summary: {type: object, additionalProperties: {type: string}}
+        forecast: {type: object, additionalProperties: {type: array, items: {$ref: '#/components/schemas/MetricPoint'}}}
+        measurements:
+          type: object
+          required: [weather, marine, forecast]
+          properties:
+            weather: {$ref: '#/components/schemas/MeasurementMap'}
+            marine: {$ref: '#/components/schemas/MeasurementMap'}
+            forecast: {type: object, additionalProperties: {type: array, items: {$ref: '#/components/schemas/Measurement'}}}
+        reliability: {type: object, additionalProperties: {type: string}}
+        dataStatus: {type: object, additionalProperties: {$ref: '#/components/schemas/DataStatus'}}
+        providers: {type: object, additionalProperties: {type: string}}
+        disclaimer: {type: string}
+    Recommendation:
+      allOf:
+        - {$ref: '#/components/schemas/Beach'}
+        - type: object
+          required: [scores, selectedScore, flag, waterTemp, airTemp, dataStatus]
+          properties:
+            scores: {$ref: '#/components/schemas/Scores'}
+            selectedScore: {type: integer, nullable: true, minimum: 0, maximum: 100}
+            flag: {type: string, enum: [green, yellow, red, unknown]}
+            waterTemp: {type: number, nullable: true}
+            airTemp: {type: number, nullable: true}
+            dataStatus: {type: object, additionalProperties: {$ref: '#/components/schemas/DataStatus'}}
+    ReportPayload:
+      type: object
+      required: [beachId, type]
+      additionalProperties: false
+      oneOf:
+        - properties: {type: {enum: [jellyfish, pollution, current, crowd, other]}}
+        - required: [value]
+          properties:
+            type: {enum: [flag]}
+            value:
+              type: object
+              anyOf:
+                - type: object
+                  required: [flag]
+                  properties:
+                    flag: {type: string, enum: [green, yellow, red, vert, verte, jaune, orange, rouge]}
+                - type: object
+                  required: [drapeau]
+                  properties:
+                    drapeau: {type: string, enum: [green, yellow, red, vert, verte, jaune, orange, rouge]}
+                - type: object
+                  required: [value]
+                  properties:
+                    value: {type: string, enum: [green, yellow, red, vert, verte,jaune, orange, rouge]}
+              properties:
+                value: {type: string, enum: [green, yellow, red, vert, verte, jaune, orange, rouge]}
+      properties:
+        beachId: {type: string, format: uuid}
+        type: {type: string, enum: [jellyfish, pollution, current, crowd, flag, other]}
+        value:
+          type: object
+          maxProperties: 10
+          additionalProperties: false
+          properties:
+            flag: {type: string, enum: [green, yellow, red, vert, verte, jaune, orange, rouge]}
+            drapeau: {type: string, enum: [green, yellow, red, vert, verte, jaune, orange, rouge]}
+            value: {type: string, maxLength: 100}
+            note: {type: string, maxLength: 2000}
+            severity: {type: string, maxLength: 50}
+            source: {type: string, maxLength: 100, description: Untrusted client label; never an official provenance.}
+        confidence: {type: number, minimum: 0, maximum: 1, deprecated: true, description: Legacy client weight. Trust and anti-abuse policy is tracked separately.}
+    Report:
+      type: object
+      required: [id, beach_id, type, value, confidence, status, created_at, provenance]
+      properties:
+        id: {type: string, format: uuid}
+        beach_id: {type: string, format: uuid}
+        type: {type: string}
+        value: {type: object, additionalProperties: true}
+        confidence: {type: number, minimum: 0, maximum: 1, nullable: true}
+        status: {type: string}
+        created_at: {type: string, format: date-time}
+        provenance:
+          type: object
+          required: [kind, source, isDemo, verified]
+          properties:
+            kind: {type: string, enum: [contribution]}
+            source: {type: string, enum: [littora-reports]}
+            isDemo: {type: boolean}
+            verified: {type: boolean}
+    AuthStatus:
+      type: object
+      required: [ready, mode, next]
+      properties: {ready: {type: boolean}, mode: {type: string}, next: {type: string}}
+    AdminHealth:
+      type: object
+      required: [status, moderationQueue]
+      properties: {status: {type: string}, moderationQueue: {type: boolean}}
+    IngestionReceipt:
+      type: object
+      required: [queued]
+      properties:
+        ok: {type: boolean}
+        queued: {type: boolean}
+        warning: {type: string}
+        jobId: {type: string}
+        queue: {type: string}
+        provider: {type: string}
+        job: {type: object, additionalProperties: true, deprecated: true, description: Legacy BullMQ receipt; not a confirmation of ingestion.}

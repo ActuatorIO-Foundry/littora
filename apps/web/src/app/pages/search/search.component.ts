@@ -10,9 +10,9 @@ import { IconComponent } from "../../shared/icon.component";
 import { LoadingComponent } from "../../shared/loading.component";
 import { CoastMapComponent } from "../../shared/coast-map.component";
 import { COASTAL_ZONES, CoastalZone } from "../../shared/coastal-zones";
-import { metricValue, providerLabel } from "../../shared/presentation";
+import { metricValue, providerLabel, dataStatusLabel } from "../../shared/presentation";
 type Result = Beach & {
-  selectedScore?: number;
+  selectedScore?: number | null;
   scores?: BeachScore["scores"];
   flag?: string;
   waterTemp?: number;
@@ -67,6 +67,7 @@ export class SearchComponent implements OnInit, OnDestroy {
   ];
   readonly metricValue = metricValue;
   readonly providerLabel = providerLabel;
+  readonly dataStatusLabel = dataStatusLabel;
   private listRequest?: Subscription;
   private scoreRequest?: Subscription;
   private placeRequest?: Subscription;

@@ -343,6 +343,11 @@
               {{ providerLabel(score.providers?.["weather"]) }} ·
               {{ providerLabel(score.providers?.["marine"]) }}
             </p>
+            <p class="caption" *ngFor="let source of ['weather', 'marine']">
+              <ng-container *ngIf="score.dataStatus?.[source]">
+                {{ providerLabel(score.providers?.[source]) }} : {{ dataStatusLabel(score.dataStatus?.[source]) }}
+              </ng-container>
+            </p>
             <div class="overview-flag">
               <app-icon name="flag" [size]="15" />Drapeau officiel non renseigné
             </div>

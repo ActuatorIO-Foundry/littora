@@ -1,2 +1,22 @@
-import { Inject, Injectable } from '@nestjs/common';import { PG } from '../../database/database.module';
-@Injectable() export class WaterQualityService{constructor(@Inject(PG) private db:any){} async get(beachId?:string,lat?:number,lon?:number){if(beachId){const {rows}=await this.db.query('select * from water_quality where beach_id=$1 order by sample_date desc limit 1',[beachId]); if(rows[0]) return {...rows[0],provider:'local-cache'}} return {provider:'baignades-sante/data-gouv-ready',status:'unknown',classification:null,reliability:'pending',warning:'Import the official bathing-water dataset URL into WATER_QUALITY_DATASET_URL, then run ingestion.'}}}
+import { Inject, Injectable } from '@nestjs/common';
+import { PG } from '../../database/database.module';
+
+@Injectable()
+export class WaterQualityService {
+  constructor(@Inject(PG) private db: any) {}
+
+  async get(beachId?: string, lat?: number, lon?: number) {
+    if (beachId) {
+      const { rows } = await this.db.query(`select * from water_quality
+        where beach_id=$1 and is_demo=false
+        and coalesce(source,'') not in ('local-seed','demo-seed')
+        and coalesce(raw->>'demo','false') <> 'true'
+        order by sample_date desc limit 1`, [beachId]);
+      if (rows[0]) return { ...rows[0], provider: rows[0].source || 'local-cache' };
+    }
+    return {
+      provider: 'baignades-sante/data-gouv-ready', status: 'unknown', classification: null,
+      reliability: 'unknown', warning: 'No verified bathing-water sample available.',
+    };
+  }
+}

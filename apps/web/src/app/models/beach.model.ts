@@ -24,10 +24,10 @@ export interface BeachScore {
     waterQuality?: Record<string, unknown>;
   };
   scores: {
-    bathing: number;
-    family: number;
-    paddle: number;
-    boat: number;
+    bathing: number | null;
+    family: number | null;
+    paddle: number | null;
+    boat: number | null;
   };
   summary?: {
     bathing?: string;
@@ -36,7 +36,7 @@ export interface BeachScore {
     boat?: string;
   };
   safety?: {
-    flag: 'green' | 'yellow' | 'red';
+    flag: 'green' | 'yellow' | 'red' | 'unknown';
     alerts: string[];
     source?: string;
     official?: boolean;
@@ -50,8 +50,18 @@ export interface BeachScore {
   forecast?: Record<string, MetricPoint[]>;
   providers?: Record<string, string>;
   reliability?: Record<string, string>;
+  dataStatus?: Record<string, DataStatus>;
   disclaimer?: string;
   error?: string;
+}
+
+export interface DataStatus {
+  status: 'available' | 'partial' | 'stale' | 'unknown';
+  provider: string;
+  kind?: string;
+  fetchedAt: string | null;
+  validAt: string | null;
+  ageSeconds: number | null;
 }
 
 export interface MetricPoint {

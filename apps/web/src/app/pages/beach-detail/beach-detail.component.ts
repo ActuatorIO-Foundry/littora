@@ -17,6 +17,7 @@ import {
   metricValue,
   metricClass,
   providerLabel,
+  dataStatusLabel,
 } from "../../shared/presentation";
 type UsageKey = "bathing" | "family" | "paddle" | "boat";
 interface Report {
@@ -57,6 +58,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
   readonly metricValue = metricValue;
   readonly metricClass = metricClass;
   readonly providerLabel = providerLabel;
+  readonly dataStatusLabel = dataStatusLabel;
   readonly usages: Array<{
     key: UsageKey;
     label: string;

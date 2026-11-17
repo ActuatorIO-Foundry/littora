@@ -1,3 +1,13 @@
+import { DataStatus } from '../models/beach.model';
+
+export function dataStatusLabel(data?: DataStatus): string {
+  if (!data) return '';
+  if (data.status === 'unknown') return 'Données indisponibles';
+  const age = data.ageSeconds == null ? '' : ` · reçues il y a ${Math.floor(data.ageSeconds / 60)} min`;
+  if (data.status === 'stale') return `Dernières prévisions conservées, fournisseur indisponible${age}`;
+  return `${data.status === 'partial' ? 'Prévisions partielles' : 'Prévisions'}${age}`;
+}
+
 export function metricValue(
   source: Record<string, unknown> | undefined,
   key: string,
@@ -23,6 +33,7 @@ export function providerLabel(provider?: string): string {
     "local-marine-fallback": "Estimation locale, non observée",
     "local-tide-estimator": "Estimation locale, non observée",
     "shom-spm": "SHOM, disponibilité à vérifier",
+    "shom": "SHOM, source non connectée",
     "baignades-sante/data-gouv-ready": "Source sanitaire non connectée",
     "local-cache": "Données locales à vérifier",
     "littora-reports": "Communauté Littora",

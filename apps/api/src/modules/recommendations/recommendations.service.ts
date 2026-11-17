@@ -15,7 +15,7 @@ export class RecommendationsService {
   async best(lat: number, lon: number, usage = 'bathing') {
     const selectedUsage: Usage = allowedUsages.includes(usage as Usage) ? (usage as Usage) : 'bathing';
     const beaches = await this.beaches.list(lat, lon, 30);
-    const enriched: Array<Record<string, any> & { selectedScore: number }> = [];
+    const enriched: Array<Record<string, any> & { selectedScore: number | null }> = [];
 
     for (const beach of beaches) {
       try {
@@ -23,7 +23,8 @@ export class RecommendationsService {
         enriched.push({
           ...beach,
           scores: score.scores,
-          selectedScore: score.scores[selectedUsage] ?? score.scores.bathing,
+          selectedScore: score.scores[selectedUsage],
+          dataStatus: score.dataStatus,
           flag: score.safety?.flag,
           waterTemp: Number(score.current?.marine?.sea_surface_temperature ?? NaN),
           airTemp: Number(score.current?.weather?.temperature_2m ?? NaN),
@@ -33,6 +34,6 @@ export class RecommendationsService {
       }
     }
 
-    return enriched.sort((a, b) => b.selectedScore - a.selectedScore);
+    return enriched.sort((a, b) => (b.selectedScore ?? -1) - (a.selectedScore ?? -1));
   }
 }

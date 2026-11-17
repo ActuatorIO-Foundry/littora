@@ -119,6 +119,34 @@ test.beforeEach(async ({ page }) => {
   await mockApi(page);
 });
 
+test('conditions : panne fournisseur sans faux score ni courbe', async ({ page }) => {
+  await page.route('**/api/score/beach/*', route => route.fulfill({ json: {
+    ...score, scores: { bathing: null, family: null, paddle: null, boat: null },
+    current: { weather: { temperature_2m: null, uv_index: null }, marine: {} },
+    forecast: { air: [], water: [], uv: [], wave: [] },
+    dataStatus: { weather: { status: 'unknown' }, marine: { status: 'unknown' } },
+  } }));
+  await page.goto('/plages/test-sea');
+  await expect(page.locator('.usage-scores strong')).toHaveText(['—', '—', '—', '—']);
+  await expect(page.getByText('Score indisponible : données récentes insuffisantes.')).toBeVisible();
+  await expect(page.getByText(/Open-Meteo : Données indisponibles/)).toBeVisible();
+  await expect(page.locator('.forecast-chart svg')).toHaveCount(0);
+  await noOverflow(page);
+});
+
+test('conditions : dernier relevé sourcé explicitement ancien, zéro réel affichable', async ({ page }) => {
+  await page.route('**/api/score/beach/*', route => route.fulfill({ json: {
+    ...score, scores: { bathing: null, family: null, paddle: null, boat: null },
+    current: { ...score.current, weather: { ...score.current.weather, temperature_2m: 0 } },
+    dataStatus: { weather: { status: 'stale', ageSeconds: 1800 }, marine: { status: 'partial', ageSeconds: 60 } },
+  } }));
+  await page.goto('/plages/test-sea');
+  await expect(page.getByText(/Dernières prévisions conservées, fournisseur indisponible.*30 min/)).toBeVisible();
+  await expect(page.locator('.conditions-grid strong').first()).toContainText('0');
+  await expect(page.locator('.forecast-chart svg path')).toHaveCount(1);
+  await noOverflow(page);
+});
+
 test('recherche : catalogue complet au-dela de 180 et 500 plages', async ({ page }) => {
   const catalogue = Array.from({ length: 602 }, (_, i) => ({
     ...beaches[0], id: `page-${i}`, name: `Escale ${String(i).padStart(4, '0')}`,

@@ -33,9 +33,7 @@ test('forecast: unavailable series are empty, not fabricated', async () => {
   });
 });
 
-test('forecast: real zero is preserved but null is not converted into zero', {
-  todo: '#12: preserve missing values in forecast normalization',
-}, async (t) => {
+test('forecast: real zero is preserved but null is not converted into zero', async (t) => {
   t.mock.method(Date, 'now', () => Date.parse('2026-07-15T12:00:00Z'));
   const result = await scoreFixture({ weather: { raw: { hourly: {
     time: ['2026-07-15T12:00:00Z', '2026-07-15T13:00:00Z'],
@@ -44,9 +42,25 @@ test('forecast: real zero is preserved but null is not converted into zero', {
   assert.deepEqual(result.forecast.air, [{ time: '2026-07-15T12:00:00Z', value: 0 }]);
 });
 
-test('scores: no bathing score without weather and marine coverage', {
-  todo: '#21: define minimum input coverage and unavailable scores',
-}, async () => {
+test('scores: no bathing score without weather and marine coverage', async () => {
   const result = await scoreFixture({ weather: { current: {} }, marine: { current: {} } }).scoreBeach(beach.id);
   assert.equal(result.scores.bathing, null);
+  assert.equal(result.safety.flag, 'unknown');
+  assert.ok(Object.values(result.scores).every(value => value === null));
+});
+
+test('scores: stale data remains attributed but is excluded from recommendations', async () => {
+  const result = await scoreFixture({ weather: { status: 'stale', fetchedAt: '2026-07-15T12:00:00Z', ageSeconds: 1800 } }).scoreBeach(beach.id);
+  assert.equal(result.current.weather.temperature_2m, 24);
+  assert.equal(result.dataStatus.weather.status, 'stale');
+  assert.equal(result.dataStatus.weather.ageSeconds, 1800);
+  assert.equal(result.providers.weather, 'test-weather');
+  assert.ok(Object.values(result.scores).every(value => value === null));
+});
+
+test('scores: missing water temperature never becomes 22 degrees', async () => {
+  const result = await scoreFixture({ marine: { current: { wave_height: 0.3, ocean_current_velocity: 0.05 } } }).scoreBeach(beach.id);
+  assert.equal(result.scores.bathing, null);
+  assert.equal(result.scores.family, null);
+  assert.ok(Number.isFinite(result.scores.paddle));
 });

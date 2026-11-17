@@ -197,7 +197,7 @@
     <app-icon name="alert" [size]="18" />{{ error
     }}<button
       class="text-link"
-      (click)="selectedZone ? exploreZone(selectedZone) : loadBeaches()"
+      (click)="retrySearch()"
     >
       Réessayer
     </button>
@@ -243,7 +243,7 @@
         </h2>
         <label
           ><span class="sr-only">Trier les plages</span
-          ><select [(ngModel)]="sort">
+          ><select [(ngModel)]="sort" (ngModelChange)="syncFilters()">
             <option value="name">Nom A–Z</option>
             <option value="score">Score indicatif</option>
             <option value="distance">Distance</option>
@@ -301,6 +301,7 @@
           <a
             [routerLink]="['/plages', beach.id]"
             [queryParams]="queryParams"
+            [state]="navigationState"
             class="details-link"
             >Détails <app-icon name="arrow" [size]="15"
           /></a>

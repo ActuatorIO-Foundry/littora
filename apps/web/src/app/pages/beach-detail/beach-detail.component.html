@@ -186,7 +186,7 @@
               <app-icon [name]="item.icon" [size]="16" />{{ item.label }}
             </button>
           </div>
-          <div class="forecast-chart" *ngIf="points.length; else noForecast">
+          <div class="forecast-chart" *ngIf="hasForecast; else noForecast">
             <div class="chart-heading">
               <span
                 >{{ chart.label }} <small>{{ chart.unit }}</small></span
@@ -218,6 +218,7 @@
               />
               <g *ngFor="let point of points; let i = index">
                 <circle
+                  *ngIf="point.value != null"
                   [attr.cx]="chartX(i)"
                   [attr.cy]="chartY(point.value)"
                   r="4"
@@ -248,7 +249,7 @@
                   <tr *ngFor="let point of points">
                     <td>{{ dateLabel(point.time) }}</td>
                     <td>
-                      {{ point.value | number: "1.0-1" }} {{ chart.unit }}
+                      {{ point.value === null ? '—' : (point.value | number: "1.0-1") }} {{ chart.unit }}
                     </td>
                   </tr>
                 </tbody>

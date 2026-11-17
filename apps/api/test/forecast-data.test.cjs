@@ -43,7 +43,7 @@ test('providers: partial real forecasts preserve zero, null, source and timestam
   t.mock.method(Date, 'now', () => now);
   t.mock.method(http, 'fetchJson', async url => {
     assert.equal(new URL(url).searchParams.get('timeformat'), 'unixtime');
-    return { hourly: { time: [now / 1000], temperature_2m: [0], precipitation: [null], cloud_cover: [''], uv_index: [Infinity] } };
+    return { hourly_units: { temperature_2m: '\u00b0C', precipitation: 'mm', cloud_cover: '%', uv_index: '' }, hourly: { time: [now / 1000], temperature_2m: [0], precipitation: [null], cloud_cover: [''], uv_index: [Infinity] } };
   });
   const data = await new WeatherService(cache()).getOpenMeteo(43, 6);
   assert.equal(data.status, 'partial');
@@ -58,7 +58,7 @@ test('providers: partial real forecasts preserve zero, null, source and timestam
 test('providers: retain only last real forecast for 24h, with original age and validity', async t => {
   let clock = now;
   t.mock.method(Date, 'now', () => clock);
-  const fetch = t.mock.method(http, 'fetchJson', async () => ({ hourly: { time: [now / 1000], wave_height: [0.4] } }));
+  const fetch = t.mock.method(http, 'fetchJson', async () => ({ hourly_units: { wave_height: 'm' }, hourly: { time: [now / 1000], wave_height: [0.4] } }));
   const store = cache(), service = new MarineService(store);
   const first = await service.get(43, 6);
   assert.equal(first.current.salinity_ppt, null);
@@ -81,7 +81,7 @@ test('providers: retain only last real forecast for 24h, with original age and v
 test('providers: malformed data cannot overwrite a previous real forecast', async t => {
   let clock = now;
   t.mock.method(Date, 'now', () => clock);
-  const fetch = t.mock.method(http, 'fetchJson', async () => ({ hourly: { time: [now / 1000], temperature_2m: [21] } }));
+  const fetch = t.mock.method(http, 'fetchJson', async () => ({ hourly_units: { temperature_2m: '\u00b0C' }, hourly: { time: [now / 1000], temperature_2m: [21] } }));
   const service = new WeatherService(cache());
   await service.getOpenMeteo(43, 6);
   clock += 1000_000;

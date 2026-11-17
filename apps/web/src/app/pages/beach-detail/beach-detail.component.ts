@@ -95,6 +95,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     { key: "water", label: "Eau", unit: "°C", icon: "waves" },
     { key: "uv", label: "UV", unit: "", icon: "sun" },
     { key: "wave", label: "Vagues", unit: "m", icon: "waves" },
+    { key: "current", label: "Courant", unit: "m/s", icon: "water" },
   ];
   readonly groups: Array<{
     category: BeachAmenity["category"];
@@ -208,11 +209,11 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
   }
   get points(): MetricPoint[] {
     return (this.score?.forecast?.[this.selectedChart] ?? []).filter(
-      (p) => p.value !== null && Number.isFinite(p.value),
+      (p) => Number.isFinite(Date.parse(p.time)),
     );
   }
   get bounds() {
-    const values = this.points.map((p) => p.value);
+    const values = this.points.map((p) => p.value).filter((v): v is number => v !== null && Number.isFinite(v));
     const min = Math.floor(Math.min(...values) - 1);
     return {
       min:
@@ -223,18 +224,26 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     };
   }
   chartX(index: number): number {
-    return 48 + (index / Math.max(this.points.length - 1, 1)) * 660;
+    const points = this.points;
+    const start = Date.parse(points[0]?.time);
+    const end = Date.parse(points[points.length - 1]?.time);
+    return 48 + ((Date.parse(points[index]?.time) - start) / Math.max(end - start, 1)) * 660;
   }
   chartY(value: number): number {
     const b = this.bounds;
     return 184 - ((value - b.min) / (b.max - b.min)) * 150;
   }
   chartPath(): string {
-    return this.points
-      .map(
-        (p, i) => `${i ? "L" : "M"}${this.chartX(i)},${this.chartY(p.value)}`,
-      )
-      .join(" ");
+    let connected = false;
+    return this.points.map((p, i) => {
+      if (p.value === null || !Number.isFinite(p.value)) { connected = false; return ''; }
+      const command = connected ? 'L' : 'M';
+      connected = true;
+      return `${command}${this.chartX(i)},${this.chartY(p.value)}`;
+    }).join(' ');
+  }
+  get hasForecast(): boolean {
+    return this.points.some(p => p.value !== null && Number.isFinite(p.value));
   }
   chartTime(time: string): string {
     const date = new Date(time);

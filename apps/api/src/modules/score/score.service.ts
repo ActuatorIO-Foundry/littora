@@ -65,6 +65,7 @@ export class ScoreService {
         air: this.series(weather.raw?.hourly, 'temperature_2m'),
         water: this.series(marine.raw?.hourly, 'sea_surface_temperature'),
         wave: this.series(marine.raw?.hourly, 'wave_height'),
+        current: this.series(marine.raw?.hourly, 'ocean_current_velocity'),
       },
       reliability: {
         weather: weather.status ?? 'unknown',
@@ -129,13 +130,14 @@ export class ScoreService {
     return times
       .slice(start, start + 8)
       .map((time, index) => ({ time, value: finiteMetric(values[start + index]) }))
-      .filter((point) => point.time && Number.isFinite(Date.parse(point.time)) && point.value !== null);
+      .filter((point) => point.time && Number.isFinite(Date.parse(point.time)));
   }
 
   private dataStatus(data: any) {
     return { status: data.status ?? 'unknown', kind: data.kind ?? null,
       fetchedAt: data.fetchedAt ?? null, validAt: data.validAt ?? null,
-      ageSeconds: data.ageSeconds ?? null, provider: data.provider, warning: data.warning ?? null };
+      ageSeconds: data.ageSeconds ?? null, producedAt: data.producedAt ?? null,
+      units: data.units ?? {}, provider: data.provider, warning: data.warning ?? null };
   }
 
   private communityPenalty(reports: Array<{ type: string; count: number; confidence: number }>) {

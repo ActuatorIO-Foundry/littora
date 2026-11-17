@@ -29,7 +29,7 @@ test('scores: community warnings remain non-official and are deduplicated', asyn
 
 test('forecast: unavailable series are empty, not fabricated', async () => {
   assert.deepEqual((await scoreFixture().scoreBeach(beach.id)).forecast, {
-    uv: [], air: [], water: [], wave: [],
+    uv: [], air: [], water: [], wave: [], current: [],
   });
 });
 
@@ -39,7 +39,7 @@ test('forecast: real zero is preserved but null is not converted into zero', asy
     time: ['2026-07-15T12:00:00Z', '2026-07-15T13:00:00Z'],
     temperature_2m: [0, null],
   } } } }).scoreBeach(beach.id);
-  assert.deepEqual(result.forecast.air, [{ time: '2026-07-15T12:00:00Z', value: 0 }]);
+  assert.deepEqual(result.forecast.air, [{ time: '2026-07-15T12:00:00Z', value: 0 }, { time: '2026-07-15T13:00:00Z', value: null }]);
 });
 
 test('scores: no bathing score without weather and marine coverage', async () => {

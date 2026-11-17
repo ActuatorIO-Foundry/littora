@@ -1,4 +1,5 @@
 import { CacheService } from '../cache/cache.service';
+import { forecastUnits, normalizeMetric } from './forecast-units';
 
 export interface ForecastData {
   provider: string;
@@ -7,6 +8,9 @@ export interface ForecastData {
   fetchedAt: string | null;
   validAt: string | null;
   ageSeconds: number | null;
+  producedAt: string | null;
+  units: Record<string, string>;
+  sourceUnits?: Record<string, string>;
   current: Record<string, number | string | null>;
   raw?: { hourly: Record<string, any[]>; [key: string]: any };
   warning?: string;
@@ -20,7 +24,8 @@ export async function forecastData(
   cache: CacheService, provider: string, lat: number, lon: number,
   keys: string[], fetchData: () => Promise<any>,
 ): Promise<ForecastData> {
-  const key = `forecast:real:v1:${provider}:${lat.toFixed(3)}:${lon.toFixed(3)}`;
+  const key = `forecast:real:v2:${provider}:${lat.toFixed(3)}:${lon.toFixed(3)}`;
+  const units = Object.fromEntries(keys.map(k => [k, forecastUnits[k].unit]));
   const last = await cache.getJson<ForecastData>(key);
   const age = last?.fetchedAt ? (Date.now() - Date.parse(last.fetchedAt)) / 1000 : NaN;
   const reusable = last?.kind === 'forecast' && last.provider === provider &&
@@ -35,7 +40,7 @@ export async function forecastData(
     const time = times.map((t: unknown) => typeof t === 'number' && Number.isFinite(t) &&
       Number.isFinite(new Date(t * 1000).getTime()) ? new Date(t * 1000).toISOString() : null);
     const hourly: Record<string, any[]> = { time };
-    for (const metric of keys) hourly[metric] = times.map((_, i) => finiteMetric(response.hourly[metric]?.[i]));
+    for (const metric of keys) hourly[metric] = times.map((_, i) => normalizeMetric(metric, response.hourly[metric]?.[i], response.hourly_units?.[metric]));
     if (!time.some((t, i) => t && keys.some(k => hourly[k][i] !== null))) throw new Error('Empty forecast');
     const now = Date.now();
     let nearest = -1, distance = 3600_000;
@@ -49,7 +54,8 @@ export async function forecastData(
     const payload: ForecastData = {
       provider, kind: 'forecast', status: count === keys.length ? 'available' : count ? 'partial' : 'unknown',
       fetchedAt: new Date(now).toISOString(), validAt: time[nearest] ?? null, ageSeconds: 0,
-      current, raw: { ...response, hourly, hourly_units: { ...response.hourly_units, time: 'iso8601' } },
+      producedAt: null, units, sourceUnits: response.hourly_units,
+      current, raw: { ...response, hourly, hourly_units: { ...units, time: 'iso8601' } },
     };
     await cache.setJson(key, payload, 86400);
     return payload;
@@ -57,6 +63,7 @@ export async function forecastData(
     if (reusable) return { ...last, status: 'stale', ageSeconds: Math.floor(age), warning: 'Provider unavailable; last successful forecast retained.' };
     return {
       provider, kind: 'forecast', status: 'unknown', fetchedAt: null, validAt: null, ageSeconds: null,
+      producedAt: null, units,
       current: Object.fromEntries(['time', ...keys].map(k => [k, null])),
       warning: 'Provider unavailable; no recent forecast cached.',
     };

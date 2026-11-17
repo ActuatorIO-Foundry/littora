@@ -62,11 +62,13 @@ export interface DataStatus {
   fetchedAt: string | null;
   validAt: string | null;
   ageSeconds: number | null;
+  producedAt?: string | null;
+  units?: Record<string, string>;
 }
 
 export interface MetricPoint {
   time: string;
-  value: number;
+  value: number | null;
 }
 
 export interface BeachAmenity {

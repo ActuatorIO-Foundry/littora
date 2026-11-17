@@ -99,7 +99,6 @@ export class BeachesService {
   }
 
   async discoverFromOpenStreetMap(bbox: string, region: string, coastline: string, limit = 140) {
-    await this.ensureGeoSchema();
     const boundedLimit = Math.min(Math.max(Number(limit) || 140, 1), 200);
     const parsedBbox = this.parseBbox(bbox);
     const cacheKey = `osm:beaches:v3:${parsedBbox.join(',')}:${boundedLimit}`;
@@ -480,15 +479,4 @@ export class BeachesService {
     return this.enrichBeach({ ...rows[0], distanceKm: null });
   }
 
-  private async ensureGeoSchema() {
-    try {
-      await this.db.query('create extension if not exists postgis');
-      await this.db.query('alter table beaches add column if not exists geom geography(Point,4326)');
-      await this.db.query('update beaches set geom = ST_SetSRID(ST_MakePoint(lon, lat), 4326)::geography where geom is null');
-      await this.db.query('create index if not exists beaches_geom_idx on beaches using gist(geom)');
-      await this.db.query('create unique index if not exists beaches_osm_id_unique_idx on beaches(osm_id) where osm_id is not null');
-    } catch {
-      // Discovery still works without geography indexes; distance sorting has a JS fallback.
-    }
-  }
 }

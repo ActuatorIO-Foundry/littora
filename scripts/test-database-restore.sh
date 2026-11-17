@@ -34,8 +34,12 @@ docker exec "$POSTGRES_CONTAINER" createdb -U "$user" -T template0 "$restored"
 created=1
 docker exec -i "$POSTGRES_CONTAINER" pg_restore -U "$user" -d "$restored" --exit-on-error < "$backup"
 query="select md5(coalesce(string_agg(row_to_json(t)::text, '' order by id), '')) from %s t;"
-for table in beaches reports water_quality restore_geometry_fixture; do
-  sql=$(printf "$query" "$table")
+for table in beaches reports water_quality restore_geometry_fixture schema_migrations; do
+  if [[ "$table" == schema_migrations ]]; then
+    sql="select md5(coalesce(string_agg(row_to_json(t)::text, '' order by version), '')) from schema_migrations t;"
+  else
+    sql=$(printf "$query" "$table")
+  fi
   expected=$(docker exec "$POSTGRES_CONTAINER" psql -U "$user" -d "$db" -Atc "$sql")
   actual=$(docker exec "$POSTGRES_CONTAINER" psql -U "$user" -d "$restored" -Atc "$sql")
   if [[ "$expected" != "$actual" ]]; then

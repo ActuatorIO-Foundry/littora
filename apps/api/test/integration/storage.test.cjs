@@ -1,7 +1,5 @@
 require('reflect-metadata');
 const assert = require('node:assert/strict');
-const { readFileSync } = require('node:fs');
-const { resolve } = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { once } = require('node:events');
 const { test } = require('node:test');
@@ -10,6 +8,7 @@ const Redis = require('ioredis');
 const { BeachesService } = require('../../dist/modules/beaches/beaches.service');
 const { ReportsService } = require('../../dist/modules/reports/reports.service');
 const { CacheService } = require('../../dist/cache/cache.service');
+const { migrate, seed } = require('../../scripts/database.cjs');
 
 test('isolated PostGIS catalogue, reports and Redis cache', { timeout: 30000 }, async () => {
   const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -24,7 +23,8 @@ test('isolated PostGIS catalogue, reports and Redis cache', { timeout: 30000 }, 
   const originalRedis = process.env.REDIS_URL;
   let cache;
   try {
-    await pool.query(readFileSync(resolve(__dirname, '../../../../scripts/init.sql'), 'utf8'));
+    await migrate(pool);
+    await seed(pool);
     const beaches = new BeachesService(pool, {});
     const result = await beaches.list(43.2409, 6.6635, 2);
     assert.equal(result.length, 2);

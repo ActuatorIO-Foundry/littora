@@ -11,7 +11,6 @@ services:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U littora -d littora"]
       interval: 2s
@@ -29,6 +28,16 @@ services:
       interval: 2s
       timeout: 5s
       retries: 30
+  migrate:
+    profiles: [tools]
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    env_file: .env
+    command: [node, scripts/database.cjs, migrate]
+    depends_on:
+      postgres:
+        condition: service_healthy
   api:
     build:
       context: ./apps/api
@@ -39,8 +48,10 @@ services:
     ports:
       - "127.0.0.1:${API_PORT:-3000}:3000"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
   web:
     build:
       context: ./apps/web

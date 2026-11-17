@@ -2,7 +2,7 @@ import { ChangeDetectorRef, Component, OnDestroy, OnInit } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
-import { Subscription, timeout } from "rxjs";
+import { map, Subscription, switchMap, timeout } from "rxjs";
 import { Beach, BeachScore } from "../../models/beach.model";
 import { LittoraApiService } from "../../services/littora-api.service";
 import { IconComponent } from "../../shared/icon.component";
@@ -104,7 +104,7 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.error = "";
     this.listRequest = this.api
-      .getBeaches()
+      .getCatalogue()
       .pipe(timeout(20000))
       .subscribe({
         next: (r) => {
@@ -132,7 +132,12 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.syncFilters();
     this.listRequest = this.api
       .discoverBeaches(zone)
-      .pipe(timeout(30000))
+      .pipe(
+        switchMap((discovery) => this.api.getCatalogue(zone.bbox).pipe(
+          map((beaches) => ({ ...discovery, beaches })),
+        )),
+        timeout(30000),
+      )
       .subscribe({
         next: (r) => {
           this.beaches = r.beaches;

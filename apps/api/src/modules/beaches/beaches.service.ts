@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CacheService } from '../../cache/cache.service';
 import { PG } from '../../database/database.module';
 import { haversineKm } from '../../shared/geo';
@@ -68,6 +68,34 @@ export class BeachesService {
     );
     if (!rows[0]) throw new NotFoundException('Beach not found');
     return this.enrichBeach(rows[0]);
+  }
+
+  async catalogue(after?: string, limit = 200, bbox?: string) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
+      throw new BadRequestException('limit must be an integer between 1 and 500');
+    }
+    if (after && !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(after)) {
+      throw new BadRequestException('Invalid catalogue cursor');
+    }
+    const bounds = bbox ? bbox.split(',').map(Number) : [-90, -180, 90, 180];
+    if (bounds.length !== 4 || bounds.some((n) => !Number.isFinite(n)) ||
+        bounds[0] < -90 || bounds[2] > 90 || bounds[1] < -180 || bounds[3] > 180 ||
+        bounds[0] >= bounds[2] || bounds[1] >= bounds[3]) {
+      throw new BadRequestException('Invalid catalogue bounds');
+    }
+    // A UUID cursor keeps subsequent pages stable when another beach is deleted.
+    const { rows } = await this.db.query(
+      `select id,name,city,department,region,coastline,lat,lon,has_lifeguard,has_parking,has_toilets,osm_id
+       from beaches where ($1::uuid is null or id > $1::uuid)
+       and lat between $3 and $5 and lon between $4 and $6
+       order by id limit $2`,
+      [after || null, limit + 1, ...bounds],
+    );
+    const page = rows.slice(0, limit);
+    return {
+      beaches: page.map((beach: BeachRow) => this.enrichBeach({ ...beach, distanceKm: null })),
+      nextCursor: rows.length > limit ? page[page.length - 1].id : null,
+    };
   }
 
   async discoverFromOpenStreetMap(bbox: string, region: string, coastline: string, limit = 140) {

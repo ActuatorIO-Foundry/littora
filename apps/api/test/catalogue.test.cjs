@@ -52,3 +52,18 @@ test('catalogue: Pays de la Loire does not imply river water', {
   }] }) }, {});
   assert.equal((await service.get(beach.id)).waterType, 'sea');
 });
+
+test('catalogue: cursor pages are bounded, stable and parameterized', async () => {
+  const rows = Array.from({ length: 201 }, (_, i) => ({ ...beach, id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}` }));
+  const service = new BeachesService({ query: async (sql, values) => {
+    assert.match(sql, /order by id limit \$2/);
+    assert.deepEqual(values, [null, 201, -90, -180, 90, 180]);
+    return { rows };
+  } }, {});
+  const page = await service.catalogue();
+  assert.equal(page.beaches.length, 200);
+  assert.equal(page.nextCursor, rows[199].id);
+  for (const limit of [0, 501, 1.5, NaN]) await assert.rejects(service.catalogue(undefined, limit), e => e.getStatus() === 400);
+  await assert.rejects(service.catalogue("' or true --"), e => e.getStatus() === 400);
+  await assert.rejects(service.catalogue(undefined, 200, '50,8,40,2'), e => e.getStatus() === 400);
+});

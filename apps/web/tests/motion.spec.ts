@@ -5,9 +5,9 @@ async function holdCatalogue(page: Page): Promise<() => void> {
   const ready = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await page.route("**/api/beaches?*", async (route) => {
+  await page.route("**/api/beaches/catalogue?*", async (route) => {
     await ready;
-    await route.fulfill({ json: [] });
+    await route.fulfill({ json: { beaches: [], nextCursor: null } });
   });
   return release;
 }

@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { EMPTY, Observable, expand, reduce } from 'rxjs';
 import { Beach, BeachAmenitiesResponse, BeachScore, ReportPayload } from '../models/beach.model';
 
 @Injectable({
@@ -13,6 +13,17 @@ export class LittoraApiService {
 
     getBeaches(limit = 180): Observable<Beach[]> {
         return this.http.get<Beach[]>(`${this.apiUrl}/beaches?limit=${limit}`);
+    }
+
+    getCatalogue(bbox?: string): Observable<Beach[]> {
+        type Page = { beaches: Beach[]; nextCursor: string | null };
+        const page = (after?: string) => this.http.get<Page>(`${this.apiUrl}/beaches/catalogue`, {
+            params: { limit: '200', ...(after ? { after } : {}), ...(bbox ? { bbox } : {}) },
+        });
+        return page().pipe(
+            expand((result) => result.nextCursor ? page(result.nextCursor) : EMPTY, 1),
+            reduce((all, result) => all.concat(result.beaches), [] as Beach[]),
+        );
     }
 
     discoverBeaches(zone: { bbox: string; name: string; coastline: string }): Observable<{ provider: string; imported: number; warning?: string; beaches: Beach[] }> {

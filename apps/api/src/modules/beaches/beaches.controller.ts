@@ -19,6 +19,11 @@ export class BeachesController {
     return this.s.discoverFromOpenStreetMap(bbox, region, coastline, limit ? +limit : 140);
   }
 
+  @Get('catalogue')
+  catalogue(@Query('after') after?: string, @Query('limit') limit?: string, @Query('bbox') bbox?: string) {
+    return this.s.catalogue(after, limit === undefined ? 200 : Number(limit), bbox);
+  }
+
   @Get(':id/amenities')
   amenities(@Param('id') id: string) {
     return this.s.nearbyAmenities(id);

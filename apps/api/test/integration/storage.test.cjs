@@ -32,6 +32,26 @@ test('isolated PostGIS catalogue, reports and Redis cache', { timeout: 30000 }, 
     assert.ok(Number(result[0].distanceKm) < 0.01);
     assert.equal(result[0].waterType, 'sea');
 
+    await pool.query(`insert into beaches(id,name,lat,lon,geom)
+      select ('10000000-0000-4000-8000-' || lpad(n::text,12,'0'))::uuid,
+      'Catalogue fixture ' || n,43.1,6.3,ST_SetSRID(ST_MakePoint(6.3,43.1),4326)::geography
+      from generate_series(1,602) n`);
+    try {
+      const seen = new Set();
+      let after;
+      do {
+        const page = await beaches.catalogue(after, 200);
+        assert.ok(page.beaches.length <= 200);
+        for (const row of page.beaches) { assert.ok(!seen.has(row.id)); seen.add(row.id); }
+        after = page.nextCursor;
+      } while (after);
+      assert.equal(seen.size, Number((await pool.query('select count(*) from beaches')).rows[0].count));
+      assert.ok(seen.has('10000000-0000-4000-8000-000000000602'));
+      assert.equal((await beaches.catalogue(undefined, 200, '0,0,1,1')).beaches.length, 0);
+    } finally {
+      await pool.query("delete from beaches where id::text like '10000000-0000-4000-8000-%'");
+    }
+
     const reports = new ReportsService(pool);
     const report = await reports.create({ beachId: result[0].id, type: 'flag', value: { flag: 'red' } });
     try {

@@ -96,6 +96,8 @@ async function mockApi(page: Page) {
           beaches: [beaches[0]],
         },
       });
+    if (url.pathname.endsWith("/catalogue"))
+      return route.fulfill({ json: { beaches, nextCursor: null } });
     if (url.pathname.endsWith("/beaches"))
       return route.fulfill({ json: beaches });
     if (url.pathname.includes("/beaches/"))
@@ -114,6 +116,25 @@ async function noOverflow(page: Page) {
 }
 test.beforeEach(async ({ page }) => {
   await mockApi(page);
+});
+
+test('recherche : catalogue complet au-dela de 180 et 500 plages', async ({ page }) => {
+  const catalogue = Array.from({ length: 602 }, (_, i) => ({
+    ...beaches[0], id: `page-${i}`, name: `Escale ${String(i).padStart(4, '0')}`,
+  }));
+  const cursors: number[] = [];
+  await page.route('**/api/beaches/catalogue?*', (route) => {
+    const start = Number(new URL(route.request().url()).searchParams.get('after') || 0);
+    cursors.push(start);
+    return route.fulfill({ json: { beaches: catalogue.slice(start, start + 200),
+      nextCursor: start + 200 < catalogue.length ? String(start + 200) : null } });
+  });
+  await page.goto('/recherche');
+  await expect(page.locator('.results-heading h2')).toContainText('602 plages');
+  expect(cursors).toEqual([0, 200, 400, 600]);
+  await page.getByRole('textbox', { name: 'Rechercher dans les plages' }).fill('Escale 0601');
+  await expect(page.locator('.results-heading h2')).toContainText('1 plage');
+  await expect(page.getByRole('button', { name: 'Escale 0601', exact: true })).toBeVisible();
 });
 
 test("accueil : scene, carte et navigation responsive", async ({
@@ -249,7 +270,7 @@ test("erreur API et refus de geolocalisation sans fausse position", async ({
       value: { getCurrentPosition: (_ok: unknown, fail: () => void) => fail() },
     }),
   );
-  await page.route("**/api/beaches?*", (route) =>
+  await page.route("**/api/beaches/catalogue?*", (route) =>
     route.fulfill({ status: 503, json: {} }),
   );
   await page.goto("/recherche");

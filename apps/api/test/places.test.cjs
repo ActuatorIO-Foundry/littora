@@ -8,6 +8,9 @@ const commune = { nom: 'Bandol', code: '83009', centre: { coordinates: [5.75,43.
   bbox: contour, contour, departement: { code: '83', nom: 'Var' }, region: { code: '93', nom: 'Provence' } };
 const osm = { category: 'natural', type: 'beach', osm_type: 'way', osm_id: 1, name: 'Renecros', lat: '43.134', lon: '5.75' };
 function fixture(t, reply, discovery = true) {
+  const previousUrl = process.env.NOMINATIM_API_URL;
+  process.env.NOMINATIM_API_URL = 'https://nominatim.example/search';
+  t.after(() => { if (previousUrl === undefined) delete process.env.NOMINATIM_API_URL; else process.env.NOMINATIM_API_URL = previousUrl; });
   const previous = process.env.CATALOGUE_DISCOVERY_ENABLED;
   process.env.CATALOGUE_DISCOVERY_ENABLED = String(discovery);
   t.after(() => {
@@ -69,7 +72,7 @@ test('communes: catalogue imports only named beaches within the actual boundary'
   assert.equal(imports[0][3], 'Var');
   assert.deepEqual(result.beaches, [{ id: 'local' }]);
   assert.deepEqual(result.commune.contour, contour);
-  const request = requests.find(url => url.hostname === 'nominatim.openstreetmap.org');
+  const request = requests.find(url => url.hostname === 'nominatim.example');
   assert.equal(request.searchParams.get('bounded'), '1');
   assert.equal(request.searchParams.get('viewbox'), '5.72,43.17,5.78,43.12');
   await service.catalogue('83009');
@@ -95,9 +98,16 @@ test('communes: invalid outlines and mismatched identifiers are rejected before 
   await assert.rejects(service.get('83010'), e => e.getStatus() === 404);
 });
 
+test('communes: public Nominatim is never used to enumerate beaches even when discovery is enabled',async t=>{
+  const {service,requests}=fixture(t,()=>commune);
+  process.env.NOMINATIM_API_URL='https://nominatim.openstreetmap.org/search';
+  assert.equal((await service.catalogue('83009')).source,'local-catalogue');
+  assert.ok(requests.every(r=>r.hostname==='geo.api.gouv.fr'));
+});
+
 test('communes: concurrent requests share a bounded provider lookup', async t => {
   const { service, requests } = fixture(t, url => url.hostname === 'geo.api.gouv.fr' ? commune : [osm]);
   const results = await Promise.all([service.catalogue('83009'), service.catalogue('83009')]);
   assert.equal(results.length, 2);
-  assert.equal(requests.filter(url => url.hostname === 'nominatim.openstreetmap.org').length, 1);
+  assert.equal(requests.filter(url => url.hostname === 'nominatim.example').length, 1);
 });

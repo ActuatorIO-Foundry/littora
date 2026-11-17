@@ -554,6 +554,8 @@ components:
         validAt: {type: string, format: date-time, nullable: true}
         ageSeconds: {type: number, minimum: 0, nullable: true}
         producedAt: {type: string, format: date-time, nullable: true}
+        nextCheckAt: {type: string, format: date-time, nullable: true, description: Earliest scheduled check for the zone (not a model run).}
+        collectionIntervalSeconds: {type: integer, minimum: 1}
         units: {type: object, additionalProperties: {type: string}}
         warning: {type: string, nullable: true}
     Forecast:

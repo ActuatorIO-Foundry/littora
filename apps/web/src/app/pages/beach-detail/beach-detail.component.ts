@@ -112,6 +112,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
   private readonly subscriptions = new Subscription();
   private beachRequests = new Subscription();
   private scoreRequest?: Subscription;
+  private scoreTimer?: ReturnType<typeof setTimeout>;
   constructor(
     private readonly route: ActivatedRoute,
     private readonly api: LittoraApiService,
@@ -121,6 +122,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     this.subscriptions.add(this.route.paramMap.subscribe(params => this.loadBeach(params.get("id"))));
   }
   private loadBeach(id: string | null): void {
+    clearTimeout(this.scoreTimer);
     this.beachRequests.unsubscribe();
     this.beachRequests = new Subscription();
     this.scoreRequest?.unsubscribe();
@@ -181,9 +183,9 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     );
     this.loadReports(id);
   }
-  loadScore(id: string): void {
-    this.score = null;
-    this.loadingScore = true;
+  loadScore(id: string, background = false): void {
+    clearTimeout(this.scoreTimer);
+    if (!background) { this.score = null; this.loadingScore = true; }
     this.scoreError = "";
     this.scoreRequest?.unsubscribe();
     this.scoreRequest = this.api
@@ -192,10 +194,19 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (r) => {
           this.score = r;
+          const now = Date.now();
+          const times = Object.values(r.dataStatus ?? {}).flatMap(s => [
+            s.nextCheckAt ? Date.parse(s.nextCheckAt) - now : Infinity,
+            s.validAt ? Date.parse(s.validAt) + 1800001 - now : Infinity,
+          ]).filter(n => Number.isFinite(n) && n > 0);
+          this.scoreTimer = setTimeout(() => this.loadScore(id, true),
+            Math.max(60000, Math.min(times.length ? 3600000 : 300000, ...times)));
           this.loadingScore = false;
           this.cdr.markForCheck();
         },
         error: () => {
+          this.score = null;
+          this.scoreTimer = setTimeout(() => this.loadScore(id, true), 300000);
           this.loadingScore = false;
           this.scoreError =
             "Conditions indisponibles. Les informations de la plage restent consultables.";
@@ -366,6 +377,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
         }).format(d);
   }
   ngOnDestroy(): void {
+    clearTimeout(this.scoreTimer);
     this.subscriptions.unsubscribe();
     this.beachRequests.unsubscribe();
     this.scoreRequest?.unsubscribe();

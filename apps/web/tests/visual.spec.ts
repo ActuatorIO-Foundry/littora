@@ -161,10 +161,10 @@ test('conditions : dernier relevé sourcé explicitement ancien, zéro réel aff
   await page.route('**/api/score/beach/*', route => route.fulfill({ json: {
     ...score, scores: { bathing: null, family: null, paddle: null, boat: null },
     current: { ...score.current, weather: { ...score.current.weather, temperature_2m: 0 } },
-    dataStatus: { weather: { status: 'stale', ageSeconds: 1800 }, marine: { status: 'partial', ageSeconds: 60 } },
+    dataStatus: { weather: { status: 'stale', ageSeconds: 1800, fetchedAt: '2026-07-15T12:00:00Z', validAt: '2026-07-15T13:00:00Z' }, marine: { status: 'partial', ageSeconds: 60 } },
   } }));
   await page.goto('/plages/test-sea');
-  await expect(page.getByText(/Dernières prévisions conservées, fournisseur indisponible.*30 min/)).toBeVisible();
+  await expect(page.getByText(/Prévisions périmées.*collecte :.*échéance :/)).toBeVisible();
   await expect(page.locator('.conditions-grid strong').first()).toContainText('0');
   await expect(page.locator('.forecast-chart svg path')).toHaveCount(1);
   await noOverflow(page);

@@ -35,6 +35,28 @@ services:
     env_file: .env.prod
     restart: unless-stopped
     depends_on: [postgres, redis]
+  redis-jobs:
+    image: littora-redis:7.4.12-r1
+    build: ./infra/redis
+    command: [redis-server, --appendonly, "yes", --maxmemory-policy, noeviction]
+    restart: unless-stopped
+    volumes:
+      - jobsdata:/data
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: [node, dist/worker.js]
+    env_file: .env.prod
+    environment:
+      JOBS_REDIS_URL: redis://redis-jobs:6379
+    restart: unless-stopped
+    depends_on: [postgres, redis, redis-jobs]
+    healthcheck:
+      test: [CMD, node, -e, "process.exit(Date.now()-Number(require('fs').readFileSync('/tmp/littora-weather-heartbeat')) < 120000 ? 0 : 1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
   web:
     build:
       context: .
@@ -54,6 +76,7 @@ services:
     depends_on: [web, api]
     restart: unless-stopped
 volumes:
+  jobsdata:
   pgdata:
     name: ${POSTGRES_VOLUME:-${COMPOSE_PROJECT_NAME}_pgdata}
     external: ${STORAGE_VOLUMES_EXTERNAL:-false}

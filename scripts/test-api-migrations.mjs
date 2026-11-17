@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const docker = args => execFileSync('docker', args, {
@@ -15,6 +18,22 @@ const environment = ['-e', `DATABASE_URL=postgresql://littora:test-only-password
   '-e', `REDIS_URL=redis://${redis}:6379/15`, '-e', 'API_PORT=3000', '-e', 'NODE_ENV=production'];
 const sql = query => docker(['exec', postgres, 'psql', '-XAt', '-v', 'ON_ERROR_STOP=1', '-U', 'littora', '-d', 'littora_ci_test', '-c', query]);
 const command = action => docker(['run', '--rm', '--network', name, ...environment, image, 'node', 'scripts/database.cjs', action]);
+
+// Exercise the real Compose profile/env_file path without application credentials.
+const fixture = mkdtempSync(join(tmpdir(), 'littora-compose-migrations-'));
+try {
+  const marker = randomUUID();
+  const fakeUrl = `postgresql://test:${marker}@postgres:5432/littora_ci_test`;
+  const envFile = join(fixture, '.env');
+  writeFileSync(envFile, `DATABASE_URL=${fakeUrl}\nPOSTGRES_VOLUME=${name}-pg\nREDIS_VOLUME=${name}-redis\nSTORAGE_VOLUMES_EXTERNAL=false\n`);
+  const override = join(fixture, 'override.json');
+  writeFileSync(override, JSON.stringify({ services: { migrate: { image, network_mode: 'none' } } }));
+  const output = docker(['compose', '--project-directory', fixture, '--env-file', envFile,
+    '--project-name', name, '-f', resolve('docker-compose.local.yml'), '-f', override,
+    '--profile', 'tools', 'run', '--rm', '--no-deps', '--entrypoint', 'node', 'migrate', '-e',
+    `require('node:assert/strict').equal(process.env.DATABASE_URL,${JSON.stringify(fakeUrl)});console.log('Migration environment verified');`]);
+  assert.equal(output, 'Migration environment verified');
+} finally { rmSync(fixture, { recursive: true, force: true }); }
 async function until(check, description) {
   for (let attempt = 0; attempt < 80; attempt++) {
     try { if (check()) return; } catch {}

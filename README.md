@@ -23,8 +23,8 @@ Pour une **installation neuve** uniquement :
 test -f .env || cp .env.example .env
 docker compose -f docker-compose.local.yml up -d --build --wait postgres redis
 docker compose -f docker-compose.local.yml build api migrate
-docker compose -f docker-compose.local.yml run --rm --no-deps migrate
-docker compose -f docker-compose.local.yml run --rm --no-deps migrate node scripts/database.cjs seed
+docker compose -f docker-compose.local.yml --profile tools run --rm --no-deps migrate
+docker compose -f docker-compose.local.yml --profile tools run --rm --no-deps migrate node scripts/database.cjs seed
 docker compose -f docker-compose.local.yml up -d --no-deps --no-build api
 docker compose -f docker-compose.local.yml up -d --no-deps --build web
 ```

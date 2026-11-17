@@ -42,6 +42,9 @@ npm --prefix apps/api run db:seed
 implicite du fichier `.env` par cette CLI. Dans Docker, utiliser le service
 `migrate`, qui recoit le meme fichier d'environnement que l'API. Il appartient
 au profil `tools` et ne fait pas partie du demarrage ordinaire de la stack.
+Activer explicitement `--profile tools` lors de `compose run` : avec Compose
+2.34, le ciblage implicite du service profile peut omettre son `env_file`.
+La CLI refuse alors le demarrage sans `DATABASE_URL`, avant toute ecriture.
 
 ## Installation neuve
 
@@ -49,8 +52,8 @@ au profil `tools` et ne fait pas partie du demarrage ordinaire de la stack.
 test -f .env || cp .env.example .env
 docker compose -f docker-compose.local.yml up -d --build --wait postgres redis
 docker compose -f docker-compose.local.yml build api migrate
-docker compose -f docker-compose.local.yml run --rm --no-deps migrate
-docker compose -f docker-compose.local.yml run --rm --no-deps migrate node scripts/database.cjs seed
+docker compose -f docker-compose.local.yml --profile tools run --rm --no-deps migrate
+docker compose -f docker-compose.local.yml --profile tools run --rm --no-deps migrate node scripts/database.cjs seed
 docker compose -f docker-compose.local.yml up -d --no-deps --no-build --wait api
 curl --fail 'http://127.0.0.1:3000/api/beaches?limit=1'
 ```
@@ -115,8 +118,8 @@ ecrit actuellement en base. Si un worker distinct est ajoute, le suspendre aussi
 docker compose -f docker-compose.local.yml build api migrate
 docker compose -f docker-compose.local.yml stop api
 # Refaire et verifier la sauvegarde finale avant la commande suivante.
-docker compose -f docker-compose.local.yml run --rm --no-deps migrate
-docker compose -f docker-compose.local.yml run --rm --no-deps migrate node scripts/database.cjs status
+docker compose -f docker-compose.local.yml --profile tools run --rm --no-deps migrate
+docker compose -f docker-compose.local.yml --profile tools run --rm --no-deps migrate node scripts/database.cjs status
 docker compose -f docker-compose.local.yml up -d --no-deps --no-build --wait api
 curl --fail 'http://127.0.0.1:3000/api/beaches?limit=1'
 ```

@@ -276,9 +276,9 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     let payload: ReportPayload;
     if (type === 'flag') {
       if (!flag) return;
-      payload = { beachId: this.beach.id, type, value: { flag, source: 'detail-page' }, confidence: 0.7 };
+      payload = { beachId: this.beach.id, type, value: { flag }, observedAt: new Date().toISOString() };
     } else {
-      payload = { beachId: this.beach.id, type, value: { source: 'detail-page' }, confidence: 0.7 };
+      payload = { beachId: this.beach.id, type, value: {}, observedAt: new Date().toISOString() };
     }
     this.sending = true;
     this.reportMessage = "";
@@ -291,13 +291,16 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
           next: () => {
             this.sending = false;
             this.reportMessage =
-              "Observation enregistrée. Merci pour votre contribution.";
+              "Observation reçue, en attente de modération. Merci.";
             this.loadReports(this.beach!.id);
             this.cdr.markForCheck();
           },
-          error: () => {
+          error: (error) => {
             this.sending = false;
-            this.reportError = "L’observation n’a pas pu être envoyée.";
+            this.reportError = error.status === 409 ? "Une observation similaire a déjà été reçue. Réessayez dans 15 minutes."
+              : error.status === 429 ? "Trop de contributions rapprochées. Veuillez patienter avant de réessayer."
+              : error.status === 401 ? "Votre session de contribution a expiré. Veuillez réessayer."
+              : "L’observation n’a pas pu être envoyée.";
             this.cdr.markForCheck();
           },
         }),

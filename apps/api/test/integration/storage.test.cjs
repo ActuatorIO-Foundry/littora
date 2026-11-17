@@ -7,6 +7,7 @@ const { Pool } = require('pg');
 const Redis = require('ioredis');
 const { BeachesService } = require('../../dist/modules/beaches/beaches.service');
 const { ReportsService } = require('../../dist/modules/reports/reports.service');
+const { ContributionsService } = require('../../dist/modules/reports/contributions.service');
 const { CacheService } = require('../../dist/cache/cache.service');
 const { migrate, seed } = require('../../scripts/database.cjs');
 
@@ -71,10 +72,22 @@ test('isolated PostGIS catalogue, reports and Redis cache', { timeout: 30000 }, 
       await pool.query("delete from beaches where id::text like '10000000-0000-4000-8000-%'");
     }
 
-    const reports = new ReportsService(pool);
-    const report = await reports.create({ beachId: result[0].id, type: 'flag', value: { flag: 'red' } });
+    const contributions = new ContributionsService(pool);
+    const reports = new ReportsService(pool, contributions);
+    const originalKey=process.env.REPORT_IP_HASH_KEY;
+    process.env.REPORT_IP_HASH_KEY='isolated-storage-test-only-key-123456';
+    let session;
+    try { session=await contributions.session('127.0.0.2'); }
+    finally { if(originalKey===undefined)delete process.env.REPORT_IP_HASH_KEY;else process.env.REPORT_IP_HASH_KEY=originalKey; }
+    process.env.REPORT_IP_HASH_KEY='isolated-storage-test-only-key-123456';
+    let report;
+    try { report=await reports.create({ beachId: result[0].id, type: 'flag', value: { flag: 'red' } },{token:session.token,address:'127.0.0.2'}); }
+    finally { if(originalKey===undefined)delete process.env.REPORT_IP_HASH_KEY;else process.env.REPORT_IP_HASH_KEY=originalKey; }
     try {
       assert.equal(report.status, 'pending');
+      assert.ok(!(await reports.list(result[0].id)).some((row) => row.id === report.id));
+      assert.equal(await reports.flagConsensus(result[0].id),null);
+      await pool.query("update reports set status='verified',confidence=0.5 where id=$1", [report.id]);
       assert.ok((await reports.list(result[0].id)).some((row) => row.id === report.id));
       assert.ok((await reports.flagConsensus(result[0].id)).counts.red >= 1);
       await pool.query("update reports set status='rejected' where id=$1", [report.id]);

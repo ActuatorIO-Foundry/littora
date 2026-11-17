@@ -5,6 +5,14 @@ import { Amenity } from '../models/amenity';
 export interface Amenities {
   amenities: Array<Amenity>;
   beachId: string;
+
+  /**
+   * An empty OSM inventory does not prove that facilities are absent.
+   */
+  coverage?: 'partial';
+  fetchedAt?: string | null;
   provider: string;
   radiusMeters: number;
+  status?: 'available' | 'stale' | 'unknown';
+  total?: number;
 }

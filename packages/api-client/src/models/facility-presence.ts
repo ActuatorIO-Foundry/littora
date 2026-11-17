@@ -13,8 +13,13 @@ export type FacilityPresence = ({
 }) & {
 'value': boolean | null;
 'status': 'present' | 'absent' | 'unknown';
-'source': 'legacy-catalogue';
+'source': 'legacy-catalogue' | 'openstreetmap' | 'unknown';
 'verified': false;
 'fetchedAt': string | null;
+
+/**
+ * Nearby infrastructure is not proof of current operation or on-site presence.
+ */
+'scope'?: 'nearby' | 'unknown';
 };
 

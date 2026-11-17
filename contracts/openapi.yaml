@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Littora API
-  version: 0.3.0
+  version: 0.4.0
   description: >-
     Additive contract for the existing API. Model forecasts are not observations or
     official bathing instructions. Null means unknown, never zero or false.
@@ -290,9 +290,10 @@ components:
       properties:
         value: {type: boolean, nullable: true}
         status: {type: string, enum: [present, absent, unknown]}
-        source: {type: string, enum: [legacy-catalogue]}
+        source: {type: string, enum: [legacy-catalogue, openstreetmap, unknown]}
         verified: {type: boolean, enum: [false]}
         fetchedAt: {type: string, format: date-time, nullable: true}
+        scope: {type: string, enum: [nearby, unknown], description: Nearby infrastructure is not proof of current operation or on-site presence.}
     Beach:
       type: object
       required: [id, name, city, department, region, coastline, waterType, lat, lon, has_lifeguard, has_parking, has_toilets, osm_id, distanceKm, facilities]
@@ -341,6 +342,7 @@ components:
             lifeguard: {$ref: '#/components/schemas/FacilityPresence'}
             parking: {$ref: '#/components/schemas/FacilityPresence'}
             toilets: {$ref: '#/components/schemas/FacilityPresence'}
+            rescueStation: {$ref: '#/components/schemas/FacilityPresence'}
     PageInfo:
       type: object
       required: [nextCursor, hasNextPage, limit]
@@ -378,6 +380,10 @@ components:
         distanceKm: {type: number, minimum: 0}
         source: {type: string}
         verification: {type: string, enum: [listed, to_verify]}
+        fetchedAt: {type: string, format: date-time}
+        sourceUpdatedAt: {type: string, format: date-time, nullable: true}
+        scope: {type: string, enum: [nearby]}
+        inService: {type: boolean, nullable: true, description: Null unless operational availability is independently verified.}
     Amenities:
       type: object
       required: [beachId, provider, radiusMeters, amenities]
@@ -385,6 +391,10 @@ components:
         beachId: {type: string, format: uuid}
         provider: {type: string}
         radiusMeters: {type: number, minimum: 0}
+        total: {type: integer, minimum: 0}
+        status: {type: string, enum: [available, stale, unknown]}
+        fetchedAt: {type: string, format: date-time, nullable: true}
+        coverage: {type: string, enum: [partial], description: An empty OSM inventory does not prove that facilities are absent.}
         amenities: {type: array, items: {$ref: '#/components/schemas/Amenity'}}
     Commune:
       type: object

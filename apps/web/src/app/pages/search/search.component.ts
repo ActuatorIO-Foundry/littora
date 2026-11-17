@@ -422,7 +422,7 @@ export class SearchComponent implements OnInit, OnDestroy {
         if (
           (this.requireParking && !b.has_parking) ||
           (this.requireToilets && !b.has_toilets) ||
-          (this.requireLifeguard && !b.has_lifeguard)
+          (this.requireLifeguard && !(b.facilities?.rescueStation?.value ?? b.has_lifeguard))
         )
           return false;
         if (this.requiredFlag !== "all" && b.flag !== this.requiredFlag)

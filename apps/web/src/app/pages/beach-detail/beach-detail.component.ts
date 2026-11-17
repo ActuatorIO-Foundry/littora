@@ -148,6 +148,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
         .subscribe({
           next: (r) => {
             this.amenities = r;
+            this.amenitiesUnavailable = r.status === 'unknown';
             this.loadingAmenities = false;
             this.cdr.markForCheck();
           },

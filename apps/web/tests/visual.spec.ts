@@ -1,4 +1,5 @@
 import { expect, test, Page } from "./fixtures";
+import { searchResult } from './search-response';
 
 const beaches = [
   {
@@ -58,6 +59,7 @@ const score = {
 async function mockApi(page: Page) {
   await page.route("**/api/**", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname === '/api/search/beaches') return route.fulfill({json:searchResult(route.request().postDataJSON(),beaches)});
     if (url.pathname.endsWith('/reports/session')) return route.fulfill({status:201,json:{token:'a'.repeat(64),expiresAt:'2099-01-01T00:00:00Z'}});
     if (url.pathname.startsWith('/api/places/')) return route.fulfill({ json: [] });
     if (url.pathname.includes("/score/")) return route.fulfill({ json: score });
@@ -173,11 +175,11 @@ test('recherche : catalogue complet au-dela de 180 et 500 plages', async ({ page
     ...beaches[0], id: `page-${i}`, name: `Escale ${String(i).padStart(4, '0')}`,
   }));
   const cursors: number[] = [];
-  await page.route('**/api/beaches/catalogue?*', (route) => {
-    const start = Number(new URL(route.request().url()).searchParams.get('after') || 0);
+  await page.route('**/api/search/beaches', (route) => {
+    const input=route.request().postDataJSON();
+    const start = Number(input.cursor || 0);
     cursors.push(start);
-    return route.fulfill({ json: { beaches: catalogue.slice(start, start + 200),
-      nextCursor: start + 200 < catalogue.length ? String(start + 200) : null } });
+    return route.fulfill({ json: searchResult(input,catalogue) });
   });
   await page.goto('/recherche');
   await expect(page.locator('.results-heading h2')).toContainText('602 plages');
@@ -189,10 +191,11 @@ test('recherche : catalogue complet au-dela de 180 et 500 plages', async ({ page
 
 test('contrat : pagination canonique et localisation inconnue restent consultables', async ({ page }) => {
   const cursors: Array<string | null> = [];
-  await page.route('**/api/beaches/catalogue?*', route => {
-    const after = new URL(route.request().url()).searchParams.get('after');
+  await page.route('**/api/search/beaches', route => {
+    const after = route.request().postDataJSON().cursor ?? null;
     cursors.push(after);
     return route.fulfill({ json: {
+      ...searchResult({},beaches),
       items: [{ ...beaches[after ? 1 : 0], city: null, department: null }],
       pageInfo: { nextCursor: after ? null : 'next-page', hasNextPage: !after, limit: 200 },
     } });
@@ -241,7 +244,7 @@ test('recherche : mer, lac, riviere et inconnu restent distincts', async ({ page
     { ...beaches[0], id: 'test-lake', name: 'Plage du lac sale', waterType: 'lake', coastline: 'Atlantique' },
     { ...beaches[0], id: 'test-unknown', name: 'Site non classe', waterType: 'unknown' },
   ];
-  await page.route('**/api/beaches/catalogue?*', route => route.fulfill({ json: { beaches: catalogue, nextCursor: null } }));
+  await page.route('**/api/search/beaches', route => route.fulfill({ json: searchResult(route.request().postDataJSON(),catalogue) }));
   await page.goto('/recherche');
   await expect(page.locator('.beach-result')).toHaveCount(4);
   await page.getByRole('button', { name: 'Filtres', exact: true }).click();
@@ -394,7 +397,7 @@ test('equipements : tous les homonymes restent visibles et la source ancienne es
 test('equipements : le filtre poste de secours ne pretend pas confirmer la surveillance', async ({ page }) => {
   const presence={value:true,status:'present',source:'openstreetmap',verified:false,fetchedAt:'2026-11-17T12:00:00Z',scope:'nearby'};
   const catalogue=[{...beaches[0],has_lifeguard:null,facilities:{rescueStation:presence}},beaches[1]];
-  await page.route('**/api/beaches/catalogue?*',route=>route.fulfill({json:{beaches:catalogue,nextCursor:null}}));
+  await page.route('**/api/search/beaches',route=>route.fulfill({json:searchResult(route.request().postDataJSON(),catalogue)}));
   await page.goto('/recherche');
   await expect(page.locator('.beach-result')).toHaveCount(2);
   await page.getByRole('button',{name:'Filtres',exact:true}).click();
@@ -445,7 +448,7 @@ test("erreur API et refus de geolocalisation sans fausse position", async ({
       value: { getCurrentPosition: (_ok: unknown, fail: () => void) => fail() },
     }),
   );
-  await page.route("**/api/beaches/catalogue?*", (route) =>
+  await page.route("**/api/search/beaches", (route) =>
     route.fulfill({ status: 503, json: {} }),
   );
   await page.goto("/recherche");

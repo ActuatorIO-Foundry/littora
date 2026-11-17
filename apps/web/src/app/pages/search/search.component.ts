@@ -2,7 +2,8 @@ import { ChangeDetectorRef, Component, OnDestroy, OnInit } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, ParamMap, Router, RouterLink } from "@angular/router";
-import { map, Subscription, switchMap, timeout } from "rxjs";
+import { Subscription, timeout } from "rxjs";
+import type { BeachSearch } from '@littora/api-client/models';
 import { Beach, BeachScore } from "../../models/beach.model";
 import { Commune } from "../../models/commune.model";
 import { LittoraApiService } from "../../services/littora-api.service";
@@ -14,8 +15,8 @@ import { metricValue, providerLabel, dataStatusLabel } from "../../shared/presen
 type Result = Beach & {
   selectedScore?: number | null;
   scores?: BeachScore["scores"];
-  flag?: string;
-  waterTemp?: number;
+  flag?: string | null;
+  waterTemp?: number | null;
 };
 @Component({
   selector: "app-search",
@@ -161,7 +162,6 @@ export class SearchComponent implements OnInit, OnDestroy {
       this.nearbyPosition = null;
       this.selectedBeach = null;
       this.score = null;
-      this.loadBeaches();
     }
     this.resultLimit = 20;
     this.syncFilters();
@@ -237,30 +237,8 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.error = "";
     this.message = "";
     this.resultLimit = 20;
-    this.syncFilters();
-    this.listRequest = this.api
-      .getCommuneCatalogue(code)
-      .pipe(timeout(25000))
-      .subscribe({
-        next: (result) => {
-          this.communePending = false;
-          this.selectedCommune = result.commune;
-          this.query = result.commune.name;
-          this.beaches = result.beaches;
-          this.message =
-            result.warning ??
-            "Plages référencées dans la commune. Inventaire non exhaustif.";
-          this.loading = false;
-          this.syncFilters();
-          this.cdr.markForCheck();
-        },
-        error: () => {
-          this.communePending = false;
-          this.loading = false;
-          this.error = "Cette commune ne peut pas être chargée actuellement.";
-          this.cdr.markForCheck();
-        },
-      });
+    this.syncFilters(false);
+    this.runSearch();
   }
   clearCommune(): void {
     this.selectedCommune = null;
@@ -268,28 +246,66 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.query = "";
     this.message = "";
     this.onQueryChange();
-    this.loadBeaches();
   }
   loadBeaches(): void {
     this.cancelLocation();
+    this.runSearch();
+  }
+  private runSearch(): void {
     this.listRequest?.unsubscribe();
-    this.communePending = false;
     this.clearPreview();
     this.beaches = [];
+    this.resultLimit = 20;
     this.loading = true;
     this.error = "";
+    if ((this.minWaterTemp !== null && (this.minWaterTemp < 0 || this.minWaterTemp > 45)) ||
+      (this.maxWaterTemp !== null && (this.maxWaterTemp < 0 || this.maxWaterTemp > 45)) ||
+      (this.minWaterTemp !== null && this.maxWaterTemp !== null && this.minWaterTemp > this.maxWaterTemp)) {
+      this.loading = false;
+      this.error = "La température minimale doit être inférieure ou égale au maximum, entre 0 et 45 °C.";
+      return;
+    }
+    const hasScope = !!(this.nearbyPosition || this.communeCode || this.selectedZone);
+    const criteria: BeachSearch = {
+      usage: this.selectedUsage as BeachSearch['usage'],
+      sort: (this.sort === 'distance' && !hasScope ? 'name' : this.sort) as BeachSearch['sort'],
+      ...(this.communeCode ? { communeCode: this.communeCode } : this.nearbyPosition
+        ? { ...this.nearbyPosition, radiusKm: 50 } : this.selectedZone ? { bbox: this.selectedZone.bbox } : {}),
+      ...(!this.communeCode && this.query.trim() ? { q: this.query.trim() } : {}),
+      ...(this.waterType !== 'all' ? { waterType: this.waterType as BeachSearch['waterType'] } : {}),
+      ...(this.requiredFlag !== 'all' ? { flag: this.requiredFlag as BeachSearch['flag'] } : {}),
+      ...(this.requireParking ? { parking: true } : {}),
+      ...(this.requireToilets ? { toilets: true } : {}),
+      ...(this.requireLifeguard ? { rescueStation: true } : {}),
+      ...(this.minWaterTemp !== null ? { minWaterTemp: this.minWaterTemp } : {}),
+      ...(this.maxWaterTemp !== null ? { maxWaterTemp: this.maxWaterTemp } : {}),
+    };
     this.listRequest = this.api
-      .getCatalogue()
-      .pipe(timeout(20000))
+      .searchBeaches(criteria)
+      .pipe(timeout(30000))
       .subscribe({
         next: (r) => {
-          this.beaches = r;
+          this.beaches = r.items;
+          this.communePending = false;
+          if (r.commune) {
+            this.selectedCommune = r.commune;
+            this.query = r.commune.name;
+            this.syncFilters(false);
+          }
+          const notes = [];
+          if (this.communeCode) notes.push("Plages référencées dans la commune. Inventaire non exhaustif.");
+          if (this.nearbyPosition) notes.push("Plages à moins de 50 km de votre position.");
+          if (this.minWaterTemp !== null || this.maxWaterTemp !== null) notes.push(`${r.coverage.waterTemperature} plage(s) avec une température récente sur ${r.coverage.candidates}. Valeurs inconnues exclues.`);
+          if (this.requiredFlag !== 'all') notes.push("Drapeaux issus d'un consensus communautaire, non officiels.");
+          if (notes.length) this.message = notes.join(' ');
           this.loading = false;
           this.cdr.markForCheck();
         },
-        error: () => {
+        error: (error) => {
+          this.communePending = false;
           this.loading = false;
-          this.error = "Les plages ne sont pas disponibles pour le moment.";
+          this.error = error.status === 409 ? "La recherche a expiré. Relancez-la pour actualiser les résultats."
+            : "Les plages ne sont pas disponibles pour le moment.";
           this.cdr.markForCheck();
         },
       });
@@ -313,32 +329,8 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.beaches = [];
     this.listRequest?.unsubscribe();
     this.scoreRequest?.unsubscribe();
-    this.syncFilters();
-    this.listRequest = this.api
-      .discoverBeaches(zone)
-      .pipe(
-        switchMap((discovery) =>
-          this.api
-            .getCatalogue(zone.bbox)
-            .pipe(map((beaches) => ({ ...discovery, beaches }))),
-        ),
-        timeout(30000),
-      )
-      .subscribe({
-        next: (r) => {
-          this.beaches = r.beaches;
-          this.loading = false;
-          this.message = r.warning
-            ? "Source externe indisponible. Dernier catalogue disponible affiché."
-            : "";
-          this.cdr.markForCheck();
-        },
-        error: () => {
-          this.loading = false;
-          this.error = "Cette zone ne peut pas être chargée actuellement.";
-          this.cdr.markForCheck();
-        },
-      });
+    this.syncFilters(false);
+    this.runSearch();
   }
   chooseZone(id: string): void {
     this.cancelLocation();
@@ -353,7 +345,7 @@ export class SearchComponent implements OnInit, OnDestroy {
     if (zone) this.exploreZone(zone);
     else {
       this.selectedZone = null;
-      this.syncFilters();
+      this.syncFilters(false);
       this.loadBeaches();
     }
   }
@@ -410,21 +402,8 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.placeRequest?.unsubscribe();
     clearTimeout(this.placeTimer);
     this.listRequest?.unsubscribe();
-    this.syncFilters();
-    this.listRequest = this.api.getRecommendations(position.lat, position.lon, this.selectedUsage)
-      .pipe(timeout(30000)).subscribe({
-        next: (r) => {
-          this.beaches = r;
-          this.loading = false;
-          this.message = "Plages à proximité de votre position.";
-          this.cdr.markForCheck();
-        },
-        error: () => {
-          this.loading = false;
-          this.error = "Les plages à proximité ne sont pas disponibles.";
-          this.cdr.markForCheck();
-        },
-      });
+    this.syncFilters(false);
+    this.runSearch();
   }
   loadScore(beach: Beach): void {
     this.cancelLocation();
@@ -473,46 +452,7 @@ export class SearchComponent implements OnInit, OnDestroy {
     );
   }
   displayedBeaches(): Result[] {
-    const q = this.query.trim().toLocaleLowerCase("fr");
-    return this.beaches
-      .filter((b) => {
-        if (
-          q &&
-          !this.selectedCommune &&
-          !`${b.name} ${b.city} ${b.region}`.toLocaleLowerCase("fr").includes(q)
-        )
-          return false;
-        if (this.waterType !== "all" && b.waterType !== this.waterType)
-          return false;
-        if (
-          (this.requireParking && !b.has_parking) ||
-          (this.requireToilets && !b.has_toilets) ||
-          (this.requireLifeguard && !(b.facilities?.rescueStation?.value ?? b.has_lifeguard))
-        )
-          return false;
-        if (this.requiredFlag !== "all" && b.flag !== this.requiredFlag)
-          return false;
-        if (this.minWaterTemp !== null || this.maxWaterTemp !== null) {
-          if (
-            b.waterTemp === undefined ||
-            b.waterTemp === null ||
-            !Number.isFinite(b.waterTemp)
-          )
-            return false;
-          if (this.minWaterTemp !== null && b.waterTemp < this.minWaterTemp)
-            return false;
-          if (this.maxWaterTemp !== null && b.waterTemp > this.maxWaterTemp)
-            return false;
-        }
-        return true;
-      })
-      .sort((a, b) =>
-        this.sort === "distance"
-          ? (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity)
-          : this.sort === "score"
-            ? (this.scoreFor(b) ?? -1) - (this.scoreFor(a) ?? -1)
-            : a.name.localeCompare(b.name, "fr"),
-      );
+    return this.beaches;
   }
   scoreFor(b: Result): number | null {
     return (
@@ -526,7 +466,6 @@ export class SearchComponent implements OnInit, OnDestroy {
   }
   resetFilters(): void {
     this.cancelLocation();
-    const hadCommune = !!this.communeCode || !!this.selectedCommune || this.communePending;
     clearTimeout(this.placeTimer);
     this.placeRequest?.unsubscribe();
     this.communeSuggestions = [];
@@ -542,7 +481,6 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.minWaterTemp = null;
     this.maxWaterTemp = null;
     this.syncFilters();
-    if (hadCommune) this.loadBeaches();
   }
   retrySearch(): void {
     if (this.communeCode) this.chooseCommune(this.communeCode);
@@ -560,8 +498,7 @@ export class SearchComponent implements OnInit, OnDestroy {
       Number(this.minWaterTemp !== null || this.maxWaterTemp !== null)
     );
   }
-  syncFilters(): void {
-    if (this.selectedBeach && !this.displayedBeaches().some(b => b.id === this.selectedBeach?.id)) this.clearPreview();
+  syncFilters(reload = true): void {
     const queryParams = {
         q: this.query || null,
         commune: this.communeCode,
@@ -584,6 +521,10 @@ export class SearchComponent implements OnInit, OnDestroy {
       state: this.navigationState,
       replaceUrl: true,
     });
+    if (reload) {
+      this.message = '';
+      this.runSearch();
+    }
   }
   private paramsKey(params: Record<string, unknown>): string {
     return JSON.stringify(Object.entries(params).filter(([,v]) => v != null)

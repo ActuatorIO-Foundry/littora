@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { LittoraService } from '@littora/api-client';
-import type { Beach as ApiBeach, Commune as ApiCommune, ContributionSession } from '@littora/api-client/models';
+import type { Beach as ApiBeach, BeachSearch, Commune as ApiCommune, ContributionSession, SearchPage } from '@littora/api-client/models';
 import { Commune, CommuneCatalogue } from '../models/commune.model';
 import { EMPTY, Observable, catchError, expand, finalize, map, of, reduce, shareReplay, switchMap, tap, throwError } from 'rxjs';
 import { Beach, BeachAmenitiesResponse, BeachScore, ReportPayload } from '../models/beach.model';
@@ -57,6 +57,22 @@ export class LittoraApiService {
             expand(result => (result.pageInfo?.nextCursor ?? result.nextCursor)
                 ? page(result.pageInfo?.nextCursor ?? result.nextCursor ?? undefined) : EMPTY, 1),
             reduce((all, result) => all.concat((result.items ?? result.beaches).map(beachView)), [] as Beach[]),
+        );
+    }
+
+    searchBeaches(criteria: BeachSearch) {
+        const page = (cursor?: string) => this.client.searchBeaches({ body: { ...criteria, limit: 200, ...(cursor ? { cursor } : {}) } });
+        return page().pipe(
+            expand(result => result.pageInfo.nextCursor ? page(result.pageInfo.nextCursor) : EMPTY, 1),
+            reduce((all: SearchPage | null, result: SearchPage) => ({ ...result, items: [...(all?.items ?? []), ...result.items] }), null),
+            map(result => {
+                if (!result || result.items.length !== result.total || new Set(result.items.map(b => b.id)).size !== result.total) {
+                    throw new Error('Incomplete search result');
+                }
+                return { ...result, commune: result.commune && 'code' in result.commune ? communeView(result.commune as ApiCommune) : null,
+                    items: result.items.map(row => ({ ...beachView(row), ...row,
+                        city: row.city ?? '', department: row.department ?? '', region: row.region ?? '', coastline: row.coastline ?? '' })) };
+            }),
         );
     }
 

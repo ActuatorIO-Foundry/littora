@@ -1,4 +1,5 @@
 import { expect, test, Page } from './fixtures';
+import { searchResult } from './search-response';
 
 const a = { id:'state-a', name:'Plage Alpha', city:'Bandol', department:'Var', region:'Provence',
   coastline:'Mediterranee', waterType:'sea', lat:43.14, lon:5.76,
@@ -12,6 +13,7 @@ const conditions = (beach=a, temperature=24) => ({ beach,
 async function api(page: Page) {
   await page.route('**/api/**', route => {
     const path=new URL(route.request().url()).pathname;
+    if(path==='/api/search/beaches')return route.fulfill({json:searchResult(route.request().postDataJSON(),[a,b])});
     if(path.includes('/score/'))return route.fulfill({json:conditions(path.endsWith(b.id)?b:a,path.endsWith(b.id)?18:24)});
     if(path.endsWith('/amenities'))return route.fulfill({json:{beachId:path.includes(b.id)?b.id:a.id,amenities:[],status:'unknown'}});
     if(path.endsWith('/reports')||path.startsWith('/api/places/'))return route.fulfill({json:[]});
@@ -38,7 +40,7 @@ test.beforeEach(async({page})=>api(page));
 
 test('recherche: un GPS tardif ne remplace pas une facade choisie manuellement',async({page})=>{
   await controlledGps(page);let recommendations=0;
-  page.on('request',r=>{if(r.url().includes('/recommendations'))recommendations++;});
+  page.on('request',r=>{if(r.url().includes('/search/beaches')&&r.postDataJSON().lat!==undefined)recommendations++;});
   await page.goto('/recherche');await page.getByRole('button',{name:'Autour de moi'}).click();
   await page.getByRole('combobox',{name:/Fa/}).selectOption('bretagne');
   await expect(page).toHaveURL(/zone=bretagne/);await resolveGps(page);
@@ -51,7 +53,7 @@ test('recherche: un GPS tardif ne remplace pas une facade choisie manuellement',
 
 test('recherche: saisie et reset annulent aussi une localisation en attente',async({page})=>{
   await controlledGps(page);let recommendations=0;
-  page.on('request',r=>{if(r.url().includes('/recommendations'))recommendations++;});
+  page.on('request',r=>{if(r.url().includes('/search/beaches')&&r.postDataJSON().lat!==undefined)recommendations++;});
   await page.goto('/recherche');await page.getByRole('button',{name:'Autour de moi'}).click();
   await page.getByRole('combobox',{name:'Rechercher dans les plages'}).fill('Alpha');
   await resolveGps(page);await expect(page.locator('.beach-result')).toHaveCount(1);
@@ -64,7 +66,7 @@ test('recherche: saisie et reset annulent aussi une localisation en attente',asy
 
 test('recherche: coordonnees invalides sans recommandation ni fausse position',async({page})=>{
   await controlledGps(page);let recommendations=0;
-  page.on('request',r=>{if(r.url().includes('/recommendations'))recommendations++;});
+  page.on('request',r=>{if(r.url().includes('/search/beaches')&&r.postDataJSON().lat!==undefined)recommendations++;});
   await page.goto('/recherche');await page.getByRole('button',{name:'Autour de moi'}).click();
   await resolveGps(page,95,0);
   await expect(page.getByRole('status')).toContainText('Position non disponible');
@@ -73,9 +75,9 @@ test('recherche: coordonnees invalides sans recommandation ni fausse position',a
 
 test('recherche: un ancien catalogue ne remplace pas la derniere zone',async({page})=>{
   let release!:()=>void;const gate=new Promise<void>(r=>release=r);let calls=0;
-  await page.route('**/api/beaches/catalogue?*',async route=>{
+  await page.route('**/api/search/beaches',async route=>{
     const first=++calls===1;if(first)await gate;
-    await route.fulfill({json:{beaches:first?[a]:[b],nextCursor:null}});
+    await route.fulfill({json:searchResult(route.request().postDataJSON(),first?[a]:[b])});
   });
   await page.goto('/recherche');await expect.poll(()=>calls).toBe(1);
   await page.getByRole('combobox',{name:/Fa/}).selectOption('azur');
@@ -134,7 +136,10 @@ test('recherche: filtres, tri, lien partage, retour et navigation sur la meme pa
 
 test('recherche: proximite conservee au retour et au rechargement sans coordonnees dans le lien',async({page,context})=>{
   await controlledGps(page);let calls=0;
-  await page.route('**/api/recommendations*',route=>{calls++;return route.fulfill({json:[a]});});
+  await page.route('**/api/search/beaches',route=>{
+    const input=route.request().postDataJSON();if(input.lat===undefined)return route.fallback();
+    calls++;expect(input.radiusKm).toBe(50);return route.fulfill({json:searchResult(input,[a])});
+  });
   await page.goto('/recherche');await page.getByRole('button',{name:'Autour de moi'}).click();await resolveGps(page);
   await expect(page).toHaveURL(/near=1/);await expect(page.locator('.beach-result')).toHaveCount(1);
   expect(page.url()).not.toMatch(/43\.14|5\.76|lat=|lon=/);
@@ -151,7 +156,10 @@ test('recherche: proximite conservee au retour et au rechargement sans coordonne
 
 test('recherche: une nouvelle tentative conserve le perimetre de proximite',async({page})=>{
   await controlledGps(page);let calls=0;
-  await page.route('**/api/recommendations*',route=>++calls===1?route.fulfill({status:503,json:{}}):route.fulfill({json:[a]}));
+  await page.route('**/api/search/beaches',route=>{
+    const input=route.request().postDataJSON();if(input.lat===undefined)return route.fallback();
+    return ++calls===1?route.fulfill({status:503,json:{}}):route.fulfill({json:searchResult(input,[a])});
+  });
   await page.goto('/recherche');await page.getByRole('button',{name:'Autour de moi'}).click();await resolveGps(page);
   await expect(page.getByRole('alert')).toBeVisible();
   await page.getByRole('button',{name:/essayer/}).click();
@@ -176,9 +184,9 @@ test('recherche: nouvelle tentative communale sans remplacement par le catalogue
   const commune={code:'83009',name:'Bandol',department:{code:'83',name:'Var'},region:{code:'93',name:'Provence'},
     center:{lat:43.14,lon:5.76},bbox:[43.1,5.7,43.2,5.8],
     contour:{type:'Polygon',coordinates:[[[5.7,43.1],[5.8,43.1],[5.8,43.2],[5.7,43.2],[5.7,43.1]]]}};
-  await page.route('**/api/places/communes/83009/beaches',route=>++calls===1
+  await page.route('**/api/search/beaches',route=>++calls===1
     ?route.fulfill({status:503,json:{}})
-    :route.fulfill({json:{commune,beaches:[a],coverage:'partial',imported:0,provider:'local-catalogue'}}));
+    :route.fulfill({json:searchResult(route.request().postDataJSON(),[a],commune)}));
   await page.goto('/recherche?commune=83009');await expect(page.getByRole('alert')).toBeVisible();
   await page.getByRole('button',{name:/essayer/}).click();
   await expect(page.locator('.beach-result')).toHaveCount(1);expect(calls).toBe(2);

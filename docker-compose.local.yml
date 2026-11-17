@@ -1,6 +1,8 @@
 services:
   postgres:
-    image: postgis/postgis:16-3.4
+    image: littora-postgres:16.16-3.7.0-r1
+    platform: linux/amd64
+    build: ./infra/postgres
     environment:
       POSTGRES_USER: littora
       POSTGRES_PASSWORD: littora
@@ -10,10 +12,23 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U littora -d littora"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
   redis:
-    image: redis:7-alpine
+    image: littora-redis:7.4.12-r1
+    build: ./infra/redis
+    volumes:
+      - redisdata:/data
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
   api:
     build:
       context: ./apps/api
@@ -42,4 +57,9 @@ services:
       - api
 volumes:
   pgdata:
+    name: ${POSTGRES_VOLUME:-${COMPOSE_PROJECT_NAME}_pgdata}
+    external: ${STORAGE_VOLUMES_EXTERNAL:-false}
+  redisdata:
+    name: ${REDIS_VOLUME:-${COMPOSE_PROJECT_NAME}_redisdata}
+    external: ${STORAGE_VOLUMES_EXTERNAL:-false}
   web_node_modules:

@@ -30,13 +30,22 @@ jobs:
   images:
     name: Runtime image security
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Build runtime images
         run: |
           docker build -t littora-api:ci apps/api
           docker build -f apps/web/Dockerfile.prod -t littora-web:ci apps/web
+          docker build --platform linux/amd64 -t littora-postgres:16.16-3.7.0-r1 infra/postgres
+          docker build -t littora-redis:7.4.12-r1 infra/redis
+          docker build -t littora-caddy:2.11.9-r1 infra/caddy
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - name: Validate reverse proxy routing
+        run: node scripts/test-caddy.mjs
       - name: Install verified scanner
         run: |
           curl --fail --location --retry 3 --output /tmp/trivy.tar.gz https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_Linux-64bit.tar.gz
@@ -48,6 +57,14 @@ jobs:
           status=0
           for image in api web; do
             /tmp/trivy image --image-src docker --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --format json --output "image-reports/$image.json" "littora-$image:ci" || status=1
+          done
+          for entry in postgres:16.16-3.7.0-r1 redis:7.4.12-r1 caddy:2.11.9-r1; do
+            name="${entry%%:*}"
+            if /tmp/trivy image --image-src docker --scanners vuln --format json --output "image-reports/$name.json" "littora-$entry"; then
+              node scripts/check-image-report.mjs "$name" "image-reports/$name.json" || status=1
+            else
+              status=1
+            fi
           done
           exit "$status"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -107,26 +124,9 @@ jobs:
     name: PostGIS, Redis and restore smoke tests
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    services:
-      postgres:
-        image: postgis/postgis:16-3.4
-        env:
-          POSTGRES_USER: littora
-          POSTGRES_PASSWORD: test-only-password
-          POSTGRES_DB: littora_ci_test
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd "pg_isready -U littora -d littora_ci_test"
-          --health-interval 5s --health-timeout 5s --health-retries 10
-      redis:
-        image: redis:7-alpine
-        ports: ['6379:6379']
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      TEST_DATABASE_URL: postgresql://littora:test-only-password@127.0.0.1:5432/littora_ci_test
-      TEST_REDIS_URL: redis://127.0.0.1:6379/15
+      TEST_DATABASE_URL: postgresql://littora:test-only-password@127.0.0.1:55432/littora_ci_test
+      TEST_REDIS_URL: redis://127.0.0.1:56379/15
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -135,8 +135,11 @@ jobs:
           cache: npm
           cache-dependency-path: apps/api/package-lock.json
       - run: npm --prefix apps/api ci --no-audit --no-fund
+      - run: docker compose -f docker-compose.test.yml up --build --wait -d
       - run: npm run test:integration
       - name: Restore a disposable database and compare its contents
-        env:
-          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
-        run: bash scripts/test-database-restore.sh
+        run: POSTGRES_CONTAINER=$(docker compose -f docker-compose.test.yml ps -q postgres) bash scripts/test-database-restore.sh
+      - name: Restore Redis and execute a preserved BullMQ job
+        run: REDIS_CONTAINER=$(docker compose -f docker-compose.test.yml ps -q redis) node scripts/test-redis-restore.mjs
+      - if: always()
+        run: docker compose -f docker-compose.test.yml down --volumes

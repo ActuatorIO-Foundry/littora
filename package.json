@@ -13,7 +13,7 @@
     "test:integration": "npm --prefix apps/api run test:integration",
     "test:ui": "npm --prefix apps/web run test:ui",
     "docker:local": "docker compose -f docker-compose.local.yml up --build",
-    "docker:prod": "docker compose -f docker-compose.prod.yml up --build -d",
+    "docker:prod": "node scripts/start-production.mjs",
     "build:api": "npm --prefix apps/api run build",
     "build:web": "npm --prefix apps/web run build"
   }

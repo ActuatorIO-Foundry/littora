@@ -2,7 +2,9 @@ name: littora-tests
 
 services:
   postgres:
-    image: postgis/postgis:16-3.4
+    image: littora-postgres:16.16-3.7.0-r1
+    platform: linux/amd64
+    build: ./infra/postgres
     environment:
       POSTGRES_USER: littora
       POSTGRES_PASSWORD: test-only-password
@@ -12,12 +14,13 @@ services:
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U littora -d littora_ci_test"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U littora -d littora_ci_test"]
       interval: 2s
       timeout: 5s
       retries: 30
   redis:
-    image: redis:7-alpine
+    image: littora-redis:7.4.12-r1
+    build: ./infra/redis
     ports:
       - "127.0.0.1:${TEST_REDIS_PORT:-56379}:6379"
     healthcheck:

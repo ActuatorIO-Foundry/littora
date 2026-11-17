@@ -1,13 +1,18 @@
 services:
   postgres:
-    image: postgis/postgis:16-3.4
+    image: littora-postgres:16.16-3.7.0-r1
+    platform: linux/amd64
+    build: ./infra/postgres
     env_file: .env.prod
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     restart: unless-stopped
   redis:
-    image: redis:7-alpine
+    image: littora-redis:7.4.12-r1
+    build: ./infra/redis
+    volumes:
+      - redisdata:/data
     restart: unless-stopped
   api:
     build:
@@ -23,7 +28,8 @@ services:
     restart: unless-stopped
     depends_on: [api]
   caddy:
-    image: caddy:2-alpine
+    image: littora-caddy:2.11.9-r1
+    build: ./infra/caddy
     ports:
       - "80:80"
       - "443:443"
@@ -35,5 +41,10 @@ services:
     restart: unless-stopped
 volumes:
   pgdata:
+    name: ${POSTGRES_VOLUME:-${COMPOSE_PROJECT_NAME}_pgdata}
+    external: ${STORAGE_VOLUMES_EXTERNAL:-false}
+  redisdata:
+    name: ${REDIS_VOLUME:-${COMPOSE_PROJECT_NAME}_redisdata}
+    external: ${STORAGE_VOLUMES_EXTERNAL:-false}
   caddy_data:
   caddy_config:

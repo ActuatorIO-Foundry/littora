@@ -319,7 +319,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
       )[type] ?? "Observation"
     );
   }
-  flagLabel(flag?: string): string {
+  flagLabel(flag?: string | null): string {
     return flag
       ? ((
           { green: "Vert", yellow: "Jaune", red: "Rouge" } as Record<

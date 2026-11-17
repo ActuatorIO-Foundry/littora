@@ -89,13 +89,10 @@ export class ScoreService {
   safety(bathing: number | null, wave: number | null, current: number | null, uv: number | null, wind: number | null, quality?: string, communityAlerts: string[] = [], communityFlag?: any) {
     const estimatedFlag = bathing === null || wave === null || current === null ? 'unknown'
       : bathing >= 78 && wave < 0.8 && current < 0.18 ? 'green' : bathing >= 55 && wave < 1.3 && current < 0.32 ? 'yellow' : 'red';
-    const flag = communityFlag?.confidence >= 0.58 ? communityFlag.flag : estimatedFlag;
     return {
-      flag,
+      flag: estimatedFlag,
       estimatedFlag,
-      source: communityFlag?.confidence >= 0.58
-        ? `Consensus communautaire récent (${Math.round(communityFlag.confidence * 100)}%) croisé avec météo/mer. Le drapeau officiel reste celui affiché sur place.`
-        : estimatedFlag === 'unknown' ? 'Conditions insuffisantes. Le drapeau officiel reste celui affiché sur place.'
+      source: estimatedFlag === 'unknown' ? 'Conditions insuffisantes. Le drapeau officiel reste celui affiché sur place.'
           : 'Estimation Littora: météo, vagues, courant, UV, qualité d’eau et signalements. Le drapeau officiel reste celui affiché sur place.',
       official: false,
       communityFlag: communityFlag ?? null,
@@ -106,6 +103,7 @@ export class ScoreService {
         ...(current !== null && current >= 0.28 ? ['Courant marqué'] : []),
         ...(quality === 'poor' ? ['Qualité d’eau défavorable'] : []),
         ...(communityFlag ? [`Drapeaux signalés: ${communityFlag.counts.green} vert, ${communityFlag.counts.yellow} jaune, ${communityFlag.counts.red} rouge`] : []),
+        ...(communityFlag?.recentRedAt ? [`Drapeau rouge observé le ${new Date(communityFlag.recentRedAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris'})}. Signalement communautaire, non officiel.`] : []),
         ...communityAlerts,
       ],
     };

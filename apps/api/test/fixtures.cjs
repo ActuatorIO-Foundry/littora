@@ -9,7 +9,7 @@ const beach = {
   water_type: 'sea', waterType: 'sea',
 };
 
-function scoreFixture({ weather = {}, marine = {}, quality = 'good', reports = [] } = {}) {
+function scoreFixture({ weather = {}, marine = {}, quality = 'good', reports = [], consensus = null } = {}) {
   return new ScoreService(
     { get: async () => ({ ...beach }) },
     { get: async () => ({ provider: 'test-weather', current: {
@@ -20,7 +20,7 @@ function scoreFixture({ weather = {}, marine = {}, quality = 'good', reports = [
     }, ...marine }) },
     { get: async () => ({ provider: 'test-tides' }) },
     { get: async () => ({ provider: 'test-water', status: quality }) },
-    { aggregate: async () => reports, flagConsensus: async () => null },
+    { aggregate: async () => reports, flagConsensus: async () => consensus },
   );
 }
 

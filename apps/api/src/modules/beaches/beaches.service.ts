@@ -180,22 +180,22 @@ export class BeachesService {
           beaches: imported,
         };
       }
-    } catch (error) {
-      const fallback = await this.list(parsedBbox[0] + (parsedBbox[2] - parsedBbox[0]) / 2, parsedBbox[1] + (parsedBbox[3] - parsedBbox[1]) / 2, boundedLimit);
+    } catch {
+      const fallback = await this.catalogue(undefined, boundedLimit, bbox);
       return {
         provider: 'local-db-fallback',
         imported: 0,
-        warning: error instanceof Error ? error.message : 'OpenStreetMap discovery unavailable',
-        beaches: fallback,
+        warning: 'OpenStreetMap discovery unavailable',
+        beaches: fallback.beaches,
       };
     }
 
-    const fallback = await this.list(parsedBbox[0] + (parsedBbox[2] - parsedBbox[0]) / 2, parsedBbox[1] + (parsedBbox[3] - parsedBbox[1]) / 2, boundedLimit);
+    const fallback = await this.catalogue(undefined, boundedLimit, bbox);
     return {
       provider: 'local-db-fallback',
       imported: 0,
       warning: 'No named beaches found from OpenStreetMap in this zone.',
-      beaches: fallback,
+      beaches: fallback.beaches,
     };
   }
 

@@ -1,12 +1,12 @@
 require('reflect-metadata');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const http = require('../dist/shared/http');
-const { forecastData } = require('../dist/shared/forecast-data');
+const { fetchZone } = require('../dist/jobs/forecast-collector');
+const { readForecast, normalizeForecast } = require('../dist/shared/forecast-data');
 const { normalizeMetric } = require('../dist/shared/forecast-units');
 const { MarineService } = require('../dist/modules/marine/marine.service');
 const { scoreFixture, beach } = require('./fixtures.cjs');
-const cache = { getJson: async () => null, setJson: async () => {} };
+
 
 test('units: provider units convert to canonical values without guessing missing units', () => {
   assert.equal(normalizeMetric('ocean_current_velocity', 3.6, 'km/h'), 1);
@@ -29,11 +29,11 @@ test('units: provider units convert to canonical values without guessing missing
 test('units: the same normalized current reaches public metrics, series and scoring', async t => {
   const now = Date.parse('2026-07-15T12:00:00Z');
   t.mock.method(Date, 'now', () => now);
-  const fetch = t.mock.method(http, 'fetchJson', async () => ({
+  const fetch = t.mock.fn(async () => Response.json({
     hourly_units: { ocean_current_velocity: 'km/h', wave_height: 'm', sea_surface_temperature: '\u00b0C' },
     hourly: { time: [now / 1000], ocean_current_velocity: [3.6], wave_height: [0], sea_surface_temperature: [24] },
   }));
-  const service = new MarineService(cache), marine = await service.get(43, 6);
+  const service = new MarineService({ get: async source => readForecast(source, { payload: await fetchZone({ source, y: 4300, x: 600 }, fetch), last_success_at: new Date(now), next_check_at: new Date(now + 21600000) }) }), marine = await service.get(43, 6);
   assert.equal(marine.current.ocean_current_velocity, 1);
   assert.equal(marine.raw.hourly.ocean_current_velocity[0], 1);
   assert.equal(marine.units.ocean_current_velocity, 'm/s');
@@ -44,7 +44,7 @@ test('units: the same normalized current reaches public metrics, series and scor
   assert.deepEqual(result.scores, expected.scores);
   assert.equal(result.forecast.current[0].value, 1);
   assert.equal(result.dataStatus.marine.units.ocean_current_velocity, 'm/s');
-  fetch.mock.mockImplementation(async () => ({
+  fetch.mock.mockImplementation(async () => Response.json({
     hourly_units: { ocean_current_velocity: 'm/s', wave_height: 'm', sea_surface_temperature: '\u00b0C' },
     hourly: { time: [now / 1000], ocean_current_velocity: [1], wave_height: [0], sea_surface_temperature: [24] },
   }));
@@ -61,10 +61,10 @@ test('UTC: summer, winter, DST and midnight are independent of the server timezo
     for (const stamp of ['2026-07-15T23:40:00Z', '2026-01-15T23:40:00Z', '2026-03-29T00:40:00Z', '2026-10-25T00:40:00Z']) {
       now = Date.parse(stamp);
       const next = Math.ceil(now / 3600_000) * 3600_000;
-      const payload = await forecastData(cache, 'test', 43, 6, ['temperature_2m'], async () => ({
+      const payload = readForecast('open-meteo', { last_success_at: new Date(now), next_check_at: new Date(now + 21600000), payload: normalizeForecast('open-meteo', {
         hourly_units: { temperature_2m: '\u00b0C' },
         hourly: { time: [(next - 3600_000) / 1000, next / 1000], temperature_2m: [20, 21] },
-      }));
+      }) });
       assert.equal(payload.fetchedAt, new Date(now).toISOString());
       assert.equal(payload.validAt, new Date(next).toISOString());
       assert.equal(payload.current.temperature_2m, 21);

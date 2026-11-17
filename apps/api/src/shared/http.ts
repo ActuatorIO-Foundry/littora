@@ -1,5 +1,5 @@
 export async function fetchJson(url: string, init?: RequestInit) {
-  const res = await fetch(url, init);
+  const res = await fetch(url, { ...init, signal: init?.signal ?? AbortSignal.timeout(20000) });
   if (!res.ok) throw new Error(`HTTP ${res.status} on ${url}`);
   return res.json();
 }
@@ -10,6 +10,9 @@ let nominatimNextStart = 0;
 
 // One shared queue covers catalogue and amenities in this single API process.
 export async function fetchNominatimJson(url: string | URL): Promise<unknown> {
+  // These lookups enumerate POIs, which the public Nominatim service prohibits.
+  if (!process.env.NOMINATIM_API_URL || /(^|\.)openstreetmap\.org\.?$/i.test(new URL(url).hostname))
+    throw new Error('POI discovery requires a dedicated Nominatim instance');
   if (nominatimPending >= 4) throw new Error('Geographic provider busy');
   nominatimPending++;
   const request = nominatimQueue.then(async () => {

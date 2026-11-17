@@ -22,10 +22,10 @@ Pour une **installation neuve** uniquement :
 ```bash
 test -f .env || cp .env.example .env
 docker compose -f docker-compose.local.yml up -d --build --wait postgres redis
-docker compose -f docker-compose.local.yml build api migrate
+docker compose -f docker-compose.local.yml build api worker migrate
 docker compose -f docker-compose.local.yml --profile tools run --rm --no-deps migrate
 docker compose -f docker-compose.local.yml --profile tools run --rm --no-deps migrate node scripts/database.cjs seed
-docker compose -f docker-compose.local.yml up -d --no-deps --no-build api
+docker compose -f docker-compose.local.yml up -d --no-deps --no-build api worker
 docker compose -f docker-compose.local.yml up -d --no-deps --build web
 ```
 
@@ -33,6 +33,9 @@ Pour une **base existante**, suivre le [guide des migrations](docs/architecture/
 avant de reconstruire l'API : sauvegarde, restauration de controle, migration
 explicite puis redemarrage. Le demarrage de l'API ne modifie jamais le schema
 et refuse une version non preparee. Ne pas rejouer `scripts/init.sql`.
+
+La [collecte météo automatique](docs/architecture/COLLECTE-METEO.md) démarre
+progressivement après migration. Une consultation n'appelle pas Open-Meteo.
 
 Frontend: http://localhost:4200  
 API: http://localhost:3000/api

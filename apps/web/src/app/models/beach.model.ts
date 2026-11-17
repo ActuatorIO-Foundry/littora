@@ -67,6 +67,8 @@ export interface DataStatus {
   fetchedAt: string | null;
   validAt: string | null;
   ageSeconds: number | null;
+  nextCheckAt?: string | null;
+  collectionIntervalSeconds?: number;
   producedAt?: string | null;
   units?: Record<string, string>;
 }

@@ -23,7 +23,7 @@ export class ScoreService {
     private cache: CacheService,
   ) {}
 
-  async scoreBeach(id: string) {
+  async scoreBeach(id: string, requireProjection = false) {
     const beach = await this.beaches.get(id);
     const [weather, marine, tides, waterQuality, community, flagConsensus] = await Promise.all([
       this.weather.get(beach.lat, beach.lon),
@@ -87,7 +87,8 @@ export class ScoreService {
       },
       disclaimer: 'Scores indicatifs. Ne remplacent jamais les consignes officielles, drapeaux, postes de secours, BMS ou autorités locales.',
     };
-    await this.cache.setJson(conditionKey(id), conditionSnapshot(result), 900);
+    const published = await this.cache.setJson(conditionKey(id), conditionSnapshot(result), 900);
+    if (requireProjection && !published) throw new Error('Search cache unavailable');
     return result;
   }
 
@@ -141,6 +142,7 @@ export class ScoreService {
     return { status: data.status ?? 'unknown', kind: data.kind ?? null,
       fetchedAt: data.fetchedAt ?? null, validAt: data.validAt ?? null,
       ageSeconds: data.ageSeconds ?? null, producedAt: data.producedAt ?? null,
+      nextCheckAt: data.nextCheckAt ?? null, collectionIntervalSeconds: data.collectionIntervalSeconds,
       units: data.units ?? {}, provider: data.provider, warning: data.warning ?? null };
   }
 

@@ -2,10 +2,13 @@ import { DataStatus } from '../models/beach.model';
 
 export function dataStatusLabel(data?: DataStatus): string {
   if (!data) return '';
-  if (data.status === 'unknown') return 'Données indisponibles';
-  const age = data.ageSeconds == null ? '' : ` · reçues il y a ${Math.floor(data.ageSeconds / 60)} min`;
-  if (data.status === 'stale') return `Dernières prévisions conservées, fournisseur indisponible${age}`;
-  return `${data.status === 'partial' ? 'Prévisions partielles' : 'Prévisions'}${age}`;
+  const date = (v: string) => new Date(v).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return [({ unknown: 'Données indisponibles', stale: 'Prévisions périmées', partial: 'Prévisions partielles', available: 'Prévisions' })[data.status],
+    data.fetchedAt && `collecte : ${date(data.fetchedAt)}`,
+    data.validAt && `échéance : ${date(data.validAt)}`,
+    data.nextCheckAt && `prochaine vérification au plus tôt : ${date(data.nextCheckAt)}`,
+    data.collectionIntervalSeconds && `collecte toutes les ${data.collectionIntervalSeconds / 3600} h ; mise à jour du modèle variable`,
+  ].filter(Boolean).join(' · ');
 }
 
 export function metricValue(

@@ -3,8 +3,14 @@
 
 export interface DataStatus {
   ageSeconds: number | null;
+  collectionIntervalSeconds?: number;
   fetchedAt: string | null;
   kind: 'forecast';
+
+  /**
+   * Earliest scheduled check for the zone (not a model run).
+   */
+  nextCheckAt?: string | null;
   producedAt: string | null;
   provider: string;
   status: 'available' | 'partial' | 'stale' | 'unknown';

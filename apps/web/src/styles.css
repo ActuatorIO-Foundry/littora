@@ -392,6 +392,12 @@ input[type="checkbox"] {
   font-family: "DM Sans Variable", sans-serif;
   background: #d8edef;
 }
+.shoreline-tiles {
+  filter: brightness(0) saturate(100%) invert(39%) sepia(62%) saturate(900%) hue-rotate(139deg);
+}
+.shoreline-selected-tiles {
+  filter: brightness(0) saturate(100%) invert(40%) sepia(64%) saturate(2000%) hue-rotate(334deg);
+}
 .leaflet-control-attribution {
   font-size: 9px !important;
 }

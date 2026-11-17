@@ -64,6 +64,7 @@ export const presentReport = (row: Row) => ({ id:row.id,beach_id:row.beach_id,ty
 
 export function present(operation: string, data: any, query: Row): unknown {
   switch (operation) {
+    case 'searchBeaches': return { ...data, items: data.items.map(presentBeach) };
     case 'listBeaches': case 'getRecommendations': return data.map(presentBeach);
     case 'getBeach': return presentBeach(data);
     case 'getBeachAmenities': return { ...data, amenities: data.amenities.map((amenity: Row) => ({

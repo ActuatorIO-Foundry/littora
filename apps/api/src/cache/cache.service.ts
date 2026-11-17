@@ -30,13 +30,26 @@ export class CacheService implements OnModuleDestroy {
     }
   }
 
-  async setJson(key: string, value: unknown, ttlSeconds: number): Promise<void> {
-    if (!this.redis) return;
+  async getManyJson<T>(keys: string[]): Promise<Array<T | null>> {
+    if (!keys.length) return [];
+    if (!this.redis) return keys.map(() => null);
+    try {
+      const values = await this.redis.mget(...keys);
+      return values.map(value => {
+        try { return value ? JSON.parse(value) as T : null; } catch { return null; }
+      });
+    } catch { return keys.map(() => null); }
+  }
+
+  async setJson(key: string, value: unknown, ttlSeconds: number): Promise<boolean> {
+    if (!this.redis) return false;
 
     try {
       await this.redis.set(key, JSON.stringify(value), 'EX', ttlSeconds);
+      return true;
     } catch {
       // Non-blocking cache.
+      return false;
     }
   }
 

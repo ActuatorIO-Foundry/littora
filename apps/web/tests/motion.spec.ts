@@ -1,13 +1,14 @@
 import { expect, Page, test } from "./fixtures";
+import { searchResult } from './search-response';
 
 async function holdCatalogue(page: Page): Promise<() => void> {
   let release!: () => void;
   const ready = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await page.route("**/api/beaches/catalogue?*", async (route) => {
+  await page.route("**/api/search/beaches", async (route) => {
     await ready;
-    await route.fulfill({ json: { beaches: [], nextCursor: null } });
+    await route.fulfill({ json: searchResult({},[]) });
   });
   return release;
 }

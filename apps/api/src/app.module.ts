@@ -18,5 +18,6 @@ import { FavoritesModule } from './modules/favorites/favorites.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { IngestionModule } from './modules/ingestion/ingestion.module';
 import { PlacesModule } from './modules/places/places.module';
-@Module({imports:[ConfigModule.forRoot({isGlobal:true}),ScheduleModule.forRoot(),CacheModule,JobsModule,DatabaseModule,BeachesModule,PlacesModule,WeatherModule,MarineModule,TidesModule,WaterQualityModule,AlertsModule,ReportsModule,ScoreModule,RecommendationsModule,AuthModule,FavoritesModule,AdminModule,IngestionModule]})
+import { SearchModule } from './modules/search/search.module';
+@Module({imports:[ConfigModule.forRoot({isGlobal:true}),ScheduleModule.forRoot(),CacheModule,JobsModule,DatabaseModule,BeachesModule,PlacesModule,SearchModule,WeatherModule,MarineModule,TidesModule,WaterQualityModule,AlertsModule,ReportsModule,ScoreModule,RecommendationsModule,AuthModule,FavoritesModule,AdminModule,IngestionModule]})
 export class AppModule {}

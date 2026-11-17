@@ -6,6 +6,8 @@ import { TidesService, unavailableTides } from '../tides/tides.service';
 import { WaterQualityService } from '../water-quality/water-quality.service';
 import { WeatherService } from '../weather/weather.service';
 import { finiteMetric } from '../../shared/forecast-data';
+import { CacheService } from '../../cache/cache.service';
+import { conditionKey, conditionSnapshot } from '../search/search-conditions';
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
@@ -18,6 +20,7 @@ export class ScoreService {
     private tides: TidesService,
     private water: WaterQualityService,
     private reports: ReportsService,
+    private cache: CacheService,
   ) {}
 
   async scoreBeach(id: string) {
@@ -54,7 +57,7 @@ export class ScoreService {
     const boat = fresh && wind !== null && gust !== null && wave !== null && current !== null
       ? clamp(84 - wind * 1.1 - gust * 0.9 - wave * 22 - current * 35 - communityPenalty.boat) : null;
 
-    return {
+    const result = {
       beach,
       current: { weather: wc, marine: mc, tides, waterQuality, community },
       scores: { bathing, family, paddle, boat },
@@ -84,6 +87,8 @@ export class ScoreService {
       },
       disclaimer: 'Scores indicatifs. Ne remplacent jamais les consignes officielles, drapeaux, postes de secours, BMS ou autorités locales.',
     };
+    await this.cache.setJson(conditionKey(id), conditionSnapshot(result), 900);
+    return result;
   }
 
   safety(bathing: number | null, wave: number | null, current: number | null, uv: number | null, wind: number | null, quality?: string, communityAlerts: string[] = [], communityFlag?: any) {

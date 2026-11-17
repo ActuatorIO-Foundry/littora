@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures";
+import { searchResult } from './search-response';
 
 const bandol = {
   code: "83009",
@@ -42,24 +43,14 @@ const beaches = [
 const local = [
   { ...beaches[0], id: "outside", name: "Autre plage", city: "Autre commune" },
 ];
-const catalogue = {
-  commune: bandol,
-  beaches,
-  source: "openstreetmap-nominatim",
-  coverage: "partial",
-  collectedAt: "2026-11-17T10:00:00Z",
-  capped: false,
-};
 
 test.beforeEach(async ({ page }) => {
-  await page.route("**/api/beaches/catalogue?*", (route) =>
-    route.fulfill({ json: { beaches: local, nextCursor: null } }),
-  );
+  await page.route("**/api/search/beaches", route => {
+    const input=route.request().postDataJSON();
+    return route.fulfill({json:searchResult(input,input.communeCode?beaches:local,input.communeCode?bandol:null)});
+  });
   await page.route("**/api/places/communes?*", (route) =>
     route.fulfill({ json: [bandol] }),
-  );
-  await page.route("**/api/places/communes/83009/beaches", (route) =>
-    route.fulfill({ json: catalogue }),
   );
 });
 
@@ -102,14 +93,10 @@ test("commune : homonymes selectionnables au clavier", async ({ page }) => {
       ],
     }),
   );
-  await page.route("**/api/places/communes/83001/beaches", (route) =>
-    route.fulfill({
-      json: {
-        ...catalogue,
-        commune: { ...bandol, code: "83001", name: "Saint-Pierre" },
-      },
-    }),
-  );
+  await page.route("**/api/search/beaches", route => {
+    const input=route.request().postDataJSON();
+    return input.communeCode==='83001'?route.fulfill({json:searchResult(input,beaches,{...bandol,code:'83001',name:'Saint-Pierre'})}):route.fallback();
+  });
   await page.goto("/recherche");
   const input = page.getByRole("combobox", {
     name: "Rechercher dans les plages",
@@ -136,10 +123,11 @@ test("commune : effacer la saisie annule une reponse de catalogue en cours", asy
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await page.route("**/api/places/communes/83009/beaches", async (route) => {
+  await page.route("**/api/search/beaches", async (route) => {
+    const input=route.request().postDataJSON();if(!input.communeCode)return route.fallback();
     started = true;
     await gate;
-    await route.fulfill({ json: catalogue }).catch(() => undefined);
+    await route.fulfill({ json: searchResult(input,beaches,bandol) }).catch(() => undefined);
   });
   await page.goto("/recherche");
   const input = page.getByRole("combobox", {
@@ -156,25 +144,16 @@ test("commune : effacer la saisie annule une reponse de catalogue en cours", asy
   await expect(page).not.toHaveURL(/commune=/);
 });
 
-test("commune : lien direct et indisponibilite de la collecte signales", async ({
+test("commune : lien direct et inventaire non exhaustif sans collecte", async ({
   page,
 }) => {
-  await page.route("**/api/places/communes/83009/beaches", (route) =>
-    route.fulfill({
-      json: {
-        ...catalogue,
-        beaches: beaches.slice(0, 1),
-        source: "local-catalogue",
-        collectedAt: null,
-        warning:
-          "Source OSM indisponible. Catalogue local uniquement, couverture partielle.",
-      },
-    }),
+  await page.route("**/api/search/beaches", (route) =>
+    route.fulfill({ json: searchResult(route.request().postDataJSON(),beaches.slice(0,1),bandol) }),
   );
   await page.goto("/recherche?commune=83009");
   await expect(page.locator(".commune-selection")).toContainText("Bandol");
   await expect(
-    page.getByText("Source OSM indisponible.", { exact: false }),
+    page.getByText("Inventaire non exhaustif.", { exact: false }),
   ).toBeVisible();
   await expect(page.locator(".results-heading h2")).toContainText("1 plage");
 });

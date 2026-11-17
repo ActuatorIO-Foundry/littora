@@ -10,6 +10,7 @@ import {
 import { CommonModule } from "@angular/common";
 import { IconComponent } from "./icon.component";
 import type * as Three from "three";
+import { oceanShoreFragmentShader } from "./ocean-shore.shader";
 
 @Component({
   selector: "app-ocean-scene",
@@ -34,6 +35,7 @@ import type * as Three from "three";
   styles: [
     `
       :host {
+        --coast-position: 50%;
         position: absolute;
         inset: 0;
         display: block;
@@ -45,7 +47,7 @@ import type * as Three from "three";
         width: 100%;
         height: 100%;
         object-fit: cover;
-        object-position: center;
+        object-position: var(--coast-position) center;
       }
       .water-surface {
         position: absolute;
@@ -70,9 +72,9 @@ import type * as Three from "three";
         border-radius: 50%;
         color: #245158;
       }
-      @media (max-width: 600px) {
-        .coast-image {
-          object-position: 40% center;
+      @media (max-width: 1000px) {
+        :host {
+          --coast-position: 80%;
         }
       }
     `,
@@ -86,30 +88,42 @@ export class OceanSceneComponent implements AfterViewInit, OnDestroy {
   private observer?: ResizeObserver;
   private visibility?: IntersectionObserver;
   private disposeScene?: () => void;
+  private setPlayback?: (running: boolean) => void;
+  private initializing = false;
   private destroyed = false;
   private visible = true;
   private media = matchMedia("(prefers-reduced-motion: reduce)");
   private readonly motionChange = () => {
     this.paused = this.media.matches;
+    if (!this.paused && !this.renderer) void this.createScene();
+    this.updatePlayback();
     this.cdr.markForCheck();
   };
+  private readonly pageVisibilityChange = () => this.updatePlayback();
   constructor(
     private readonly zone: NgZone,
     private readonly cdr: ChangeDetectorRef,
   ) {}
   async ngAfterViewInit(): Promise<void> {
     this.media.addEventListener("change", this.motionChange);
+    document.addEventListener("visibilitychange", this.pageVisibilityChange);
     if (this.media.matches) return;
+    await this.createScene();
+  }
+  private async createScene(): Promise<void> {
+    if (this.initializing || this.destroyed || this.renderer) return;
+    this.initializing = true;
+    let texture: Three.Texture | undefined;
     try {
       const T = await import("three");
       if (this.destroyed) return;
-      const texture = await new T.TextureLoader().loadAsync(
-        "/images/lagune.jpg",
-      );
+      texture = await new T.TextureLoader().loadAsync("/images/lagune.jpg");
       if (this.destroyed) {
         texture.dispose();
         return;
       }
+      const source = texture.image as HTMLImageElement;
+      const imageRatio = source.naturalWidth / source.naturalHeight;
       this.zone.runOutsideAngular(() => {
         const host = this.el.nativeElement;
         const renderer = new T.WebGLRenderer({
@@ -126,25 +140,14 @@ export class OceanSceneComponent implements AfterViewInit, OnDestroy {
         const uniforms = {
           image: { value: texture },
           time: { value: 0 },
-          ratio: { value: 1 },
+          coverScale: { value: new T.Vector2(1, 1) },
+          coverOffset: { value: new T.Vector2(0, 0) },
           pointer: { value: new T.Vector2(0.5, 0.5) },
         };
         const material = new T.ShaderMaterial({
           uniforms,
           vertexShader: `varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
-          fragmentShader: `
-          uniform sampler2D image;uniform float time;uniform float ratio;uniform vec2 pointer;varying vec2 vUv;
-          void main(){
-            float imageRatio=2.328;vec2 uv=vUv;
-            if(ratio<imageRatio)uv.x=(uv.x-.5)*ratio/imageRatio+.5;else uv.y=(uv.y-.5)*imageRatio/ratio+.5;
-            vec3 base=texture2D(image,uv).rgb;
-            float water=smoothstep(.035,.16,base.g-base.r)*smoothstep(.02,.12,base.b-base.r);
-            vec2 ripple=vec2(sin(uv.y*85.+time*.8)+cos(uv.x*54.-time*.6),cos(uv.x*70.+time*.65)+sin(uv.y*47.-time*.8))*.0015;
-            float distance=length(vUv-pointer);ripple+=normalize(vUv-pointer+.001)*sin(distance*40.-time*1.2)*.0007*exp(-distance*4.);
-            vec3 color=texture2D(image,uv+ripple*water).rgb;
-            float light=sin(uv.x*80.+uv.y*40.+time*.5)*sin(uv.y*94.-time*.6)*.012*water;
-            gl_FragColor=vec4(color+light,1.);
-          }`,
+          fragmentShader: oceanShoreFragmentShader,
         });
         const geometry = new T.PlaneGeometry(2, 2);
         scene.add(new T.Mesh(geometry, material));
@@ -176,7 +179,17 @@ export class OceanSceneComponent implements AfterViewInit, OnDestroy {
             h = host.clientHeight;
           if (!w || !h) return;
           renderer.setSize(w, h);
-          uniforms.ratio.value = w / h;
+          const scaleX = Math.min(1, w / h / imageRatio);
+          const scaleY = Math.min(1, imageRatio / (w / h));
+          const position =
+            parseFloat(
+              getComputedStyle(host).getPropertyValue("--coast-position"),
+            ) / 100;
+          uniforms.coverScale.value.set(scaleX, scaleY);
+          uniforms.coverOffset.value.set(
+            (1 - scaleX) * position,
+            (1 - scaleY) / 2,
+          );
           buoy.scale.set(1 / (w / h), 1, 1);
           buoy.visible = w > 620;
           renderer.render(scene, camera);
@@ -186,6 +199,7 @@ export class OceanSceneComponent implements AfterViewInit, OnDestroy {
         resize();
         this.visibility = new IntersectionObserver(([entry]) => {
           this.visible = entry.isIntersecting;
+          this.updatePlayback();
         });
         this.visibility.observe(host);
         const move = (event: PointerEvent) => {
@@ -197,21 +211,27 @@ export class OceanSceneComponent implements AfterViewInit, OnDestroy {
         };
         host.addEventListener("pointermove", move, { passive: true });
         let last = 0;
-        renderer.setAnimationLoop((now) => {
-          const delta = Math.min((now - last) / 1000, 0.04);
+        const tick = (now: number) => {
+          if (last && now - last < 1000 / 30) return;
+          const delta = last ? Math.min((now - last) / 1000, 0.08) : 0;
           last = now;
-          if (this.paused || !this.visible || document.hidden) return;
           uniforms.time.value += delta;
           const t = uniforms.time.value;
           buoy.position.y = -0.2 + Math.sin(t * 0.9) * 0.012;
           buoy.rotation.z = Math.sin(t * 0.65) * 0.1;
           renderer.render(scene, camera);
-        });
+        };
+        this.setPlayback = (running) => {
+          last = 0;
+          renderer.domElement.dataset["motion"] = running ? "running" : "still";
+          renderer.setAnimationLoop(running ? tick : null);
+        };
+        this.updatePlayback();
         this.disposeScene = () => {
           host.removeEventListener("pointermove", move);
           geometry.dispose();
           material.dispose();
-          texture.dispose();
+          texture?.dispose();
           ballGeo.dispose();
           ballMat.dispose();
           ringGeo.dispose();
@@ -223,19 +243,36 @@ export class OceanSceneComponent implements AfterViewInit, OnDestroy {
         });
       });
     } catch {
-      this.renderer?.dispose();
+      if (!this.disposeScene) texture?.dispose();
+      this.releaseScene();
+    } finally {
+      this.initializing = false;
     }
+  }
+  private updatePlayback(): void {
+    this.setPlayback?.(
+      !this.destroyed && !this.paused && this.visible && !document.hidden,
+    );
   }
   toggle(): void {
     this.paused = !this.paused;
+    this.updatePlayback();
   }
-  ngOnDestroy(): void {
-    this.destroyed = true;
-    this.media.removeEventListener("change", this.motionChange);
+  private releaseScene(): void {
     this.observer?.disconnect();
     this.visibility?.disconnect();
     this.renderer?.setAnimationLoop(null);
     this.disposeScene?.();
+    this.renderer?.domElement.remove();
     this.renderer?.dispose();
+    this.renderer = undefined;
+    this.disposeScene = undefined;
+    this.setPlayback = undefined;
+  }
+  ngOnDestroy(): void {
+    this.destroyed = true;
+    this.media.removeEventListener("change", this.motionChange);
+    document.removeEventListener("visibilitychange", this.pageVisibilityChange);
+    this.releaseScene();
   }
 }

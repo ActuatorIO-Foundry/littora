@@ -8,9 +8,9 @@ export interface Beach {
   waterType?: 'sea' | 'river' | 'lake' | 'unknown';
   lat: number;
   lon: number;
-  has_lifeguard: boolean;
-  has_parking: boolean;
-  has_toilets: boolean;
+  has_lifeguard: boolean | null;
+  has_parking: boolean | null;
+  has_toilets: boolean | null;
   osm_id: string | null;
   distanceKm: number | null;
 }

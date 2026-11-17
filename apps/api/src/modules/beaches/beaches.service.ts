@@ -2,7 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 import { CacheService } from '../../cache/cache.service';
 import { PG } from '../../database/database.module';
 import { haversineKm } from '../../shared/geo';
-import { fetchJson } from '../../shared/http';
+import { fetchJson, fetchNominatimJson } from '../../shared/http';
 
 type BeachRow = {
   id: string;
@@ -14,9 +14,9 @@ type BeachRow = {
   water_type?: string;
   lat: number;
   lon: number;
-  has_lifeguard: boolean;
-  has_parking: boolean;
-  has_toilets: boolean;
+  has_lifeguard: boolean | null;
+  has_parking: boolean | null;
+  has_toilets: boolean | null;
   osm_id: string | null;
   distanceKm?: number | null;
   distancekm?: number | null;
@@ -96,6 +96,21 @@ export class BeachesService {
       beaches: page.map((beach: BeachRow) => this.enrichBeach({ ...beach, distanceKm: null })),
       nextCursor: rows.length > limit ? page[page.length - 1].id : null,
     };
+  }
+
+  async inGeometry(contour: unknown) {
+    const { rows } = await this.db.query(`select b.* from beaches b
+      where ST_Covers(ST_SetSRID(ST_GeomFromGeoJSON($1),4326),
+        coalesce(b.geom::geometry, ST_SetSRID(ST_MakePoint(b.lon,b.lat),4326))) order by b.name,b.id`, [JSON.stringify(contour)]);
+    return rows.map((row: BeachRow) => this.enrichBeach({ ...row, distanceKm: null }));
+  }
+
+  async featuresInGeometry(features: Array<{ osmId: string; name: string; city: string; lat: number; lon: number }>, contour: unknown) {
+    const { rows } = await this.db.query(`select f.* from jsonb_to_recordset($1::jsonb)
+      as f("osmId" text,name text,city text,lat double precision,lon double precision)
+      where ST_Covers(ST_SetSRID(ST_GeomFromGeoJSON($2),4326),ST_SetSRID(ST_MakePoint(f.lon,f.lat),4326))`,
+      [JSON.stringify(features), JSON.stringify(contour)]);
+    return rows as typeof features;
   }
 
   async discoverFromOpenStreetMap(bbox: string, region: string, coastline: string, limit = 140) {
@@ -266,13 +281,8 @@ export class BeachesService {
     for (const search of searches) {
       try {
         const url = `${endpoint}?format=json&q=${encodeURIComponent(search.q)}&bounded=1&viewbox=${viewbox}&limit=8&addressdetails=0`;
-        const raw = await fetchJson(url, {
-          headers: {
-            'user-agent': 'LittoraLocal/0.1 (development nearby amenities)',
-            accept: 'application/json',
-          },
-        });
-        for (const place of raw ?? []) {
+        const raw = await fetchNominatimJson(url);
+        for (const place of Array.isArray(raw) ? raw : []) {
           const lat = Number(place.lat);
           const lon = Number(place.lon);
           if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
@@ -427,14 +437,9 @@ export class BeachesService {
   private async fetchNominatimBeaches([south, west, north, east]: [number, number, number, number], limit: number) {
     const endpoint = process.env.NOMINATIM_API_URL || 'https://nominatim.openstreetmap.org/search';
     const url = `${endpoint}?format=json&q=plage&bounded=1&viewbox=${west},${north},${east},${south}&limit=${limit}&addressdetails=1`;
-    const raw = await fetchJson(url, {
-      headers: {
-        'user-agent': 'LittoraLocal/0.1 (development beach discovery)',
-        accept: 'application/json',
-      },
-    });
+    const raw = await fetchNominatimJson(url);
 
-    return (raw ?? [])
+    return (Array.isArray(raw) ? raw : [])
       .map((place: any) => {
         const lat = Number(place.lat);
         const lon = Number(place.lon);
@@ -452,7 +457,7 @@ export class BeachesService {
       .slice(0, limit);
   }
 
-  private async upsertDiscoveredBeach(feature: { osmId: string; name: string; city?: string | null; lat: number; lon: number }, region: string, coastline: string) {
+  async upsertDiscoveredBeach(feature: { osmId: string; name: string; city?: string | null; lat: number; lon: number }, region: string, coastline: string, department = region) {
     const existing = await this.db.query(
       'select id,name,city,department,region,coastline,lat,lon,has_lifeguard,has_parking,has_toilets,osm_id from beaches where osm_id=$1 limit 1',
       [feature.osmId],
@@ -472,10 +477,15 @@ export class BeachesService {
 
     const { rows } = await this.db.query(
       `insert into beaches(name,city,department,region,coastline,lat,lon,geom,has_lifeguard,has_parking,has_toilets,osm_id)
-       values($1,$2,$3,$4,$5,$6,$7,ST_SetSRID(ST_MakePoint($7,$6),4326)::geography,false,false,false,$8)
+       values($1,$2,$3,$4,$5,$6,$7,ST_SetSRID(ST_MakePoint($7,$6),4326)::geography,null,null,null,$8)
+       on conflict (osm_id) where osm_id is not null do nothing
        returning id,name,city,department,region,coastline,lat,lon,has_lifeguard,has_parking,has_toilets,osm_id`,
-      [feature.name, feature.city ?? 'Commune à préciser', region, region, coastline, feature.lat, feature.lon, feature.osmId],
+      [feature.name, feature.city ?? 'Commune à préciser', department, region, coastline, feature.lat, feature.lon, feature.osmId],
     );
+    if (!rows[0]) {
+      const concurrent = await this.db.query('select * from beaches where osm_id=$1', [feature.osmId]);
+      return concurrent.rows[0] ? this.enrichBeach({ ...concurrent.rows[0], distanceKm: null }) : null;
+    }
     return this.enrichBeach({ ...rows[0], distanceKm: null });
   }
 

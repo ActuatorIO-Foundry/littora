@@ -65,8 +65,11 @@ import { listBeaches } from '../fn/littora/list-beaches';
 import { ListBeaches$Params } from '../fn/littora/list-beaches';
 import { Recommendation } from '../models/recommendation';
 import { Report } from '../models/report';
+import { searchBeaches } from '../fn/littora/search-beaches';
+import { SearchBeaches$Params } from '../fn/littora/search-beaches';
 import { searchCommunes } from '../fn/littora/search-communes';
 import { SearchCommunes$Params } from '../fn/littora/search-communes';
+import { SearchPage } from '../models/search-page';
 import { Tides } from '../models/tides';
 import { WaterQuality } from '../models/water-quality';
 
@@ -74,6 +77,37 @@ import { WaterQuality } from '../models/water-quality';
 export class LittoraService extends BaseService {
   constructor(config: ApiConfiguration, http: HttpClient) {
     super(config, http);
+  }
+
+  /** Path part for operation `searchBeaches()` */
+  static readonly SearchBeachesPath = '/search/beaches';
+
+  /**
+   * Read-only metropolitan search. Filters apply to the entire selected scope before ranking and pagination. Numeric filters exclude missing or stale values. Flags are independent community consensus, never calculated safety or official instructions. Forecast coverage depends on previously collected provider data; no provider fan-out or catalogue discovery occurs here. Cursor pages share a frozen 120-second snapshot; expired cursors return 409 and must restart. Coordinates belong in the body, not shared URLs.
+   *
+   * This method provides access to the full `HttpResponse`, allowing access to response headers.
+   * To access only the response body, use `searchBeaches()` instead.
+   *
+   * This method sends `application/json` and handles request body of type `application/json`.
+   */
+  searchBeaches$Response(params: SearchBeaches$Params, context?: HttpContext): Observable<StrictHttpResponse<SearchPage>> {
+    const obs = searchBeaches(this.http, this.rootUrl, params, context);
+    return obs;
+  }
+
+  /**
+   * Read-only metropolitan search. Filters apply to the entire selected scope before ranking and pagination. Numeric filters exclude missing or stale values. Flags are independent community consensus, never calculated safety or official instructions. Forecast coverage depends on previously collected provider data; no provider fan-out or catalogue discovery occurs here. Cursor pages share a frozen 120-second snapshot; expired cursors return 409 and must restart. Coordinates belong in the body, not shared URLs.
+   *
+   * This method provides access only to the response body.
+   * To access the full response (for headers, for example), `searchBeaches$Response()` instead.
+   *
+   * This method sends `application/json` and handles request body of type `application/json`.
+   */
+  searchBeaches(params: SearchBeaches$Params, context?: HttpContext): Observable<SearchPage> {
+    const resp = this.searchBeaches$Response(params, context);
+    return resp.pipe(
+      map((r: StrictHttpResponse<SearchPage>): SearchPage => r.body)
+    );
   }
 
   /** Path part for operation `listBeaches()` */
@@ -451,10 +485,14 @@ export class LittoraService extends BaseService {
   static readonly GetRecommendationsPath = '/recommendations';
 
   /**
+   * Legacy bounded recommendations. Use searchBeaches for filters, a bounded radius and complete pagination.
+   *
    * This method provides access to the full `HttpResponse`, allowing access to response headers.
    * To access only the response body, use `getRecommendations()` instead.
    *
    * This method doesn't expect any request body.
+   *
+   * @deprecated
    */
   getRecommendations$Response(params: GetRecommendations$Params, context?: HttpContext): Observable<StrictHttpResponse<Array<Recommendation>>> {
     const obs = getRecommendations(this.http, this.rootUrl, params, context);
@@ -462,10 +500,14 @@ export class LittoraService extends BaseService {
   }
 
   /**
+   * Legacy bounded recommendations. Use searchBeaches for filters, a bounded radius and complete pagination.
+   *
    * This method provides access only to the response body.
    * To access the full response (for headers, for example), `getRecommendations$Response()` instead.
    *
    * This method doesn't expect any request body.
+   *
+   * @deprecated
    */
   getRecommendations(params: GetRecommendations$Params, context?: HttpContext): Observable<Array<Recommendation>> {
     const resp = this.getRecommendations$Response(params, context);

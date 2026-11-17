@@ -58,4 +58,27 @@ export class ReportsService {
 
     return flagConsensus(rows);
   }
+
+  async flagConsensuses(beachIds: string[]) {
+    const result = new Map<string, ReturnType<typeof flagConsensus>>();
+    if (!beachIds.length) return result;
+    const { rows } = await this.db.query(`select * from (
+        select r.beach_id,r.id,r.value,r.status,r.created_at,c.observed_at,c.expires_at,c.contributor_id,c.network_hash,
+          row_number() over(partition by r.beach_id order by coalesce(c.observed_at,r.created_at) desc,r.id) as rank
+        from reports r join beach_catalogue b on b.id=r.beach_id
+        left join report_contributions c on c.report_id=r.id
+        where r.beach_id=any($1::uuid[]) and r.type='flag' and r.status='verified'
+        and coalesce(r.value->>'demo','false')<>'true'
+        and coalesce(c.expires_at,r.created_at+interval '24 hours')>now()
+        and coalesce(c.observed_at,r.created_at)>now()-interval '12 hours'
+        and coalesce(c.observed_at,r.created_at)<=now() and r.created_at<=now()
+      ) observations where rank<=1001`, [beachIds]);
+    const groups = new Map<string, any[]>();
+    for (const row of rows) {
+      const group = groups.get(row.beach_id) ?? [];
+      group.push(row); groups.set(row.beach_id,group);
+    }
+    for (const [id, group] of groups) result.set(id,flagConsensus(group));
+    return result;
+  }
 }

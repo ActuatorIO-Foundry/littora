@@ -32,6 +32,10 @@ const score = { beach: row, current: { weather: forecast.current, marine: foreca
   dataStatus: { weather: forecast, marine: forecast }, providers: { weather: 'open-meteo' }, disclaimer: 'Indicative' };
 let app, url, calls = 0, fail = false, corrupt = false, receivedReport;
 const modules = [
+  ['search', 'Search', { search: async () => { calls++; return { items: [], total: 0,
+    pageInfo: { nextCursor: null, hasNextPage: false, limit: 200 }, asOf: now, expiresAt: now,
+    commune: null, coverage: { candidates: 0, waterTemperature: 0, airTemperature: 0, scores: 0, flags: 0 },
+    unknownPolicy: 'exclude-when-filtered' }; } }],
   ['beaches', 'Beaches', { list: async () => { calls++; if (fail) throw new Error('SQL password=secret'); return [{ ...row, lat: corrupt ? 'bad' : row.lat }]; },
     get: async () => row, catalogue: async () => ({ beaches: [row], nextCursor: null }),
     nearbyAmenities: async () => ({ beachId: id, provider: 'openstreetmap', radiusMeters: 1800, amenities: [
@@ -80,6 +84,17 @@ test('contract: every controller route is documented exactly once', () => {
     }
   }
   assert.deepEqual(actual, new Set(operations.keys()));
+});
+
+test('contract: search body is strict, coordinates stay out of URLs, responses are not cached', async () => {
+  const request=body=>fetch(`${url}/api/search/beaches`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  const response=await request({lat:43,lon:6,radiusKm:50,waterType:'sea',parking:true,minWaterTemp:0});
+  assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');
+  assert.equal(schemaValidator('SearchPage')(await response.json()),true);
+  for(const body of [{waterType:'ocean'},{parking:'true'},{limit:201},{radiusKm:0},{minWaterTemp:null},
+    {lat:91,lon:0,radiusKm:50},{flag:'calculated'},{q:'x'.repeat(81)},{invented:1}]) {
+    const before=calls;assert.equal((await request(body)).status,400,JSON.stringify(body));assert.equal(calls,before);
+  }
 });
 
 test('contract: observed, predicted, unknown, stale, zero and demo examples validate', () => {

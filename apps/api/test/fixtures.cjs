@@ -21,6 +21,7 @@ function scoreFixture({ weather = {}, marine = {}, quality = 'good', reports = [
     { get: async () => ({ provider: 'test-tides' }) },
     { get: async () => ({ provider: 'test-water', status: quality }) },
     { aggregate: async () => reports, flagConsensus: async () => consensus },
+    { setJson: async () => true },
   );
 }
 

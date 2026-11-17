@@ -3,5 +3,5 @@ import { BeachesModule } from '../beaches/beaches.module';
 import { PlacesController } from './places.controller';
 import { PlacesService } from './places.service';
 
-@Module({ imports: [BeachesModule], controllers: [PlacesController], providers: [PlacesService] })
+@Module({ imports: [BeachesModule], controllers: [PlacesController], providers: [PlacesService], exports: [PlacesService] })
 export class PlacesModule {}

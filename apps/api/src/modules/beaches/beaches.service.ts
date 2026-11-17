@@ -5,6 +5,8 @@ import { haversineKm } from '../../shared/geo';
 import { fetchJson, fetchNominatimJson } from '../../shared/http';
 import { WaterType } from './water-classification';
 import { AmenitiesService } from './amenities.service';
+import type { SearchInput } from '../search/search-input';
+import type { Commune } from '../places/places.service';
 
 type BeachRow = {
   id: string;
@@ -108,6 +110,36 @@ export class BeachesService {
       where ST_Covers(ST_SetSRID(ST_GeomFromGeoJSON($1),4326),
         coalesce(b.geom::geometry, ST_SetSRID(ST_MakePoint(b.lon,b.lat),4326))) order by b.name,b.id`, [JSON.stringify(contour)]);
     return rows.map((row: BeachRow) => this.enrichBeach({ ...row, distanceKm: null }));
+  }
+
+  async searchCandidates(input: SearchInput, commune: Commune | null) {
+    const params: unknown[] = [];
+    const bind = (value: unknown) => { params.push(value); return `$${params.length}`; };
+    const where: string[] = [];
+    const bounds = input.bbox?.split(',').map(Number) ?? commune?.bbox;
+    if (bounds) {
+      const [south, west, north, east] = bounds.map(bind);
+      where.push(`(geom && ST_MakeEnvelope(${west},${south},${east},${north},4326)::geography or geom is null)`,
+        `lat between ${south} and ${north}`, `lon between ${west} and ${east}`);
+    }
+    if (commune?.contour) where.push(`ST_Covers(ST_SetSRID(ST_GeomFromGeoJSON(${bind(JSON.stringify(commune.contour))}),4326),ST_SetSRID(ST_MakePoint(lon,lat),4326))`);
+    const center = input.lat !== undefined ? {lat:input.lat,lon:input.lon!} : commune?.center ??
+      (bounds ? {lat:(bounds[0]+bounds[2])/2,lon:(bounds[1]+bounds[3])/2} : null);
+    const point = center ? `ST_SetSRID(ST_MakePoint(${bind(center.lon)},${bind(center.lat)}),4326)::geography` : null;
+    const location = 'coalesce(geom,ST_SetSRID(ST_MakePoint(lon,lat),4326)::geography)';
+    if (input.radiusKm !== undefined) {
+      const radius = bind(input.radiusKm * 1000);
+      where.push(`(ST_DWithin(geom,${point},${radius}) or geom is null and ST_DWithin(${location},${point},${radius}))`);
+    }
+    if (input.waterType) where.push(`water_type=${bind(input.waterType)}`);
+    for (const key of ['parking','toilets','rescueStation'] as const) {
+      if (input[key]) where.push(`facility_facts->'${key}'->>'value'='true'`);
+    }
+    if (input.q?.trim() && !commune) where.push(`strpos(lower(concat_ws(' ',name,city,region)),lower(${bind(input.q.trim())}))>0`);
+    const { rows } = await this.db.query(`select ${catalogueColumns},
+      ${point ? `ST_Distance(${location},${point})/1000` : 'null::double precision'} as "distanceKm"
+      from beach_catalogue ${where.length ? `where ${where.join(' and ')}` : ''} order by id`, params);
+    return (rows as BeachRow[]).map(row => this.enrichBeach(row));
   }
 
   async featuresInGeometry(features: Array<{ osmId: string; name: string; city: string; lat: number; lon: number }>, contour: unknown) {

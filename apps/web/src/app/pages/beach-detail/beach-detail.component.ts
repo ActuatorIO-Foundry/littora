@@ -110,6 +110,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     { category: "food", name: "Restauration", icon: "compass" },
   ];
   private readonly subscriptions = new Subscription();
+  private beachRequests = new Subscription();
   private scoreRequest?: Subscription;
   constructor(
     private readonly route: ActivatedRoute,
@@ -117,13 +118,32 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     private readonly cdr: ChangeDetectorRef,
   ) {}
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get("id");
+    this.subscriptions.add(this.route.paramMap.subscribe(params => this.loadBeach(params.get("id"))));
+  }
+  private loadBeach(id: string | null): void {
+    this.beachRequests.unsubscribe();
+    this.beachRequests = new Subscription();
+    this.scoreRequest?.unsubscribe();
+    this.beach = null;
+    this.score = null;
+    this.amenities = null;
+    this.reports = [];
+    this.loading = true;
+    this.loadingScore = true;
+    this.loadingAmenities = true;
+    this.error = "";
+    this.scoreError = "";
+    this.reportError = "";
+    this.reportMessage = "";
+    this.sending = false;
+    this.reportsUnavailable = false;
+    this.amenitiesUnavailable = false;
     if (!id) {
       this.error = "Plage introuvable.";
       this.loading = false;
       return;
     }
-    this.subscriptions.add(
+    this.beachRequests.add(
       this.api
         .getBeach(id)
         .pipe(timeout(15000))
@@ -141,7 +161,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
         }),
     );
     this.loadScore(id);
-    this.subscriptions.add(
+    this.beachRequests.add(
       this.api
         .getBeachAmenities(id)
         .pipe(timeout(20000))
@@ -162,6 +182,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     this.loadReports(id);
   }
   loadScore(id: string): void {
+    this.score = null;
     this.loadingScore = true;
     this.scoreError = "";
     this.scoreRequest?.unsubscribe();
@@ -183,7 +204,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
       });
   }
   private loadReports(id: string): void {
-    this.subscriptions.add(
+    this.beachRequests.add(
       this.api
         .getReports(id)
         .pipe(timeout(12000))
@@ -202,6 +223,9 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
   }
   get backQuery() {
     return this.route.snapshot.queryParams;
+  }
+  get backState() {
+    return { nearbyPosition: history.state?.nearbyPosition ?? null };
   }
   get selectedUsageInfo() {
     return this.usages.find((u) => u.key === this.selectedUsage)!;
@@ -283,7 +307,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     this.sending = true;
     this.reportMessage = "";
     this.reportError = "";
-    this.subscriptions.add(
+    this.beachRequests.add(
       this.api
         .createReport(payload)
         .pipe(timeout(12000))
@@ -343,6 +367,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
   }
   ngOnDestroy(): void {
     this.subscriptions.unsubscribe();
+    this.beachRequests.unsubscribe();
     this.scoreRequest?.unsubscribe();
   }
 }

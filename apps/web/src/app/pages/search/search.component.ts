@@ -1,7 +1,7 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
-import { ActivatedRoute, Router, RouterLink } from "@angular/router";
+import { ActivatedRoute, ParamMap, Router, RouterLink } from "@angular/router";
 import { map, Subscription, switchMap, timeout } from "rxjs";
 import { Beach, BeachScore } from "../../models/beach.model";
 import { Commune } from "../../models/commune.model";
@@ -73,7 +73,12 @@ export class SearchComponent implements OnInit, OnDestroy {
   private placeRequest?: Subscription;
   private placeTimer?: ReturnType<typeof setTimeout>;
   private communePending = false;
+  private communeCode: string | null = null;
   private destroyed = false;
+  private routeRequest?: Subscription;
+  private writtenParams = "";
+  private locationAttempt = 0;
+  private nearbyPosition: { lat: number; lon: number } | null = null;
   constructor(
     private readonly api: LittoraApiService,
     private readonly cdr: ChangeDetectorRef,
@@ -81,8 +86,30 @@ export class SearchComponent implements OnInit, OnDestroy {
     private readonly router: Router,
   ) {}
   ngOnInit(): void {
-    const p = this.route.snapshot.queryParamMap;
+    this.routeRequest = this.route.queryParamMap.subscribe((p) => {
+      const key = this.paramsKey(Object.fromEntries(p.keys.map((k) => [k, p.get(k)])));
+      if (key === this.writtenParams) return;
+      this.writtenParams = key;
+      this.restoreSearch(p);
+    });
+  }
+  private restoreSearch(p: ParamMap): void {
+    this.cancelLocation();
+    this.listRequest?.unsubscribe();
+    this.placeRequest?.unsubscribe();
+    clearTimeout(this.placeTimer);
+    this.clearPreview();
+    this.selectedZone = null;
+    this.selectedCommune = null;
+    this.communeCode = null;
+    this.nearbyPosition = null;
+    this.communePending = false;
+    this.communeSuggestions = [];
+    this.activeSuggestion = -1;
+    this.message = "";
+    this.resultLimit = 20;
     this.query = p.get("q") ?? "";
+    this.sort = ["name", "score", "distance"].includes(p.get("sort") ?? "") ? p.get("sort")! : "name";
     this.selectedUsage = this.usages.some((u) => u.id === p.get("usage"))
       ? p.get("usage")!
       : "bathing";
@@ -106,6 +133,15 @@ export class SearchComponent implements OnInit, OnDestroy {
     const zone = this.coastalZones.find((z) => z.id === p.get("zone"));
     const commune = p.get("commune");
     if (commune) this.chooseCommune(commune);
+    else if (p.get("near") === "1") {
+      const state = this.router.getCurrentNavigation()?.extras.state ?? history.state;
+      const position = state?.["nearbyPosition"];
+      if (this.validPosition(position)) this.loadNearby(position);
+      else {
+        this.loadBeaches();
+        this.message = "La position privée n'est pas disponible dans ce lien.";
+      }
+    }
     else {
       if (zone) this.exploreZone(zone);
       else this.loadBeaches();
@@ -113,13 +149,16 @@ export class SearchComponent implements OnInit, OnDestroy {
     }
   }
   onQueryChange(): void {
+    this.cancelLocation();
     this.message = "";
     clearTimeout(this.placeTimer);
     this.placeRequest?.unsubscribe();
     this.communeSuggestions = [];
     this.activeSuggestion = -1;
-    if (this.selectedCommune || this.communePending) {
+    if (this.communeCode || this.selectedCommune || this.communePending || this.nearbyPosition) {
       this.selectedCommune = null;
+      this.communeCode = null;
+      this.nearbyPosition = null;
       this.selectedBeach = null;
       this.score = null;
       this.loadBeaches();
@@ -180,6 +219,9 @@ export class SearchComponent implements OnInit, OnDestroy {
     }
   }
   chooseCommune(code: string): void {
+    this.cancelLocation();
+    this.nearbyPosition = null;
+    this.communeCode = code;
     clearTimeout(this.placeTimer);
     this.placeRequest?.unsubscribe();
     this.listRequest?.unsubscribe();
@@ -188,15 +230,14 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.activeSuggestion = -1;
     this.selectedZone = null;
     this.selectedCommune = null;
-    this.selectedBeach = null;
-    this.score = null;
-    this.loadingScore = false;
+    this.clearPreview();
     this.communePending = true;
     this.beaches = [];
     this.loading = true;
     this.error = "";
     this.message = "";
     this.resultLimit = 20;
+    this.syncFilters();
     this.listRequest = this.api
       .getCommuneCatalogue(code)
       .pipe(timeout(25000))
@@ -223,15 +264,18 @@ export class SearchComponent implements OnInit, OnDestroy {
   }
   clearCommune(): void {
     this.selectedCommune = null;
+    this.communeCode = null;
     this.query = "";
     this.message = "";
     this.onQueryChange();
     this.loadBeaches();
   }
   loadBeaches(): void {
+    this.cancelLocation();
     this.listRequest?.unsubscribe();
     this.communePending = false;
     this.clearPreview();
+    this.beaches = [];
     this.loading = true;
     this.error = "";
     this.listRequest = this.api
@@ -251,6 +295,9 @@ export class SearchComponent implements OnInit, OnDestroy {
       });
   }
   exploreZone(zone: CoastalZone): void {
+    this.cancelLocation();
+    this.nearbyPosition = null;
+    this.communeCode = null;
     clearTimeout(this.placeTimer);
     this.placeRequest?.unsubscribe();
     this.selectedCommune = null;
@@ -294,6 +341,9 @@ export class SearchComponent implements OnInit, OnDestroy {
       });
   }
   chooseZone(id: string): void {
+    this.cancelLocation();
+    this.nearbyPosition = null;
+    this.communeCode = null;
     clearTimeout(this.placeTimer);
     this.placeRequest?.unsubscribe();
     this.communeSuggestions = [];
@@ -308,6 +358,8 @@ export class SearchComponent implements OnInit, OnDestroy {
     }
   }
   useMyPosition(): void {
+    this.cancelLocation();
+    const attempt = this.locationAttempt;
     if (!navigator.geolocation) {
       this.message = "La localisation est indisponible. Choisissez une façade.";
       return;
@@ -316,44 +368,15 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.message = "";
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        if (this.destroyed) return;
+        if (this.destroyed || attempt !== this.locationAttempt) return;
         this.locating = false;
-        this.loading = true;
-        this.error = "";
-        this.selectedZone = null;
-        this.selectedCommune = null;
-        this.communePending = false;
-        this.communeSuggestions = [];
-        this.clearPreview();
-        this.query = "";
-        this.placeRequest?.unsubscribe();
-        clearTimeout(this.placeTimer);
-        this.listRequest?.unsubscribe();
-        this.syncFilters();
-        this.listRequest = this.api
-          .getRecommendations(
-            pos.coords.latitude,
-            pos.coords.longitude,
-            this.selectedUsage,
-          )
-          .pipe(timeout(30000))
-          .subscribe({
-            next: (r) => {
-              this.beaches = r;
-              this.loading = false;
-              this.message = "Plages à proximité de votre position.";
-              this.cdr.markForCheck();
-            },
-            error: () => {
-              this.loading = false;
-              this.error = "Les plages à proximité ne sont pas disponibles.";
-              this.cdr.markForCheck();
-            },
-          });
+        const position = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        if (this.validPosition(position)) this.loadNearby(position);
+        else this.message = "Position non disponible. Vous pouvez choisir une façade ou une ville.";
         this.cdr.markForCheck();
       },
       () => {
-        if (this.destroyed) return;
+        if (this.destroyed || attempt !== this.locationAttempt) return;
         this.locating = false;
         this.message =
           "Position non disponible. Vous pouvez choisir une façade ou une ville.";
@@ -362,7 +385,49 @@ export class SearchComponent implements OnInit, OnDestroy {
       { timeout: 8000, maximumAge: 120000 },
     );
   }
+  private validPosition(position: any): position is { lat: number; lon: number } {
+    return position && Number.isFinite(position.lat) && Number.isFinite(position.lon)
+      && Math.abs(position.lat) <= 90 && Math.abs(position.lon) <= 180;
+  }
+  private cancelLocation(): void {
+    ++this.locationAttempt;
+    this.locating = false;
+  }
+  private loadNearby(position: { lat: number; lon: number }): void {
+    this.cancelLocation();
+    this.loading = true;
+    this.error = "";
+    this.selectedZone = null;
+    this.selectedCommune = null;
+    this.communeCode = null;
+    this.nearbyPosition = { ...position };
+    this.communePending = false;
+    this.communeSuggestions = [];
+    this.activeSuggestion = -1;
+    this.beaches = [];
+    this.clearPreview();
+    this.query = "";
+    this.placeRequest?.unsubscribe();
+    clearTimeout(this.placeTimer);
+    this.listRequest?.unsubscribe();
+    this.syncFilters();
+    this.listRequest = this.api.getRecommendations(position.lat, position.lon, this.selectedUsage)
+      .pipe(timeout(30000)).subscribe({
+        next: (r) => {
+          this.beaches = r;
+          this.loading = false;
+          this.message = "Plages à proximité de votre position.";
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          this.loading = false;
+          this.error = "Les plages à proximité ne sont pas disponibles.";
+          this.cdr.markForCheck();
+        },
+      });
+  }
   loadScore(beach: Beach): void {
+    this.cancelLocation();
     this.scoreRequest?.unsubscribe();
     this.selectedBeach = beach;
     this.score = null;
@@ -460,12 +525,14 @@ export class SearchComponent implements OnInit, OnDestroy {
     return this.displayedBeaches().slice(0, this.resultLimit);
   }
   resetFilters(): void {
-    const hadCommune = !!this.selectedCommune || this.communePending;
+    this.cancelLocation();
+    const hadCommune = !!this.communeCode || !!this.selectedCommune || this.communePending;
     clearTimeout(this.placeTimer);
     this.placeRequest?.unsubscribe();
     this.communeSuggestions = [];
     this.activeSuggestion = -1;
     this.selectedCommune = null;
+    this.communeCode = null;
     this.query = "";
     this.waterType = "all";
     this.requiredFlag = "all";
@@ -476,6 +543,12 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.maxWaterTemp = null;
     this.syncFilters();
     if (hadCommune) this.loadBeaches();
+  }
+  retrySearch(): void {
+    if (this.communeCode) this.chooseCommune(this.communeCode);
+    else if (this.nearbyPosition) this.loadNearby(this.nearbyPosition);
+    else if (this.selectedZone) this.exploreZone(this.selectedZone);
+    else this.loadBeaches();
   }
   filterCount(): number {
     return (
@@ -488,11 +561,10 @@ export class SearchComponent implements OnInit, OnDestroy {
     );
   }
   syncFilters(): void {
-    void this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: {
+    if (this.selectedBeach && !this.displayedBeaches().some(b => b.id === this.selectedBeach?.id)) this.clearPreview();
+    const queryParams = {
         q: this.query || null,
-        commune: this.selectedCommune?.code ?? null,
+        commune: this.communeCode,
         zone: this.selectedZone?.id ?? null,
         usage: this.selectedUsage,
         water: this.waterType === "all" ? null : this.waterType,
@@ -502,9 +574,23 @@ export class SearchComponent implements OnInit, OnDestroy {
         flag: this.requiredFlag === "all" ? null : this.requiredFlag,
         min: this.minWaterTemp,
         max: this.maxWaterTemp,
-      },
+        sort: this.sort === "name" ? null : this.sort,
+        near: this.nearbyPosition ? "1" : null,
+      };
+    this.writtenParams = this.paramsKey(queryParams);
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams,
+      state: this.navigationState,
       replaceUrl: true,
     });
+  }
+  private paramsKey(params: Record<string, unknown>): string {
+    return JSON.stringify(Object.entries(params).filter(([,v]) => v != null)
+      .map(([k,v]) => [k,String(v)]).sort(([a],[b]) => a.localeCompare(b)));
+  }
+  get navigationState() {
+    return { nearbyPosition: this.nearbyPosition };
   }
   get queryParams() {
     return this.route.snapshot.queryParams;
@@ -523,6 +609,8 @@ export class SearchComponent implements OnInit, OnDestroy {
   }
   ngOnDestroy(): void {
     this.destroyed = true;
+    this.cancelLocation();
+    this.routeRequest?.unsubscribe();
     this.listRequest?.unsubscribe();
     this.scoreRequest?.unsubscribe();
     this.placeRequest?.unsubscribe();

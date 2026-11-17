@@ -74,8 +74,11 @@ export class LittoraApiService {
     }
 
     getScore(beachId: string): Observable<BeachScore> {
-        return this.client.getBeachScore({ id: beachId }).pipe(map(result => ({ ...result, beach: beachView(result.beach),
-            current: { ...result.current, tides: { ...result.current.tides }, waterQuality: { ...result.current.waterQuality } } })));
+        return this.client.getBeachScore({ id: beachId }).pipe(map(result => {
+            if (result.beach.id.toLowerCase() !== beachId.toLowerCase()) throw new Error('Beach score identity mismatch');
+            return { ...result, beach: beachView(result.beach),
+                current: { ...result.current, tides: { ...result.current.tides }, waterQuality: { ...result.current.waterQuality } } };
+        }));
     }
 
     getRecommendations(lat: number, lon: number, usage = 'bathing'): Observable<Array<Beach & { selectedScore: number | null; scores: BeachScore['scores'] }>> {

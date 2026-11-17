@@ -11,8 +11,8 @@ import { promisify } from 'node:util';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 test('install policy: every locked lifecycle script has an exact reviewed decision', () => {
-  for (const app of ['api', 'web']) {
-    const dir = join(root, 'apps', app);
+  {
+    const dir = root;
     const pkg = JSON.parse(readFileSync(join(dir, 'package.json')));
     const lock = JSON.parse(readFileSync(join(dir, 'package-lock.json')));
     assert.match(readFileSync(join(dir, '.npmrc'), 'utf8'), /^strict-allow-scripts=true$/m);
@@ -21,7 +21,7 @@ test('install policy: every locked lifecycle script has an exact reviewed decisi
       if (!dependency.hasInstallScript) continue;
       const name = path.split('node_modules/').at(-1);
       const key = `${name}@${dependency.version}`;
-      assert.equal(typeof pkg.allowScripts[key], 'boolean', `${app}: review ${key}`);
+      assert.equal(typeof pkg.allowScripts[key], 'boolean', `review ${key}`);
       decisions.add(key);
     }
     assert.deepEqual(new Set(Object.keys(pkg.allowScripts)), decisions, 'No stale or wildcard approvals');

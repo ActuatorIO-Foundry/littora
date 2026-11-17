@@ -1,0 +1,44 @@
+{
+  "observation": {
+    "value": 18.2, "unit": "degC", "source": {"provider": "example-buoy", "product": "in-situ"},
+    "kind": "observation", "status": "available", "fetchedAt": "2026-07-15T12:05:00Z",
+    "validAt": "2026-07-15T12:00:00Z", "validUntil": null, "producedAt": null,
+    "resolution": {"spatialMeters": null, "temporalSeconds": 600}, "isDemo": false
+  },
+  "forecast": {
+    "value": 19.1, "unit": "degC", "source": {"provider": "open-meteo", "product": null},
+    "kind": "forecast", "status": "available", "fetchedAt": "2026-07-15T12:05:00Z",
+    "validAt": "2026-07-15T15:00:00Z", "validUntil": null, "producedAt": null,
+    "resolution": {"spatialMeters": null, "temporalSeconds": null}, "isDemo": false
+  },
+  "unknown": {
+    "value": null, "unit": "m/s", "source": {"provider": "open-meteo-marine", "product": null},
+    "kind": "forecast", "status": "unknown", "fetchedAt": null, "validAt": null,
+    "validUntil": null, "producedAt": null,
+    "resolution": {"spatialMeters": null, "temporalSeconds": null}, "isDemo": false
+  },
+  "stale": {
+    "value": 0.3, "unit": "m", "source": {"provider": "open-meteo-marine", "product": null},
+    "kind": "forecast", "status": "stale", "fetchedAt": "2026-07-14T15:05:00Z",
+    "validAt": "2026-07-14T15:00:00Z", "validUntil": null, "producedAt": null,
+    "resolution": {"spatialMeters": null, "temporalSeconds": null}, "isDemo": false
+  },
+  "zero": {
+    "value": 0, "unit": "m/s", "source": {"provider": "open-meteo-marine", "product": null},
+    "kind": "forecast", "status": "available", "fetchedAt": "2026-07-15T12:05:00Z",
+    "validAt": "2026-07-15T12:00:00Z", "validUntil": null, "producedAt": null,
+    "resolution": {"spatialMeters": null, "temporalSeconds": null}, "isDemo": false
+  },
+  "contribution": {
+    "value": 21, "unit": "degC", "source": {"provider": "littora-reports", "product": null},
+    "kind": "contribution", "status": "available", "fetchedAt": "2026-07-15T12:05:00Z",
+    "validAt": "2026-07-15T12:00:00Z", "validUntil": null, "producedAt": null,
+    "resolution": {"spatialMeters": null, "temporalSeconds": null}, "isDemo": false
+  },
+  "demo": {
+    "value": 25, "unit": "degC", "source": {"provider": "demo-fixture", "product": "synthetic"},
+    "kind": "calculation", "status": "available", "fetchedAt": "2026-07-15T12:05:00Z",
+    "validAt": "2026-07-15T12:00:00Z", "validUntil": null, "producedAt": null,
+    "resolution": {"spatialMeters": null, "temporalSeconds": null}, "isDemo": true
+  }
+}

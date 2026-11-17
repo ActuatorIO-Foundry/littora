@@ -89,9 +89,4 @@ export interface BeachAmenitiesResponse {
   amenities: BeachAmenity[];
 }
 
-export interface ReportPayload {
-  beachId: string;
-  type: 'jellyfish' | 'pollution' | 'current' | 'crowd' | 'flag' | 'other';
-  value?: Record<string, unknown>;
-  confidence?: number;
-}
+export type { ReportPayload } from '@littora/api-client/models';

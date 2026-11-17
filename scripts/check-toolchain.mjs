@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const root = new URL('../', import.meta.url);
 const readJson = (path) => JSON.parse(readFileSync(new URL(path, root), 'utf8'));
@@ -13,18 +13,22 @@ assert.ok(
   `Run npm run check:toolchain with npm ${npmVersion}`,
 );
 
-for (const directory of ['apps/api', 'apps/web']) {
-  const pkg = readJson(`${directory}/package.json`);
-  const lock = readJson(`${directory}/package-lock.json`);
+const lock = readJson('package-lock.json');
+assert.deepEqual(manifest.workspaces, ['apps/api', 'apps/web', 'packages/api-client']);
+for (const directory of ['', ...manifest.workspaces]) {
+  const pkg = directory ? readJson(`${directory}/package.json`) : manifest;
+  if (directory) assert.equal(existsSync(new URL(`${directory}/package-lock.json`, root)), false, 'Use the root lockfile');
   assert.equal(pkg.packageManager, manifest.packageManager);
   assert.deepEqual(pkg.engines, manifest.engines);
-  for (const section of ['dependencies', 'devDependencies']) {
-    assert.deepEqual(lock.packages[''][section], pkg[section], `${directory}: lockfile mismatch`);
-    for (const [name, version] of Object.entries(pkg[section])) {
+  for (const section of ['dependencies', 'devDependencies', 'peerDependencies']) {
+    assert.deepEqual(lock.packages[directory][section], pkg[section], `${directory}: lockfile mismatch`);
+    for (const [name, version] of Object.entries(pkg[section] ?? {})) {
       assert.match(version, /^\d+\.\d+\.\d+$/, `${directory}: pin ${name} exactly`);
-      assert.equal(lock.packages[`node_modules/${name}`]?.version, version, name);
+      const dependency = lock.packages[`${directory}/node_modules/${name}`] ?? lock.packages[`node_modules/${name}`];
+      assert.equal(dependency?.link ? lock.packages[dependency.resolved]?.version : dependency?.version, version, name);
     }
   }
+  if (!['apps/api', 'apps/web'].includes(directory)) continue;
   const dockerfiles = directory === 'apps/api' ? ['Dockerfile'] : ['Dockerfile.local', 'Dockerfile.prod'];
   for (const dockerfile of dockerfiles) {
     const content = readFileSync(new URL(`${directory}/${dockerfile}`, root), 'utf8');

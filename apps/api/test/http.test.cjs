@@ -9,6 +9,8 @@ const { IngestionService } = require('../dist/modules/ingestion/ingestion.servic
 const { BeachesController } = require('../dist/modules/beaches/beaches.controller');
 const { BeachesService } = require('../dist/modules/beaches/beaches.service');
 const { beach } = require('./fixtures.cjs');
+const { configureHttpBoundary } = require('../dist/http/http-boundary');
+const { presentBeach } = require('../dist/http/presenters');
 
 let app, url, calls = 0;
 const token = randomBytes(32).toString('hex');
@@ -23,11 +25,12 @@ before(async () => {
         calls += 1;
         return { queued: true };
       } } },
-      { provide: BeachesService, useValue: { list: async () => [beach] } },
+      { provide: BeachesService, useValue: { list: async () => [{ ...beach, waterType: 'sea' }] } },
     ],
   }).compile();
   app = module.createNestApplication({ logger: false });
   app.setGlobalPrefix('api');
+  configureHttpBoundary(app);
   await app.listen(0, '127.0.0.1');
   url = await app.getUrl();
 });
@@ -42,7 +45,7 @@ test('HTTP: public catalogue remains accessible without a token', async () => {
   delete process.env.ADMIN_API_TOKEN;
   const response = await fetch(`${url}/api/beaches`);
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), [beach]);
+  assert.deepEqual(await response.json(), [presentBeach({ ...beach, waterType: 'sea' })]);
 });
 
 test('HTTP: internal routes fail closed without a valid configured secret', async () => {
@@ -50,6 +53,7 @@ test('HTTP: internal routes fail closed without a valid configured secret', asyn
     process.env.ADMIN_API_TOKEN = secret;
     const response = await fetch(`${url}/api/ingestion/water-quality`, { method: 'POST' });
     assert.equal(response.status, 503);
+    assert.equal((await response.json()).code, 'UNAVAILABLE');
     assert.equal(calls, 0);
     assert.equal((await fetch(`${url}/api/admin/health`)).status, 503);
   }

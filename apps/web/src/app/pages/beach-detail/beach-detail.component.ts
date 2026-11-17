@@ -8,6 +8,7 @@ import {
   BeachAmenitiesResponse,
   BeachScore,
   MetricPoint,
+  ReportPayload,
 } from "../../models/beach.model";
 import { LittoraApiService } from "../../services/littora-api.service";
 import { IconComponent } from "../../shared/icon.component";
@@ -268,20 +269,22 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
   }
   signal(
     type: "jellyfish" | "pollution" | "current" | "crowd" | "flag",
-    flag?: string,
+    flag?: 'green' | 'yellow' | 'red',
   ): void {
     if (!this.beach || this.sending) return;
+    let payload: ReportPayload;
+    if (type === 'flag') {
+      if (!flag) return;
+      payload = { beachId: this.beach.id, type, value: { flag, source: 'detail-page' }, confidence: 0.7 };
+    } else {
+      payload = { beachId: this.beach.id, type, value: { source: 'detail-page' }, confidence: 0.7 };
+    }
     this.sending = true;
     this.reportMessage = "";
     this.reportError = "";
     this.subscriptions.add(
       this.api
-        .createReport({
-          beachId: this.beach.id,
-          type,
-          value: { ...(flag ? { flag } : {}), source: "detail-page" },
-          confidence: 0.7,
-        })
+        .createReport(payload)
         .pipe(timeout(12000))
         .subscribe({
           next: () => {

@@ -44,7 +44,9 @@ test('development: native watch starts the TypeScript API without the Nest CLI',
       continue;
     }
     assert.equal(response.status, 503, 'Internal operations must still fail closed');
-    assert.match(await response.text(), /Internal operations are disabled/);
+    const body = await response.json();
+    assert.equal(body.code, 'UNAVAILABLE');
+    assert.match(body.requestId, /^[a-f0-9-]{36}$/);
     return;
   }
   assert.fail(`Development server did not start: ${logs}`);

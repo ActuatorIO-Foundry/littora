@@ -92,6 +92,7 @@ export class ScoreService {
     const flag = communityFlag?.confidence >= 0.58 ? communityFlag.flag : estimatedFlag;
     return {
       flag,
+      estimatedFlag,
       source: communityFlag?.confidence >= 0.58
         ? `Consensus communautaire récent (${Math.round(communityFlag.confidence * 100)}%) croisé avec météo/mer. Le drapeau officiel reste celui affiché sur place.`
         : estimatedFlag === 'unknown' ? 'Conditions insuffisantes. Le drapeau officiel reste celui affiché sur place.'

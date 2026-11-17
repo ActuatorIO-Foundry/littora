@@ -259,6 +259,7 @@ test("detail : series reelles, indisponibilite et equipements", async ({
   ).toBeVisible();
   await expect(page.getByText("Faux parking")).toHaveCount(0);
   await expect(page.locator(".forecast-chart svg path")).toHaveCount(1);
+  await expect(page.locator(".forecast-chart svg path")).toHaveAttribute('d', /L/);
   await page.getByRole("button", { name: "Eau", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Prévisions non disponibles" }),

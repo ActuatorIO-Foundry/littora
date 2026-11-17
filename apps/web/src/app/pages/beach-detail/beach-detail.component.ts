@@ -237,7 +237,6 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     let connected = false;
     return this.points.map((p, i) => {
       if (p.value === null || !Number.isFinite(p.value)) { connected = false; return ''; }
-      if (i && Date.parse(p.time) - Date.parse(this.points[i - 1].time) > 5400_000) connected = false;
       const command = connected ? 'L' : 'M';
       connected = true;
       return `${command}${this.chartX(i)},${this.chartY(p.value)}`;

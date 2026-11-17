@@ -44,7 +44,10 @@ async function until(check, description) {
 function start(service, imageName = image) {
   const container = `${name}-${service}`;
   containers.push(container);
-  docker(['run', '-d', '--name', container, '--network', name, ...environment, imageName]);
+  // Deterministic provider outage: avoid external DNS timeouts starving database lookups.
+  docker(['run', '-d', '--name', container, '--network', name,
+    '--add-host', 'api.open-meteo.com:127.0.0.1', '--add-host', 'marine-api.open-meteo.com:127.0.0.1',
+    ...environment, imageName]);
   return container;
 }
 function request(container, path) {
@@ -94,6 +97,16 @@ try {
   const id = response.body.beaches[0].id;
   assert.equal(request(api, `/api/beaches/${id}`).body.id, id);
   assert.deepEqual(request(api, `/api/reports?beachId=${id}`).body, []);
+  const score = request(api, `/api/score/beach/${id}`);
+  assert.equal(score.status, 200, JSON.stringify(score.body));
+  assert.equal(score.body.safety.officialFlag.value, null);
+  assert.equal(score.body.safety.calculatedConditions.level, 'unknown');
+  assert.ok(Object.values(score.body.scores).every(value => value === null));
+  for (const group of ['weather', 'marine']) {
+    const values = Object.values(score.body.measurements[group]);
+    assert.ok(values.length > 0);
+    assert.ok(values.every(value => value.value === null && value.status === 'unknown'));
+  }
   assert.equal(sql("select md5(string_agg(to_jsonb(b)::text,'' order by id)) from beaches b"), before);
 
   if (process.env.PREVIOUS_API_IMAGE) {
@@ -102,7 +115,7 @@ try {
     assert.equal(request(previous, `/api/beaches/${id}`).body.id, id);
   }
   console.log(JSON.stringify({ verified: true, readonlyStartup: true, migrations: 2,
-    seedIdempotent: true, beaches: 5, sanitarySamples: 0, http: true,
+    seedIdempotent: true, beaches: 5, sanitarySamples: 0, http: true, offlineScoreContract: true,
     previousImage: Boolean(process.env.PREVIOUS_API_IMAGE) }));
 } finally {
   const failures = [];

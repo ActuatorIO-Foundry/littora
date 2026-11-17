@@ -233,6 +233,13 @@
 .forecast-chart {
   margin-top: 20px;
 }
+
+@media (max-width: 600px) {
+  .forecast-section .segmented {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
 .chart-heading {
   display: flex;
   justify-content: space-between;

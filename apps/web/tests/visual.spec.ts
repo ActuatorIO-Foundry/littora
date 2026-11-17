@@ -119,6 +119,26 @@ test.beforeEach(async ({ page }) => {
   await mockApi(page);
 });
 
+test('prévisions : courant en m/s et interruption de courbe pour une mesure absente', async ({ page }) => {
+  await page.route('**/api/score/beach/*', route => route.fulfill({ json: {
+    ...score, forecast: { current: [
+      { time: '2026-07-15T12:00:00Z', value: 1 },
+      { time: '2026-07-15T13:00:00Z', value: null },
+      { time: '2026-07-15T14:00:00Z', value: 0 },
+    ] },
+  } }));
+  await page.goto('/plages/test-sea');
+  await page.getByRole('group', { name: 'Mesure du graphique' }).getByRole('button', { name: 'Courant', exact: true }).click();
+  await expect(page.locator('.chart-heading')).toContainText('m/s');
+  await expect(page.locator('.forecast-chart circle')).toHaveCount(2);
+  await expect(page.locator('.forecast-chart path')).toHaveAttribute('d', /^M[^L]* M[^L]*$/);
+  await page.getByText('Valeurs détaillées').click();
+  await expect(page.locator('.chart-table tbody tr').nth(0)).toContainText('1 m/s');
+  await expect(page.locator('.chart-table tbody tr').nth(1)).toContainText('— m/s');
+  await expect(page.locator('.chart-table tbody tr').nth(2)).toContainText('0 m/s');
+  await noOverflow(page);
+});
+
 test('conditions : panne fournisseur sans faux score ni courbe', async ({ page }) => {
   await page.route('**/api/score/beach/*', route => route.fulfill({ json: {
     ...score, scores: { bathing: null, family: null, paddle: null, boat: null },

@@ -29,10 +29,28 @@ L'interface affiche la provenance et les etats anciens/partiels/indisponibles
 dans le detail et l'apercu. L'ancien frontend doit etre mis a jour avant publication
 de scores nullables ; il ne doit pas convertir null en zero.
 
-Les autres chantiers restent distincts : conversion exhaustive des unites et
-validation des plages physiques (#12), provenance et couverture des equipements
+Les autres chantiers sont distincts : normalisation des unites (#12, ci-dessous),
+provenance et couverture des equipements
 (#14), connecteurs officiels (#16 a #19), drapeaux (#20), ponderation et explication
 complete des scores (#21). Ce correctif ne vaut pas validation de securite nautique.
+
+## Normalisation #12
+
+- Courants en m/s, vent et rafales en km/h, temperatures en degres Celsius,
+  hauteurs en metres, periodes en secondes, directions en degres.
+- Conversion selon `hourly_units`, pas selon une unite supposee. Unite absente ou
+  inconnue, valeur non numerique/non finie ou hors bornes physiques larges : null.
+  Les bornes sont des controles de coherence, pas des seuils de danger.
+- Metadonnees `units` canoniques et `sourceUnits` conservees ; cache v2 distinct
+  des anciennes valeurs non normalisees pour eviter une double conversion.
+- Requete fournisseur en GMT/Unix, conversion ISO UTC explicite. Localisation
+  uniquement a l'affichage. `fetchedAt` est la collecte, `validAt` l'echeance ;
+  `producedAt` reste null car cette reponse ne donne pas l'heure du run du modele.
+  `generationtime_ms` est un temps de calcul de requete, pas une date de production.
+- Meme courant normalise pour l'API, la courbe et le score. Les points manquants
+  gardent leur echeance ; la courbe est interrompue, sans zero ni interpolation.
+- Tests UTC/Europe-Paris : ete, hiver, changements d'heure et passage de jour.
+  Le contrat OpenAPI exhaustif #7 reste a produire, sans nouvelle API parallele.
 
 ## Recette
 

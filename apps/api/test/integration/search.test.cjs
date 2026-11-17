@@ -60,6 +60,7 @@ test('search: complete PostGIS scope, amenities, fresh conditions, stable Redis 
   assert.equal((await service.search({communeCode:'83009'})).total,602,'Bounding rectangle must not replace the actual commune');
   assert.equal((await service.search({lat:43,lon:6,radiusKm:1})).total,602);
   assert.equal((await service.search({bbox:'48,2,49,3'})).total,0);
+  assert.equal((await service.search({bbox:'-90,-180,90,180'})).total,603,'Global bounds must not collapse into a spherical polygon');
   assert.equal((await service.search({q:"' OR true --"})).total,0,'Search text is a literal SQL parameter');
   assert.equal((await service.search({flag:'green'})).total,0,'A calculated score cannot invent a flag');
   for(let n=1;n<=4;n++) {

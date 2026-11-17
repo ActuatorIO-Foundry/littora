@@ -119,8 +119,11 @@ export class BeachesService {
     const bounds = input.bbox?.split(',').map(Number) ?? commune?.bbox;
     if (bounds) {
       const [south, west, north, east] = bounds.map(bind);
-      where.push(`(geom && ST_MakeEnvelope(${west},${south},${east},${north},4326)::geography or geom is null)`,
-        `lat between ${south} and ${north}`, `lon between ${west} and ${east}`);
+      // Global/polar rectangles are ambiguous as spherical polygons; their numeric bounds remain exact.
+      if (bounds[3] - bounds[1] < 180 && bounds[0] > -90 && bounds[2] < 90) {
+        where.push(`(geom && ST_MakeEnvelope(${west},${south},${east},${north},4326)::geography or geom is null)`);
+      }
+      where.push(`lat between ${south} and ${north}`, `lon between ${west} and ${east}`);
     }
     if (commune?.contour) where.push(`ST_Covers(ST_SetSRID(ST_GeomFromGeoJSON(${bind(JSON.stringify(commune.contour))}),4326),ST_SetSRID(ST_MakePoint(lon,lat),4326))`);
     const center = input.lat !== undefined ? {lat:input.lat,lon:input.lon!} : commune?.center ??

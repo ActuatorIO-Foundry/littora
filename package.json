@@ -21,7 +21,8 @@
   "devDependencies": { "ng-openapi-gen": "1.1.0" },
   "scripts": {
     "check:toolchain": "node scripts/check-toolchain.mjs",
-    "audit": "npm audit --audit-level=low",
+    "audit": "node scripts/check-npm-audit.mjs",
+    "audit:strict": "npm audit --audit-level=low",
     "install:ci": "npm ci",
     "generate:api": "ng-openapi-gen --config contracts/ng-openapi-gen.json",
     "check:contracts": "npm run generate:api && node scripts/check-contracts.mjs",

@@ -2,7 +2,7 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from "@angular/core";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { Subscription, timeout } from "rxjs";
-import type { Alerts } from "@littora/api-client/models";
+import type { Alerts, ArsMeasurement } from "@littora/api-client/models";
 import {
   Beach,
   BeachAmenity,
@@ -60,6 +60,11 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
   amenitiesUnavailable = false;
   selectedUsage: UsageKey = "bathing";
   selectedChart = "air";
+  sanitaryReading(m?: ArsMeasurement): string {
+    if (m?.value == null || m.qualifier === 'missing') return 'non renseigné';
+    const value = m.value.toLocaleString('fr-FR') + ' / 100 ml';
+    return m.qualifier === 'detection-limit' ? 'limite de détection : ' + value : value;
+  }
   readonly metricValue = metricValue;
   readonly metricClass = metricClass;
   readonly providerLabel = providerLabel;

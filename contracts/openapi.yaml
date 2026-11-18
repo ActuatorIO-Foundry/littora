@@ -633,6 +633,48 @@ components:
         provider: {type: string}
         status: {type: string}
         classification: {type: string, nullable: true}
+        restriction:
+          type: object
+          required: [status, decisions]
+          properties:
+            status: {type: string, enum: [closed, unknown]}
+            decisions:
+              type: array
+              items:
+                type: object
+                required: [reference, authority, closedOn, closureUrl, liftedOn, liftUrl, active]
+                properties:
+                  reference: {type: string}
+                  authority: {type: string}
+                  closedOn: {type: string, format: date}
+                  closureUrl: {type: string, format: uri}
+                  liftedOn: {type: string, format: date, nullable: true}
+                  liftUrl: {type: string, format: uri, nullable: true}
+                  active: {type: boolean}
+        archive:
+          type: object
+          nullable: true
+          required: [siteCode, siteName, season, samplesUrl, eventsUrl, classificationUrl, classificationCode, samples, historicalClosures, historicalPollutions]
+          properties:
+            siteCode: {type: string}
+            siteName: {type: string}
+            season: {type: integer}
+            samplesUrl: {type: string, format: uri}
+            eventsUrl: {type: string, format: uri}
+            classificationUrl: {type: string, format: uri}
+            classificationCode: {type: string, nullable: true}
+            samples:
+              type: array
+              items:
+                type: object
+                required: [date, enterococci, ecoli, sampleStatus]
+                properties:
+                  date: {type: string, format: date}
+                  enterococci: {$ref: '#/components/schemas/ArsMeasurement'}
+                  ecoli: {$ref: '#/components/schemas/ArsMeasurement'}
+                  sampleStatus: {type: string, nullable: true}
+            historicalClosures: {type: array, items: {$ref: '#/components/schemas/ArsPeriod'}}
+            historicalPollutions: {type: array, items: {$ref: '#/components/schemas/ArsPeriod'}}
         sample_date: {type: string, nullable: true, description: Date of the last dated sample; never a clearance to swim.}
         lastSample:
           type: object
@@ -645,6 +687,19 @@ components:
         reliability: {type: string}
         warning: {type: string}
         isDemo: {type: boolean, enum: [false]}
+    ArsPeriod:
+      type: object
+      required: [from, to, kind]
+      properties:
+        from: {type: string, format: date}
+        to: {type: string, format: date, nullable: true}
+        kind: {type: string}
+    ArsMeasurement:
+      type: object
+      required: [value, qualifier]
+      properties:
+        value: {type: number, minimum: 0, nullable: true}
+        qualifier: {type: string, enum: [confirmed, detection-limit, missing]}
     Alerts:
       type: object
       required: [provider, product, alerts, warning, status, reason, bulletinUrl, issuedAt, fetchedAt, validFrom, validUntil, checkBy]

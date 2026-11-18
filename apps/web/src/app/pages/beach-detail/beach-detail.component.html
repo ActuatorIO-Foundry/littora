@@ -476,7 +476,23 @@
         </div>
         <div>
           <dt>Qualité de l’eau</dt>
-          <dd>{{ providerLabel(score?.providers?.["waterQuality"]) }}</dd>
+          <dd *ngIf="score?.current?.waterQuality as water; else noSanitary">
+            <ng-container *ngIf="water.archive as archive">
+              <a [href]="archive.samplesUrl" target="_blank" rel="noopener noreferrer">Analyses ARS · {{ archive.season }}</a>
+              · {{ archive.siteName }} · {{ archive.samples.length }} prélèvements enregistrés.
+              <ng-container *ngIf="archive.samples[0] as sample">
+                Dernier prélèvement le {{ sample.date | date:'dd/MM/yyyy':'UTC' }} :
+                E. coli ({{ sanitaryReading(sample.ecoli) }}) ; entérocoques ({{ sanitaryReading(sample.enterococci) }}).
+              </ng-container>
+              <a *ngIf="archive.historicalClosures.length" [href]="archive.eventsUrl" target="_blank" rel="noopener noreferrer">
+                Interdictions archivées : {{ archive.historicalClosures.length }}.</a>
+            </ng-container>
+            <span>{{ water.restriction?.status === 'closed' ? 'Baignade interdite par décision officielle.' : 'Autorisation actuelle non confirmée.' }}</span>
+            <ng-container *ngFor="let decision of water.restriction?.decisions">
+              <a *ngIf="decision.active" [href]="decision.closureUrl" target="_blank" rel="noopener noreferrer">{{ decision.authority }} · {{ decision.closedOn | date:'dd/MM/yyyy':'UTC' }}</a>
+            </ng-container>
+          </dd>
+          <ng-template #noSanitary><dd>Données sanitaires indisponibles</dd></ng-template>
         </div>
         <div>
           <dt>Communauté</dt>

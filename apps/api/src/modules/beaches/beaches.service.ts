@@ -100,6 +100,11 @@ export class BeachesService {
     return rows.map((row: BeachRow) => this.enrichBeach({ ...row, distanceKm: null }));
   }
 
+  async closedForBathing(): Promise<Set<string>> {
+    const {rows} = await this.db.query('select distinct beach_id from active_bathing_restrictions order by beach_id');
+    return new Set(rows.map((r:{beach_id:string})=>r.beach_id));
+  }
+
   async searchCandidates(input: SearchInput, commune: Commune | null) {
     const params: unknown[] = [];
     const bind = (value: unknown) => { params.push(value); return `$${params.length}`; };

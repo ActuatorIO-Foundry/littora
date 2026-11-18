@@ -122,6 +122,25 @@ test.beforeEach(async ({ page }) => {
   await mockApi(page);
 });
 
+test('ARS : archive saisonnière et interdiction officielle distinctes', async ({page})=>{
+  let closed=false;
+  await page.route('**/api/score/beach/*',route=>route.fulfill({json:{...score,current:{...score.current,waterQuality:{
+    archive:{siteName:'Capélan',season:2025,samplesUrl:'https://www.data.gouv.fr/',eventsUrl:'https://www.data.gouv.fr/',
+      samples:[{date:'2025-07-10',ecoli:{value:15,qualifier:'detection-limit'},enterococci:{value:null,qualifier:'missing'}}],
+      historicalClosures:[{from:'2025-06-24',to:'2025-06-26'}]},
+    restriction:{status:closed?'closed':'unknown',decisions:closed?[{authority:'Ville de Bandol',active:true,closedOn:'2026-07-20',closureUrl:'https://www.bandol.fr/acte'}]:[]}
+  }}}}));
+  await page.goto('/plages/test-sea');
+  const sources=page.locator('#sources');
+  await expect(sources).toContainText('Interdictions archivées : 1');
+  await expect(sources).toContainText('limite de détection : 15 / 100 ml');
+  await expect(sources).toContainText('entérocoques (non renseigné)');
+  await expect(sources).toContainText('Autorisation actuelle non confirmée');
+  closed=true;await page.reload();
+  await expect(sources).toContainText('Baignade interdite par décision officielle');
+  await expect(sources.getByRole('link',{name:/Ville de Bandol/})).toHaveAttribute('href','https://www.bandol.fr/acte');
+});
+
 test('SHOM : références du port distinctes des horaires et retrait à échéance', async ({page})=>{
   await page.clock.install({time:new Date('2026-11-18T22:59:45Z')});
   await page.route('**/api/score/beach/*', route=>route.fulfill({json:{...score,current:{...score.current,tides:{

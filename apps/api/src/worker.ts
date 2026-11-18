@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { collectShom } from './jobs/shom-collector';
 import { collectVigilance } from './jobs/vigilance-collector';
 import { CacheService } from './cache/cache.service';
 import { Queue, Worker } from 'bullmq';
@@ -24,10 +25,11 @@ async function start() {
   const connection = { url, maxRetriesPerRequest: null };
   const queue = new Queue('littora-weather', { connection });
   await queue.setGlobalConcurrency(1);
-  for (const [name,every] of [['collect',15000],['project',60000],['vigilance',300000]] as const)
+  for (const [name,every] of [['collect',15000],['project',60000],['vigilance',300000],['shom',60000]] as const)
     await queue.upsertJobScheduler(name, { every }, { name, opts: { attempts: 1, removeOnComplete: 100, removeOnFail: 200 } });
   const worker = new Worker(queue.name, async job => {
     try {
+      if (job.name === 'shom') return await collectShom(app.get(CacheService));
       if (job.name === 'vigilance') return await collectVigilance(app.get(CacheService));
       if (job.name === 'collect') return await collectOne(db);
       if (job.name === 'project') return await projectDue(db,scores);

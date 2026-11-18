@@ -122,6 +122,25 @@ test.beforeEach(async ({ page }) => {
   await mockApi(page);
 });
 
+test('SHOM : références du port distinctes des horaires et retrait à échéance', async ({page})=>{
+  await page.clock.install({time:new Date('2026-11-18T22:59:45Z')});
+  await page.route('**/api/score/beach/*', route=>route.fulfill({json:{...score,current:{...score.current,tides:{
+    portReference:{name:'Calais',distanceKm:1,timetableUrl:'https://maree.shom.fr/harbor/CALAIS/'},
+    heightReference:{lowestAstronomical:0.19,highestAstronomical:7.9,expiresAt:'2026-11-18T23:00:00Z'},
+    currentReference:{vmaxClass:0,expiresAt:'2026-11-18T23:00:05Z'},
+  }}}}));
+  await page.goto('/plages/test-sea');
+  const sources=page.locator('#sources');
+  const link=sources.getByRole('link',{name:'Horaires Shom · Calais'});
+  await expect(link).toHaveAttribute('href','https://maree.shom.fr/harbor/CALAIS/');
+  await expect(sources).toContainText('0.19 à 7.9 m');
+  await expect(sources).toContainText('VMAX 0 nd');
+  await page.clock.fastForward(21000);
+  await expect(sources).not.toContainText('Extrêmes astronomiques');
+  await expect(sources).not.toContainText('VMAX');
+  await expect(link).toBeVisible();
+});
+
 test('vigilance officielle : source et échéance indépendantes du score', async ({page}) => {
   await page.clock.install({time:new Date('2026-11-18T19:00:00Z')});
   let valid=true;

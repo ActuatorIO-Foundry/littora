@@ -21,7 +21,7 @@ export interface BeachScore {
   current?: {
     weather?: Record<string, unknown>;
     marine?: Record<string, unknown>;
-    tides?: Record<string, unknown>;
+    tides?: import('@littora/api-client/models').Tides;
     waterQuality?: Record<string, unknown>;
   };
   scores: {

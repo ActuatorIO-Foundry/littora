@@ -56,7 +56,7 @@ complete des scores (#21). Ce correctif ne vaut pas validation de securite nauti
 
 - Panne totale, reponse partielle, reponse malformee, cache ancien et expiration.
 - Source effective conservee avec une configuration Meteo-France non connectee.
-- SHOM sans adaptateur : aucun evenement de maree, avec ou sans cle configuree.
+- [SHOM](SHOM.md) : references RAM/VMAX au port ; aucun evenement de maree simule ou importe.
 - PostgreSQL jetable : demonstration ignoree, echantillon reel anterieur retrouve,
   aucun bonus artificiel, aucune ligne supprimee.
 - Interface responsive : aucun score /100 ni courbe inventee en cas de panne ;

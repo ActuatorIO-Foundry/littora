@@ -42,7 +42,7 @@ const modules = [
       { id: 'node/1', name: 'Parking', category: 'parking', lat: 43, lon: 6, distanceKm: 0.2, source: 'openstreetmap' },
       { id: 'hint', name: 'To verify', category: 'toilets', lat: 43, lon: 6, distanceKm: 0.2, source: 'local-hint', verification: 'to_verify' },
     ] }),
-    discoverFromOpenStreetMap: async () => ({ provider: 'openstreetmap', imported: 0, beaches: [row] }) }],
+    discover: async () => ({ provider: 'local-catalogue', imported: 0, beaches: [row], nextCursor:null, coverage:'partial' }) }],
   ['places', 'Places', { search: async () => [commune], catalogue: async () => ({ commune, beaches: [row], source: 'local-catalogue', collectedAt: null, coverage: 'partial', capped: false }) }],
   ['weather', 'Weather', { get: async () => forecast }], ['marine', 'Marine', { get: async () => forecast }],
   ['tides', 'Tides', { get: async () => tides }], ['water-quality', 'WaterQuality', { get: async () => water }],

@@ -60,8 +60,10 @@ test('territory: real borders, preserved history, pagination, direct access and 
   assert.deepEqual(await reports.list(foreign.id),[]);assert.deepEqual(await reports.aggregate(foreign.id),[]);
   assert.equal(await reports.flagConsensus(foreign.id),null);
   assert.equal((await new WaterQualityService(pool).get(foreign.id)).status,'unknown');
-  assert.equal(await service.upsertDiscoveredBeach({...foreign,osmId:'way/new-foreign'},'France','Mediterranee'),null);
-  assert.equal(await service.upsertDiscoveredBeach({...positions[0],osmId:foreign.osmId},'France','Mediterranee'),null,'Existing hidden OSM identity is never overwritten');
+  const {applyZone}=require('../../scripts/catalogue-zone-apply.cjs');
+  const importDecisions=await applyZone(pool,{nom:'Test',departement:{nom:'Test'},region:{nom:'Test'},contour:continent},
+    [{...foreign,id:'way/9999999'},{...positions[0],id:foreign.osmId}],true);
+  assert.deepEqual(new Set(importDecisions.map(d=>d.outcome)),new Set(['outside_france','review_identity']));
   const originalKey=process.env.REPORT_IP_HASH_KEY;process.env.REPORT_IP_HASH_KEY='territory-isolated-test-key-123456789';
   try{
     const contributions=new ContributionsService(pool);const session=await contributions.session('127.0.0.10');

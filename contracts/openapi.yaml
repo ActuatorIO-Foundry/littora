@@ -54,9 +54,10 @@ paths:
     get:
       operationId: discoverBeaches
       tags: [Littora]
-      description: Legacy synchronous OSM discovery. May persist catalogue entries; coverage is partial. Replaced by jobs in a later release.
+      description: Read-only compatibility endpoint. Local, non-exhaustive catalogue; follow nextCursor with after. Region/coastline are legacy display hints only.
       parameters:
         - {name: bbox, in: query, required: true, schema: {$ref: '#/components/schemas/Bounds'}}
+        - {name: after, in: query, schema: {type: string, format: uuid}}
         - {name: region, in: query, schema: {type: string, minLength: 1, maxLength: 100}}
         - {name: coastline, in: query, schema: {type: string, minLength: 1, maxLength: 100}}
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500}}
@@ -92,7 +93,7 @@ paths:
     get:
       operationId: getCommuneCatalogue
       tags: [Littora]
-      description: Commune boundary and partial catalogue. May collect and persist OSM entries.
+      description: Commune boundary and local catalogue, read-only. Coverage is partial.
       parameters:
         - {name: code, in: path, required: true, schema: {type: string, pattern: '^(?:[0-9]{2}|2[AB])[0-9]{3}$'}}
       responses:
@@ -470,8 +471,10 @@ components:
         nextCursor: {type: string, format: uuid, nullable: true, deprecated: true}
     Discovery:
       type: object
-      required: [provider, imported, beaches]
+      required: [provider, imported, beaches, nextCursor, coverage]
       properties:
+        nextCursor: {type: string, format: uuid, nullable: true}
+        coverage: {type: string, enum: [partial]}
         provider: {type: string}
         imported: {type: integer, minimum: 0}
         warning: {type: string}

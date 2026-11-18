@@ -77,12 +77,10 @@ La commande `review` est reservee a l'exploitation disposant des acces PostgreSQ
 aucune route publique de correction n'est ajoutee. Conserver le rapport applique
 avec la sauvegarde. Les acces et l'historique de moderation restent suivis separement.
 
-Les anciennes routes de decouverte restent en lecture seule par defaut.
-`CATALOGUE_DISCOVERY_ENABLED=true` est une activation explicite des anciens imports,
-qui restent partiels et ne doivent pas etre actives pour cette livraison. Le controle
-des objets OSM refuse les commerces, parkings, acces et resorts sans plage naturelle.
-Les imports par lots, la deduplication spatiale complete et la couverture exhaustive
-restent des travaux distincts ; le catalogue n'est pas presente comme exhaustif.
+Les routes publiques sont en lecture seule, y compris avec un ancien fichier
+de configuration. La [collecte privee par commune](../CARTOGRAPHIE.md#collecte-privee-par-commune)
+distingue simulation, exclusions, conflits a revoir et insertion explicite.
+Le catalogue n'est pas presente comme exhaustif.
 
 ## Verification et retour arriere
 

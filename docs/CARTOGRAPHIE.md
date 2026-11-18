@@ -34,28 +34,30 @@ departement. La carte affiche le vrai polygone et ajuste sa vue. Le code INSEE
 est conserve dans l'URL (`/recherche?commune=83009`).
 
 - `GET /api/places/communes?q=Bandol` : suggestions, cache 24 heures.
-- `GET /api/places/communes/83009/beaches` : contour (cache 7 jours), catalogue
-  local et enrichissement ponctuel OpenStreetMap (cache 24 heures).
-- `ST_Covers` selectionne les points dans le polygone reel, pas seulement dans
-  son rectangle englobant. Les points sur la limite sont inclus.
-- Les sites nouveaux conservent leur identifiant OSM. Les equipements non
-  renseignes sont `null`, sans modifier ceux des fiches existantes.
+- `GET /api/places/communes/83009/beaches` : contour officiel (cache 7 jours) et toutes les fiches locales retenues par `ST_Covers`, limites incluses. La couverture est partielle : une absence ne signifie pas que la commune ne compte aucune plage.
+- `GET /api/beaches/discover?bbox=...` : compatibilite en lecture seule. Suivre `nextCursor` dans le parametre `after` jusqu'a `null`. Aucun filtre ni affichage public ne lance un import.
+- La [classification des milieux](architecture/CLASSIFICATION-EAU.md) est independante de cette collecte. Une plage dans OSM n'est pas une autorisation de baignade.
 
-La recherche OSM est bornee a une commune et 40 resultats. Elle n'est ni un
-recensement exhaustif ni un service d'autocompletion. La reponse expose
-`coverage: partial`, `capped`, `source` et `collectedAt`. Une panne de collecte
-conserve les resultats locaux avec avertissement. L'absence de contour valide
-empeche la selection communale au lieu d'inventer une emprise.
+## Collecte privee par commune
 
-Nominatim utilise `NOMINATIM_API_URL` et une file commune a tous ses appels dans
-le processus API : requetes serialisees, intervalle minimum 1,1 seconde,
-4 requetes en attente maximum, delai reseau 10 secondes. Respecter sa
-[politique d'utilisation](https://operations.osmfoundation.org/policies/nominatim/).
-Avant de multiplier les instances ou d'importer toute la France, utiliser un
-fournisseur adapte ou un import OSM dedie avec les jobs centralises (#13/#15).
-Ce connecteur ponctuel ne remplace pas ce chantier de catalogue.
+Depuis la racine, avec les dependances installees et l'API compilee (`npm run build:api`), Node 24. Un repertoire par campagne, un fichier local par code INSEE ; ne pas le partager ni le versionner. Exemple pour Bandol :
 
-La classification historique mer/lac/riviere reste a remplacer par les donnees
-source (#13). Les sections separees et les indicateurs propres a l'eau douce
-sont suivis dans #35. Aucun classement sanitaire ne decoule de la presence
-d'un lieu dans OpenStreetMap.
+```sh
+node apps/api/scripts/catalogue-zone.cjs collect .local/zones/campagne-1 83009
+node apps/api/scripts/catalogue-zone.cjs status .local/zones/campagne-1 83009
+node apps/api/scripts/catalogue-zone.cjs review .local/zones/campagne-1 83009
+```
+
+`collect` fige le contour et la date OSM, interroge les mailles successivement et s'arrete a la premiere erreur. Relancer la meme commande reprend les mailles inachevees. Une reponse sans decompte final valide, trop volumineuse ou en erreur ne valide jamais une maille. `status` donne la date, le nombre de mailles validees/attendues, les erreurs, candidats et exclusions. `complete: true` signifie uniquement que toutes les mailles OSM de cet instantane ont ete validees, pas que toutes les plages reelles sont recensees ni que des fiches ont ete publiees. Pour une autre date, utiliser un nouveau repertoire.
+
+Source : (c) contributeurs OpenStreetMap, [ODbL](https://www.openstreetmap.org/copyright). Les objets nommes `natural=beach` sont representes par un point (centre d'emprise pour les chemins et relations), pas le contour de la plage. Un centre peut se trouver hors du rivage : il n'est pas deplace pour forcer un rapprochement. Exclure les acces restreints, equipements seuls et objets mal localises. Respecter les [limites du service public](https://dev.overpass-api.de/overpass-doc/en/preface/commons.html) ; pour la production, provisionner un service historique dedie via `OVERPASS_API_URL`. Aucune collecte automatique nationale.
+
+Pour une zone complete, configurer `DATABASE_URL` vers une **copie restauree et migree** et examiner la simulation :
+
+```sh
+node apps/api/scripts/catalogue-zone.cjs preview .local/zones/campagne-1 83009
+```
+
+`preview` ne modifie ni la base ni le journal. Les limites de la commune et du territoire sont verifiees dans PostGIS. Une identite OSM connue est conservee ; un changement de position de plus de 5 m ou de nom passe en revue. Deux identites a moins de 25 m (250 m si meme nom) restent en revue, sans fusion automatique. Les objets exclus et les conflits ne sont pas publies. Aucune mise a jour ni suppression d'une fiche existante.
+
+Seulement apres verification de la cible, sauvegarde et decision explicite d'enrichir le catalogue, remplacer `preview` par `apply`. Les decisions sont recalculees dans une transaction ; `status` et `review` exposent ensuite les resultats et identifiants a revoir. Apres une interruption entre la validation PostgreSQL et la sauvegarde locale du bilan, relancer `apply` : les insertions deja validees seront reconnues comme existantes.

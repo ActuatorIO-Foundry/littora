@@ -76,10 +76,6 @@ export class LittoraApiService {
         );
     }
 
-    discoverBeaches(zone: { bbox: string; name: string; coastline: string }): Observable<{ provider: string; imported: number; warning?: string; beaches: Beach[] }> {
-        return this.client.discoverBeaches({ bbox: zone.bbox, region: zone.name, coastline: zone.coastline, limit: 140 })
-            .pipe(map(result => ({ ...result, beaches: result.beaches.map(beachView) })));
-    }
 
     getBeach(beachId: string): Observable<Beach> {
         return this.client.getBeach({ id: beachId }).pipe(map(beachView));

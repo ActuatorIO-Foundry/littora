@@ -57,26 +57,14 @@ test('communes: official lookup, metropolitan coverage, cache and validation', a
   await assert.rejects(service.get('../secret'), e => e.getStatus() === 400);
 });
 
-test('communes: catalogue imports only named beaches within the actual boundary', async t => {
-  const rows = [osm, { ...osm, osm_id: 2, name: 'Casino' },
-    { ...osm, osm_id: 3, name: 'Outside polygon' },
-    { ...osm, osm_id: 4, category: 'amenity', type: 'parking' },
-    { ...osm, osm_id: 5, lat: '45' }, { ...osm, osm_id: 6, name: '' }];
-  const { service, requests, imports } = fixture(t, url => url.hostname === 'geo.api.gouv.fr' ? commune : rows);
-  const result = await service.catalogue('83009');
-  assert.equal(result.source, 'openstreetmap-nominatim');
-  assert.equal(result.coverage, 'partial');
-  assert.equal(result.capped, false);
-  assert.equal(imports.length, 2);
-  assert.equal(imports[0][0].city, 'Bandol');
-  assert.equal(imports[0][3], 'Var');
-  assert.deepEqual(result.beaches, [{ id: 'local' }]);
-  assert.deepEqual(result.commune.contour, contour);
-  const request = requests.find(url => url.hostname === 'nominatim.example');
-  assert.equal(request.searchParams.get('bounded'), '1');
-  assert.equal(request.searchParams.get('viewbox'), '5.72,43.17,5.78,43.12');
-  await service.catalogue('83009');
-  assert.equal(requests.length, 2, 'Both provider responses are cached');
+test('communes: obsolete discovery flag cannot modify the catalogue or enumerate external POIs',async t=>{
+  const {service,requests,imports}=fixture(t,()=>commune,true);
+  const result=await service.catalogue('83009');
+  assert.equal(result.source,'local-catalogue');
+  assert.equal(result.capped,false);
+  assert.equal(imports.length,0);
+  assert.deepEqual(result.commune.contour,contour);
+  assert.deepEqual(requests.map(r=>r.hostname),['geo.api.gouv.fr']);
 });
 
 test('communes: provider failure retains local results with explicit partial coverage', async t => {
@@ -105,9 +93,9 @@ test('communes: public Nominatim is never used to enumerate beaches even when di
   assert.ok(requests.every(r=>r.hostname==='geo.api.gouv.fr'));
 });
 
-test('communes: concurrent requests share a bounded provider lookup', async t => {
+test('communes: concurrent public reads never trigger an import', async t => {
   const { service, requests } = fixture(t, url => url.hostname === 'geo.api.gouv.fr' ? commune : [osm]);
   const results = await Promise.all([service.catalogue('83009'), service.catalogue('83009')]);
   assert.equal(results.length, 2);
-  assert.equal(requests.filter(url => url.hostname === 'nominatim.example').length, 1);
+  assert.equal(requests.filter(url => url.hostname === 'nominatim.example').length, 0);
 });

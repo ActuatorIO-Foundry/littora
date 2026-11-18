@@ -21,15 +21,8 @@ test('territory: snapshot identity, geometry and metropolitan components are val
   assert.ok(!/\b(?:DELETE FROM|UPDATE public\.beaches|DROP TABLE)\b/i.test(sql));
 });
 
-test('territory: opt-in imports reject foreign or invalid positions before any write', async () => {
-  let queries=0;
-  const service=new BeachesService({query:async(sql,values)=>{
-    queries++;
-    assert.equal(sql,'select catalogue_in_metropolitan_france($1,$2) as included');
-    assert.deepEqual(values,[50.8165,-0.123]);
-    return {rows:[{included:false}]};
-  }},{});
-  assert.equal(await service.upsertDiscoveredBeach({osmId:'way/1',name:'Beach',lat:50.8165,lon:-0.123},'France','Manche'),null);
-  for(const lat of [NaN,Infinity,91]) assert.equal(await service.upsertDiscoveredBeach({osmId:'way/1',name:'Beach',lat,lon:0},'France','Manche'),null);
-  assert.equal(queries,1);
+test('territory: invalid candidate coordinates are rejected before staging',()=>{
+  const {qualify}=require('../scripts/catalogue-zone.cjs');
+  for(const [lat,lon] of [[NaN,0],[Infinity,0],[91,0],[0,181]])assert.equal(qualify({
+    type:'node',id:1,tags:{name:'Beach',natural:'beach'},lat,lon}).reason,'invalid_point');
 });

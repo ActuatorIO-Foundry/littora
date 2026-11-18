@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { CacheService } from '../../cache/cache.service';
 import { BeachesService } from '../beaches/beaches.service';
-import { fetchNominatimJson } from '../../shared/http';
 
 type Outline = { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown[] };
 export type Commune = {
@@ -12,14 +11,11 @@ export type Commune = {
   bbox: [number, number, number, number];
   contour?: Outline;
 };
-type Feature = { osmId: string; name: string; city: string; lat: number; lon: number };
-type Collection = { features: Feature[]; collectedAt: string; capped: boolean };
 const object = (value: unknown): Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 
 @Injectable()
 export class PlacesService {
-  private readonly pending = new Map<string, Promise<Collection>>();
   constructor(private readonly cache: CacheService, private readonly beaches: BeachesService) {}
 
   async search(query: string): Promise<Commune[]> {
@@ -64,66 +60,9 @@ export class PlacesService {
 
   async catalogue(code: string) {
     const commune = await this.get(code);
-    let collection: Collection | null = null;
-    let warning: string | undefined;
-    if (process.env.CATALOGUE_DISCOVERY_ENABLED === 'true') {
-      try {
-        collection = await this.collect(commune);
-      } catch {
-        warning = 'Source OSM indisponible. Catalogue local uniquement, couverture partielle.';
-      }
-    }
-    if (collection) {
-      const inside = await this.beaches.featuresInGeometry(collection.features, commune.contour);
-      for (const feature of inside) {
-        await this.beaches.upsertDiscoveredBeach(feature, commune.region.name, 'Type a preciser', commune.department.name);
-      }
-    }
-    return {
-      commune,
-      beaches: await this.beaches.inGeometry(commune.contour),
-      source: collection ? 'openstreetmap-nominatim' : 'local-catalogue',
-      collectedAt: collection?.collectedAt ?? null,
-      coverage: 'partial' as const,
-      capped: collection?.capped ?? false,
-      warning,
-    };
-  }
-
-  private async collect(commune: Commune): Promise<Collection> {
-    const key = `osm:commune:v1:${commune.code}`;
-    const cached = await this.cache.getJson<Collection>(key);
-    if (cached) return cached;
-    const running = this.pending.get(key);
-    if (running) return running;
-    if (this.pending.size >= 4) throw new ServiceUnavailableException('Discovery busy');
-    const request = this.requestBeaches(commune);
-    this.pending.set(key, request);
-    try {
-      const result = await request;
-      await this.cache.setJson(key, result, 86400);
-      return result;
-    } finally { this.pending.delete(key); }
-  }
-
-  private async requestBeaches(commune: Commune): Promise<Collection> {
-    const [south, west, north, east] = commune.bbox;
-    const url = new URL(process.env.NOMINATIM_API_URL || 'https://nominatim.openstreetmap.org/search');
-    url.search = new URLSearchParams({ q: 'plage', format: 'jsonv2', bounded: '1',
-      viewbox: `${west},${north},${east},${south}`, limit: '40', addressdetails: '1' }).toString();
-    const raw = await fetchNominatimJson(url);
-    if (!Array.isArray(raw)) throw new ServiceUnavailableException('Invalid OSM response');
-    const features: Feature[] = [];
-    for (const value of raw) {
-      const row = object(value);
-      const lat = Number(row.lat), lon = Number(row.lon);
-      if ((row.category ?? row.class) !== 'natural' || row.type !== 'beach' ||
-          typeof row.name !== 'string' || !row.name.trim() || !['node', 'way', 'relation'].includes(String(row.osm_type)) ||
-          !/^\d+$/.test(String(row.osm_id)) || row.lat == null || row.lon == null ||
-          !Number.isFinite(lat) || !Number.isFinite(lon) || lat < south || lat > north || lon < west || lon > east) continue;
-      features.push({ osmId: `${row.osm_type}/${row.osm_id}`, name: row.name, city: commune.name, lat, lon });
-    }
-    return { features, collectedAt: new Date().toISOString(), capped: raw.length >= 40 };
+    return {commune,beaches:await this.beaches.inGeometry(commune.contour),source:'local-catalogue',
+      collectedAt:null,coverage:'partial' as const,capped:false,
+      warning:'Catalogue local uniquement, couverture partielle.'};
   }
 
   private normalize(value: unknown): Commune | null {

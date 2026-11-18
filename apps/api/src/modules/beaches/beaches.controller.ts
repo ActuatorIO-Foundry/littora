@@ -12,11 +12,10 @@ export class BeachesController {
   @Get('discover')
   discover(
     @Query('bbox') bbox: string,
-    @Query('region') region = 'France littorale',
-    @Query('coastline') coastline = 'Littoral',
+    @Query('after') after?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.s.discoverFromOpenStreetMap(bbox, region, coastline, limit ? +limit : 140);
+    return this.s.discover(bbox, limit ? +limit : 140, after);
   }
 
   @Get('catalogue')

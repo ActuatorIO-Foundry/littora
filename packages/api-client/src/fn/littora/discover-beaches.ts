@@ -12,6 +12,7 @@ import { Discovery } from '../../models/discovery';
 
 export interface DiscoverBeaches$Params {
   bbox: Bounds;
+  after?: string;
   region?: string;
   coastline?: string;
   limit?: number;
@@ -21,6 +22,7 @@ export function discoverBeaches(http: HttpClient, rootUrl: string, params: Disco
   const rb = new RequestBuilder(rootUrl, discoverBeaches.PATH, 'get');
   if (params) {
     rb.query('bbox', params.bbox, {});
+    rb.query('after', params.after, {});
     rb.query('region', params.region, {});
     rb.query('coastline', params.coastline, {});
     rb.query('limit', params.limit, {});

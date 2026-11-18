@@ -46,7 +46,7 @@ const modules = [
   ['places', 'Places', { search: async () => [commune], catalogue: async () => ({ commune, beaches: [row], source: 'local-catalogue', collectedAt: null, coverage: 'partial', capped: false }) }],
   ['weather', 'Weather', { get: async () => forecast }], ['marine', 'Marine', { get: async () => forecast }],
   ['tides', 'Tides', { get: async () => tides }], ['water-quality', 'WaterQuality', { get: async () => water }],
-  ['alerts', 'Alerts', { get: async () => ({ provider: 'meteofrance-ready', alerts: [], warning: 'Not connected' }) }],
+  ['alerts', 'Alerts', { get: async () => require('../dist/modules/alerts/vigilance').currentVigilance(null) }],
   ['score', 'Score', { scoreBeach: async () => score }],
   ['reports', 'Reports', { create: async body => { calls++; receivedReport = body; return { ...report, confidence: body.confidence ?? 0.5 }; }, list: async () => [report] }],
   ['recommendations', 'Recommendations', { best: async () => [{ ...row, scores: score.scores, selectedScore: null, flag: 'unknown', airTemp: NaN, waterTemp: NaN, dataStatus: score.dataStatus }] }],

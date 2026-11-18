@@ -427,7 +427,7 @@ export class LittoraService extends BaseService {
   static readonly GetAlertsPath = '/alerts';
 
   /**
-   * Official alert adapter is not connected. An empty array is not a declaration of safety.
+   * Current official coastal waves/submersion vigilance only. Select one department or public beach. No matching coastal domain or verified interval means unknown, never a bathing flag.
    *
    * This method provides access to the full `HttpResponse`, allowing access to response headers.
    * To access only the response body, use `getAlerts()` instead.
@@ -440,7 +440,7 @@ export class LittoraService extends BaseService {
   }
 
   /**
-   * Official alert adapter is not connected. An empty array is not a declaration of safety.
+   * Current official coastal waves/submersion vigilance only. Select one department or public beach. No matching coastal domain or verified interval means unknown, never a bathing flag.
    *
    * This method provides access only to the response body.
    * To access the full response (for headers, for example), `getAlerts$Response()` instead.

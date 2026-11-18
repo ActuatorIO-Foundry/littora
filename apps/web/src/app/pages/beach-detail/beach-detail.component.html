@@ -54,6 +54,15 @@
           {{ dateLabel(score?.current?.weather?.["time"]) }}</span
         >
       </div>
+      <p class="caption" *ngIf="beach.waterType === 'sea'">
+        <a href="https://vigilance.meteofrance.fr/fr/vagues-submersion" target="_blank" rel="noopener noreferrer">Météo-France · Vagues-submersion</a> :
+        <ng-container *ngIf="vigilance as v; else unknownVigilance">
+          vigilance {{ v.alerts.length ? vigilanceLabels[v.alerts[0].level] : 'verte' }} sur le littoral {{ v.department }}.
+          Bulletin du {{ dateLabel(v.issuedAt) }}, valable du {{ dateLabel(v.validFrom) }} au {{ dateLabel(v.validUntil) }}.
+          Ce niveau ne désigne pas le drapeau de baignade.
+        </ng-container>
+        <ng-template #unknownVigilance>information indisponible pour cette plage.</ng-template>
+      </p>
       <app-loading *ngIf="loadingScore" />
       <div *ngIf="scoreError" class="notice error">
         <app-icon name="alert" [size]="18" />{{ scoreError

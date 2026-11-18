@@ -11,12 +11,14 @@ import { Alerts } from '../../models/alerts';
 
 export interface GetAlerts$Params {
   department?: string;
+  beachId?: string;
 }
 
 export function getAlerts(http: HttpClient, rootUrl: string, params?: GetAlerts$Params, context?: HttpContext): Observable<StrictHttpResponse<Alerts>> {
   const rb = new RequestBuilder(rootUrl, getAlerts.PATH, 'get');
   if (params) {
     rb.query('department', params.department, {});
+    rb.query('beachId', params.beachId, {});
   }
 
   return http.request(

@@ -48,6 +48,13 @@ test('water classification: PostGIS evidence, persistence, correction and unchan
   const original = await snapshot('beaches');
   await apply(pool, report);
   const first = await snapshot('beach_water_classifications');
+  const { AlertsService } = require('../../dist/modules/alerts/alerts.service');
+  const vigilance = new AlertsService(pool,{ getJson:async()=>null });
+  assert.equal((await vigilance.get(undefined,sites[0].id)).reason,'zone_unknown','point between the coastal and land polygons');
+  assert.equal((await vigilance.get(undefined,sites[1].id)).department,'44');
+  assert.equal((await vigilance.get(undefined,sites[2].id)).reason,'zone_unknown','no marine vigilance on an inland lake');
+  await assert.rejects(vigilance.get('44',sites[0].id),/Choose one/);
+  await assert.rejects(vigilance.get(undefined,randomUUID()),/Beach not found/);
   await apply(pool, report);
   assert.deepEqual(await snapshot('beaches'), original);
   assert.deepEqual(await snapshot('beach_water_classifications'), first);

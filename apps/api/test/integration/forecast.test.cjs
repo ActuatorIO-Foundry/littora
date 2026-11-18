@@ -13,6 +13,7 @@ const { migrate } = require('../../scripts/database.cjs');
 const { collectOne } = require('../../dist/jobs/forecast-collector');
 const { ForecastStore } = require('../../dist/shared/forecast-store');
 const { conditionKey } = require('../../dist/modules/search/search-conditions');
+const { cacheKey: vigilanceKey } = require('../../dist/modules/alerts/vigilance');
 
 async function until(check) {
   for (let i=0;i<160;i++) { if (await check()) return; await sleep(250); }
@@ -37,7 +38,7 @@ test('weather worker: shared collection, search projection, restart, durable coo
   };
   t.after(async()=>{
     await stop();await queue.obliterate({force:true});await queue.close();
-    await redis.del(...ids.map(conditionKey));await redis.quit();await pool.end();
+    await redis.del(vigilanceKey,...ids.map(conditionKey));await redis.quit();await pool.end();
     try{await admin.query(`drop database "${name}"`);}finally{await admin.end();}
   });
   await migrate(pool);
@@ -47,10 +48,14 @@ test('weather worker: shared collection, search projection, restart, durable coo
   const before=await catalogue();
   const start=()=>{
     worker=spawn(process.execPath,['--require',resolve(__dirname,'../fixtures/worker-provider.cjs'),resolve(__dirname,'../../dist/worker.js')],
-      { env:{...process.env,DATABASE_URL:url.href,REDIS_URL:redisUrl,JOBS_REDIS_URL:redisUrl},stdio:'ignore' });
+      { env:{...process.env,METEOFRANCE_API_KEY:'',DATABASE_URL:url.href,REDIS_URL:redisUrl,JOBS_REDIS_URL:redisUrl},stdio:'ignore' });
   };
   start();
   await until(async()=>(await pool.query('select 1 from forecast_zones where last_success_at is not null')).rowCount===1);
+  assert.equal(Number((await queue.getJobScheduler('vigilance')).every),300000);
+  const vigilance=await queue.add('vigilance',{});
+  await until(async()=>await vigilance.getState()==='completed');
+  assert.deepEqual(JSON.parse(await redis.get(vigilanceKey)),{reason:'disabled'});
   await queue.add('project',{}); // Exercise the real processor without waiting for its minute tick.
   await until(async()=>(await redis.mget(...ids.map(conditionKey))).every(v=>v && JSON.parse(v).airTemp===17));
   await stop();

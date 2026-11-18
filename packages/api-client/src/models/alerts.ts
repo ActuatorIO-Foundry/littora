@@ -3,9 +3,18 @@
 
 export interface Alerts {
   alerts: Array<{
+'level': 'yellow' | 'orange' | 'red';
 }>;
+  bulletinUrl: string;
+  checkBy: string | null;
   department?: string;
-  provider: string;
-  status: 'unknown';
+  fetchedAt: string | null;
+  issuedAt: string | null;
+  product: 'vigilance-vagues-submersion';
+  provider: 'meteofrance';
+  reason: string | null;
+  status: 'available' | 'unknown';
+  validFrom: string | null;
+  validUntil: string | null;
   warning: string;
 }

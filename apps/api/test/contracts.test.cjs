@@ -26,6 +26,7 @@ const commune = { code: '83009', name: 'Bandol', center: { lat: 43.13, lon: 5.75
   contour: { type: 'Polygon', coordinates: [[[5,43],[6,43],[6,44],[5,43]]] } };
 const score = { beach: row, current: { weather: forecast.current, marine: forecast.current, tides, waterQuality: water, community: [] },
   scores: { bathing: null, family: null, paddle: null, boat: null },
+  explanations: require('../dist/modules/score/comfort-model').explainAll('sea',{},false,false,[]),
   safety: { flag: 'red', estimatedFlag: 'green', source: 'legacy', official: false, alerts: [],
     communityFlag: { flag: 'red', confidence: 1, counts: { red: 1, green: 0, yellow: 0 }, history: [{ flag: 'red', confidence: 1, time: now }] } },
   summary: {}, forecast: { uv: [{ time: now, value: 0 }] }, reliability: {},
@@ -49,7 +50,7 @@ const modules = [
   ['alerts', 'Alerts', { get: async () => require('../dist/modules/alerts/vigilance').currentVigilance(null) }],
   ['score', 'Score', { scoreBeach: async () => score }],
   ['reports', 'Reports', { create: async body => { calls++; receivedReport = body; return { ...report, confidence: body.confidence ?? 0.5 }; }, list: async () => [report] }],
-  ['recommendations', 'Recommendations', { best: async () => [{ ...row, scores: score.scores, selectedScore: null, flag: 'unknown', airTemp: NaN, waterTemp: NaN, dataStatus: score.dataStatus }] }],
+  ['recommendations', 'Recommendations', { best: async () => [{ ...row, scores: score.scores, scoreExplanation:score.explanations.bathing, selectedScore: null, flag: 'unknown', airTemp: NaN, waterTemp: NaN, dataStatus: score.dataStatus }] }],
 ];
 before(async () => {
   const controllers = [], providers = [];

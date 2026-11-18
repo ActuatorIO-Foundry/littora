@@ -3,8 +3,10 @@
 
 import { Beach } from '../models/beach';
 import { DataStatus } from '../models/data-status';
+import { ScoreExplanation } from '../models/score-explanation';
 import { Scores } from '../models/scores';
 export type Recommendation = Beach & {
+'scoreExplanation': ScoreExplanation;
 'bathingRestriction'?: 'closed' | 'unknown';
 'scores': Scores;
 'selectedScore': number | null;

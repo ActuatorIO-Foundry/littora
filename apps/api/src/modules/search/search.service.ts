@@ -27,7 +27,7 @@ export class SearchService {
       const match = /^([a-f0-9-]{36}):([1-9][0-9]*)$/.exec(cursor);
       if (!match) throw new BadRequestException('Invalid search cursor');
       id = match[1] as typeof id; offset = Number(match[2]);
-      const saved = await this.cache.getJson<Snapshot>(`search:page:v3:${id}`);
+      const saved = await this.cache.getJson<Snapshot>(`search:page:v4:${id}`);
       if (!saved || saved.closedKey!==closedKey || Date.parse(saved.expiresAt) <= Date.now()) throw new ConflictException('Search expired; restart from first page');
       if (saved.hash !== hash || !Number.isSafeInteger(offset) || offset >= saved.items.length || offset % limit) {
         throw new BadRequestException('Cursor does not match search');
@@ -40,10 +40,9 @@ export class SearchService {
       const flags = await this.reports.flagConsensuses(candidates.map(b => b.id));
       const now = Date.now(), usage = input.usage ?? 'bathing';
       const enriched = candidates.map((beach, i) => {
-        const conditions = searchConditions(beach, cached[i], now);
-        if(closed.has(beach.id)) conditions.scores={...conditions.scores,bathing:0,family:0};
+        const {explanations,...conditions} = searchConditions(beach, cached[i], now, closed.has(beach.id));
         const community = flags.get(beach.id);
-        return { ...beach, ...conditions, bathingRestriction:closed.has(beach.id)?'closed':'unknown', selectedScore: conditions.scores[usage],
+        return { ...beach, ...conditions, scoreExplanation:explanations[usage], bathingRestriction:closed.has(beach.id)?'closed':'unknown', selectedScore: conditions.scores[usage],
           flag: community?.flag ?? null, flagSource: community?.flag ? 'community' : null,
           recentRedAt: community?.recentRedAt ?? null };
       });
@@ -61,7 +60,7 @@ export class SearchService {
           airTemperature: enriched.filter(b => b.airTemp !== null).length,
           scores: enriched.filter(b => b.selectedScore !== null).length, flags: enriched.filter(b => b.flag !== null).length } };
       // A frozen short-lived result prevents changing weather or reports from duplicating/skipping pages.
-      if (items.length > limit && !await this.cache.setJson(`search:page:v3:${id}`, snapshot, 120)) {
+      if (items.length > limit && !await this.cache.setJson(`search:page:v4:${id}`, snapshot, 120)) {
         throw new ServiceUnavailableException('Stable pagination unavailable');
       }
     }

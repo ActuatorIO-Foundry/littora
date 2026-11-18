@@ -43,9 +43,9 @@ test('search: complete PostGIS scope, amenities, fresh conditions, stable Redis 
     {id:'node/2',name:'Toilets',category:'toilets',lat:43,lon:6},{id:'node/3',name:'Rescue',category:'rescue',lat:43,lon:6}],
     'https://overpass-api.de/api/interpreter');
   const before=(await pool.query('select to_jsonb(b) row from beaches b order by id')).rows;
-  const now=new Date().toISOString();const source={provider:'open-meteo',kind:'forecast',status:'available',fetchedAt:now,validAt:now,units:{}};
-  await cache.setJson(conditionKey(target.id),{lat:43,lon:6,waterType:'sea',calculatedAt:now,waterTemp:21,airTemp:0,
-    scores:{bathing:70,family:80,paddle:30,boat:10},dataStatus:{weather:source,marine:source}},900);
+  const projection=require('../fixtures.cjs').calmProjection();
+  projection.weather.wind_speed_10m=20;
+  await cache.setJson(conditionKey(target.id),projection,900);
   const commune={code:'83009',name:'Test',department:{code:'83',name:'Var'},region:{code:'93',name:'Provence'},
     center:{lat:43,lon:6},bbox:[42.9,5.9,44,7],contour:{type:'Polygon',coordinates:[[[5.9,42.9],[7,42.9],[5.9,44],[5.9,42.9]]]}};
   const service=new SearchService(beaches,{get:async()=>commune},reports,cache);

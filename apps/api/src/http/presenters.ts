@@ -1,4 +1,5 @@
 import { ForecastData, finiteMetric } from '../shared/forecast-data';
+import { modelVersion } from '../modules/score/comfort-model';
 
 type Row = Record<string, any>;
 const date = (value: unknown): string | null => {
@@ -45,7 +46,7 @@ export function presentScore(score: Row) {
   return { ...score, beach: presentBeach(score.beach),
     current: { ...score.current, waterQuality: { ...score.current.waterQuality, isDemo: false } },
     safety: { ...safety, officialFlag: { value: null, status: 'unknown', source: null, validAt: null },
-      calculatedConditions: { level: levels[estimatedFlag] ?? 'unknown', source: 'littora-score-v1' } },
+      calculatedConditions: { level: levels[estimatedFlag] ?? 'unknown', source: modelVersion } },
     measurements: {
       weather: measurements(score.current.weather, score.dataStatus.weather),
       marine: measurements(score.current.marine, score.dataStatus.marine),

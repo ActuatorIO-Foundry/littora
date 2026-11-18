@@ -8,12 +8,7 @@ const {scoreFixture} = require('./fixtures.cjs');
 
 const rows = Array.from({length:65},(_,i)=>({id:`00000000-0000-4000-8000-${String(i).padStart(12,'0')}`,
   name:'Same name',lat:43,lon:6,waterType:'sea',distanceKm:i}));
-function snapshot(value=21) {
-  const date=new Date().toISOString();
-  const source={provider:'open-meteo',kind:'forecast',status:'available',fetchedAt:date,validAt:date,units:{}};
-  return {lat:43,lon:6,waterType:'sea',calculatedAt:date,waterTemp:value,airTemp:0,
-    scores:{bathing:70,family:90,paddle:20,boat:0},dataStatus:{weather:source,marine:source}};
-}
+const snapshot=require('./fixtures.cjs').calmProjection;
 function fixture() {
   const stored=new Map();let reads=0;
   const cache={getJson:async k=>structuredClone(stored.get(k)??null),
@@ -25,9 +20,10 @@ function fixture() {
 }
 test('search: dynamic criteria apply beyond candidate 30, including real zero and inclusive bounds',async()=>{
   const {service,stored}=fixture();stored.set(conditionKey(rows[64].id),snapshot(0));
-  const result=await service.search({minWaterTemp:0,maxWaterTemp:0,minAirTemp:0,maxAirTemp:0,usage:'family',minScore:90});
+  const result=await service.search({minWaterTemp:0,maxWaterTemp:0,minAirTemp:0,maxAirTemp:0,usage:'family',minScore:20});
   assert.deepEqual(result.items.map(b=>b.id),[rows[64].id]);assert.equal(result.total,1);
-  assert.equal(result.items[0].selectedScore,90);assert.equal(result.coverage.waterTemperature,1);
+  assert.equal(result.items[0].selectedScore,20);assert.equal(result.coverage.waterTemperature,1);
+  assert.equal(result.items[0].scoreExplanation.score,20);assert.equal((await service.search({usage:'family',minScore:21})).total,0);
   assert.equal((await service.search({minWaterTemp:1})).total,0);
 });
 test('search: frozen stable pagination survives changes without duplicate names or IDs',async()=>{
@@ -70,8 +66,9 @@ test('search: score publication retains source times, nulls and never the calcul
   service.cache={setJson:async(key,value,ttl)=>{saved={key,value,ttl};return true;}};
   await service.scoreBeach(rows[0].id);
   assert.equal(saved.key,conditionKey(rows[0].id));assert.equal(saved.ttl,900);
-  assert.equal(saved.value.waterTemp,22);assert.equal(saved.value.flag,undefined);
-  assert.equal(searchConditions(saved.value,saved.value,Date.now()).waterTemp,null,'Undated test providers are not searchable forecasts');
+  assert.equal(saved.value.marine.sea_surface_temperature,22);assert.equal(saved.value.flag,undefined);
+  saved.value.dataStatus.marine.fetchedAt=null;
+  assert.equal(searchConditions(saved.value,saved.value,Date.now()).waterTemp,null,'Undated providers are not searchable forecasts');
 });
 
 test('search: a new official closure overrides cached scores and expires outstanding cursors',async()=>{

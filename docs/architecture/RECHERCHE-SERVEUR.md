@@ -26,11 +26,12 @@ d'une distance inventee. Les autres tris conservent le perimetre choisi.
 
 ## Conditions et inconnues
 
-Le calcul existant d'une fiche publie un instantane `search:conditions:v1:<uuid>`
-dans Redis, avec position, milieu, scores, temperatures et provenance datee.
-Une mesure est eligible si son fournisseur indique une prevision disponible ou
-partielle, collectee il y a moins de 15 minutes, valide a moins d'une heure du
-moment de recherche. Un deplacement de plage ou un changement de milieu invalide
+La fiche et le worker publient un instantane `search:conditions:confort-2:<uuid>`
+dans Redis pour 15 minutes : position, milieu, entrees du modele, unites et provenance.
+La liste et la fiche partagent le [modele de confort](SCORES.md). Les previsions
+horaires doivent etre disponibles ou partielles et valides a moins d'une heure ;
+la collecte doit dater de moins de 6 h pour le worker (#15), 15 min sinon.
+Un deplacement de plage ou un changement de milieu invalide
 l'instantane. Les donnees anciennes, absentes, non datees ou futures ne sont
 pas converties en zero. Les bornes numeriques sont inclusives.
 

@@ -10,6 +10,7 @@ import { MetricPoint } from '../models/metric-point';
 import { Safety } from '../models/safety';
 import { Scores } from '../models/scores';
 import { Tides } from '../models/tides';
+import { UsageExplanations } from '../models/usage-explanations';
 import { WaterQuality } from '../models/water-quality';
 export interface BeachScore {
   beach: Beach;
@@ -28,6 +29,7 @@ export interface BeachScore {
 [key: string]: DataStatus;
 };
   disclaimer: string;
+  explanations: UsageExplanations;
   forecast: {
 [key: string]: Array<MetricPoint>;
 };

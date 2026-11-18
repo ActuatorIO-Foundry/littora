@@ -31,6 +31,34 @@ Redis produites même en l'absence de visiteurs. Le cache est reconstructible.
   admissible. Une pause globale ou la file peuvent repousser la prochaine
   vérification au-delà de `nextCheckAt`.
 
+## Recette après un cycle réel (#43)
+
+Un heartbeat sain ou six heures écoulées ne prouvent pas que toutes les zones
+ont été traitées. Depuis la racine avec le Node du projet et Compose local :
+
+```sh
+npm run check:v1-cycle -- start
+npm run check:v1-cycle -- watch HORODATAGE EMPREINTE http://127.0.0.1:4200
+```
+
+Reprendre les valeurs `start` et `scope` imprimées par la première commande.
+Le suivi lit PostgreSQL toutes les cinq minutes, sans appeler le fournisseur,
+déclencher de job ni visiter les fiches. Il compare les mêmes zones et sites
+(identifiants, positions, milieux). Un succès ou un échec **terminé** compte
+pour le passage ; une simple réservation, même avec une erreur héritée,
+ne compte pas. Les succès et les erreurs sont indiqués séparément.
+
+Une fois les deux sources entièrement parcourues, attendre au moins 15 minutes
+(une durée de vie de projection), puis mesurer une nouvelle recherche paginée.
+Sa date et l’empreinte de ses identifiants doivent correspondre à la base locale.
+Une projection manquante est donc visible comme telle, pas réparée par le test.
+Les seuils restent 90 % des sites publics pour l’air, 80 % des sites marins pour
+l’eau ; aucun indicateur marin en eau douce. Sortie 0 : seuils atteints à cet
+instant ; 2 : cycle mesuré sous les seuils ; 1 : pas de verdict (périmètre
+modifié, indisponibilité, horloge incohérente ou délai de huit heures).
+Conserver les seuls agrégats dans le ticket, jamais le journal ni le cache.
+Un passage réussi n’établit pas une disponibilité continue ou de production.
+
 ## Exploitation
 
 `docker compose -f docker-compose.local.yml ps worker` contrôle l'activité

@@ -23,6 +23,7 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY contracts ./contracts
 COPY apps/api/scripts/database.cjs ./apps/api/scripts/database.cjs
 COPY apps/api/scripts/classify-water.cjs ./apps/api/scripts/classify-water.cjs
+COPY apps/api/scripts/catalogue-zone*.cjs ./apps/api/scripts/
 COPY apps/api/migrations ./apps/api/migrations
 COPY apps/api/seeds ./apps/api/seeds
 WORKDIR /app/apps/api

@@ -18,7 +18,7 @@ test('catalogue: discovery never executes schema or backfill statements', async 
     assert.match(sql, /^select /i);
     return { rows: [beach] };
   } }, { getJson: async () => [] });
-  await service.discoverFromOpenStreetMap('43,6,44,7', 'Region', 'Sea');
+  await service.discover('43,6,44,7');
   assert.ok(statements.length > 0);
 });
 
@@ -57,15 +57,15 @@ test('catalogue: Pays de la Loire does not imply river water', async () => {
   assert.equal((await service.get(beach.id)).waterType, 'sea');
 });
 
-test('catalogue: discovery is readonly unless explicitly enabled', async () => {
+test('catalogue: discovery is readonly even with the retired opt-in', async () => {
   const previous = process.env.CATALOGUE_DISCOVERY_ENABLED;
-  delete process.env.CATALOGUE_DISCOVERY_ENABLED;
+  process.env.CATALOGUE_DISCOVERY_ENABLED='true';
   try {
     const service = new BeachesService({ query: async sql => {
       assert.match(sql, /^select /i);
       return { rows: [beach] };
     } }, { getJson: () => assert.fail('No discovery cache or provider in readonly mode') });
-    assert.equal((await service.discoverFromOpenStreetMap('43,6,44,7', 'Test', 'Atlantique')).imported, 0);
+    assert.equal((await service.discover('43,6,44,7')).imported, 0);
   } finally {
     if (previous === undefined) delete process.env.CATALOGUE_DISCOVERY_ENABLED;
     else process.env.CATALOGUE_DISCOVERY_ENABLED = previous;
@@ -73,11 +73,11 @@ test('catalogue: discovery is readonly unless explicitly enabled', async () => {
 });
 
 test('catalogue: a parking, shop, access or resort named Plage is not a beach', () => {
-  const service = new BeachesService({}, {});
+  const {qualify}=require('../scripts/catalogue-zone.cjs');
   for (const tags of [{ amenity: 'parking' }, { shop: 'clothes' }, { highway: 'footway' }, { leisure: 'beach_resort' }]) {
-    assert.equal(service.osmElementToBeach({ type: 'node', id: 1, lat: 43, lon: 6, tags: { name: 'La Plage', ...tags } }), null);
+    assert.ok(qualify({ type: 'node', id: 1, lat: 43, lon: 6, tags: { name: 'La Plage', ...tags } }).reason);
   }
-  assert.ok(service.osmElementToBeach({ type: 'way', id: 2, center: { lat: 43, lon: 6 }, tags: { name: 'Plage', natural: 'beach' } }));
+  assert.equal(qualify({ type: 'way', id: 2, center: { lat: 43, lon: 6 }, tags: { name: 'Plage', natural: 'beach' } }).reason,null);
 });
 
 test('catalogue: cursor pages are bounded, stable and parameterized', async () => {
@@ -93,4 +93,25 @@ test('catalogue: cursor pages are bounded, stable and parameterized', async () =
   for (const limit of [0, 501, 1.5, NaN]) await assert.rejects(service.catalogue(undefined, limit), e => e.getStatus() === 400);
   await assert.rejects(service.catalogue("' or true --"), e => e.getStatus() === 400);
   await assert.rejects(service.catalogue(undefined, 200, '50,8,40,2'), e => e.getStatus() === 400);
+});
+
+test('nearby list: a database failure cannot turn into an arbitrary partial ranking', async () => {
+  let queries = 0;
+  const service = new BeachesService({ query: async () => { queries++; throw Error('storage unavailable'); } }, {});
+  await assert.rejects(service.list(43,6,20), /storage unavailable/);
+  assert.equal(queries,1);
+});
+
+test('discovery forwards the cursor and reports partial coverage even on the last page', async () => {
+  const service = new BeachesService({});
+  const next = '00000000-0000-4000-8000-000000000008';
+  service.catalogue = async (after,limit,bbox) => {
+    assert.equal(limit,1);assert.equal(bbox,'43,6,44,7');
+    if(after !== undefined) assert.equal(after,next);
+    return {beaches:[beach],nextCursor:after?null:next};
+  };
+  const first = await service.discover('43,6,44,7',1);
+  assert.equal(first.nextCursor,next);
+  const last = await service.discover('43,6,44,7',1,first.nextCursor);
+  assert.equal(last.coverage,'partial');assert.equal(last.nextCursor,null);
 });

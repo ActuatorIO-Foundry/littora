@@ -35,19 +35,29 @@ test('isolated PostGIS catalogue, reports and Redis cache', { timeout: 30000 }, 
 
     const outline = { type: 'Polygon', coordinates: [[[2,48],[3,48],[2,49],[2,48]]] };
     const features = [
-      { osmId: `test/${randomUUID()}`, name: 'Inside commune', city: 'Test', lat: 48.2, lon: 2.2 },
-      { osmId: `test/${randomUUID()}`, name: 'On boundary', city: 'Test', lat: 48, lon: 2.5 },
-      { osmId: `test/${randomUUID()}`, name: 'Outside commune', city: 'Test', lat: 48.9, lon: 2.9 },
+      { osmId: 'node/1000', name: 'Inside commune', city: 'Test', lat: 48.2, lon: 2.2 },
+      { osmId: 'node/1001', name: 'On boundary', city: 'Test', lat: 48, lon: 2.5 },
+      { osmId: 'node/1002', name: 'Outside commune', city: 'Test', lat: 48.9, lon: 2.9 },
     ];
     assert.deepEqual((await beaches.featuresInGeometry(features, outline)).map(f => f.name), ['Inside commune', 'On boundary']);
+    const {applyZone}=require('../../scripts/catalogue-zone-apply.cjs');
+    const commune={nom:'Test',region:{nom:'Region'},departement:{nom:'Dept'},contour:outline};
+    const batch=features.map(f=>({...f,id:f.osmId}));
     try {
-      for (const feature of features) await beaches.upsertDiscoveredBeach(feature, 'Test', 'Unknown', 'Test');
+      const preview=await applyZone(pool,commune,batch,false);
+      assert.deepEqual(preview.map(d=>d.outcome),['would_insert','would_insert','outside_commune']);
+      assert.equal((await beaches.inGeometry(outline)).length,0,'Preview never writes');
+      const applied=await applyZone(pool,commune,batch,true);
+      assert.deepEqual(applied.map(d=>d.outcome),['inserted','inserted','outside_commune']);
       const inside = await beaches.inGeometry(outline);
       assert.equal(inside.length, 2);
       assert.equal(inside[0].has_parking, null, 'Missing amenities must remain unknown');
       assert.ok(!inside.some(row => row.name === 'Outside commune'));
-      const again = await beaches.upsertDiscoveredBeach(features[0], 'Test', 'Unknown');
-      assert.equal(again.id, inside.find(row => row.name === 'Inside commune').id);
+      const again=await applyZone(pool,commune,batch,true);
+      assert.deepEqual(again.map(d=>d.outcome),['existing','existing','outside_commune']);
+      const review=await applyZone(pool,commune,[{...batch[0],name:'Renamed'},{...batch[1],id:'way/11223',name:'Another name'}],true);
+      assert.deepEqual(review.map(r=>r.outcome),['review_identity','review_proximity']);
+      assert.deepEqual(await beaches.inGeometry(outline),inside,'No overwrite or silent merge');
     } finally {
       await pool.query('delete from beaches where osm_id = any($1::text[])', [features.map(f => f.osmId)]);
     }

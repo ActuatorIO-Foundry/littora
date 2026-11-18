@@ -4,7 +4,9 @@
 import { Beach } from '../models/beach';
 export interface Discovery {
   beaches: Array<Beach>;
+  coverage: 'partial';
   imported: number;
+  nextCursor: string | null;
   provider: string;
   warning?: string;
 }

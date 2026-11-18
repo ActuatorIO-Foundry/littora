@@ -18,6 +18,8 @@ test-results/
 playwright-report/
 *.db
 *.db-*
+*.sqlite
+*.sqlite-*
 .local/
 
 # Independent local project, not part of Littora

@@ -176,7 +176,7 @@ export class LittoraService extends BaseService {
   static readonly DiscoverBeachesPath = '/beaches/discover';
 
   /**
-   * Legacy synchronous OSM discovery. May persist catalogue entries; coverage is partial. Replaced by jobs in a later release.
+   * Read-only compatibility endpoint. Local, non-exhaustive catalogue; follow nextCursor with after. Region/coastline are legacy display hints only.
    *
    * This method provides access to the full `HttpResponse`, allowing access to response headers.
    * To access only the response body, use `discoverBeaches()` instead.
@@ -189,7 +189,7 @@ export class LittoraService extends BaseService {
   }
 
   /**
-   * Legacy synchronous OSM discovery. May persist catalogue entries; coverage is partial. Replaced by jobs in a later release.
+   * Read-only compatibility endpoint. Local, non-exhaustive catalogue; follow nextCursor with after. Region/coastline are legacy display hints only.
    *
    * This method provides access only to the response body.
    * To access the full response (for headers, for example), `discoverBeaches$Response()` instead.
@@ -288,7 +288,7 @@ export class LittoraService extends BaseService {
   static readonly GetCommuneCataloguePath = '/places/communes/{code}/beaches';
 
   /**
-   * Commune boundary and partial catalogue. May collect and persist OSM entries.
+   * Commune boundary and local catalogue, read-only. Coverage is partial.
    *
    * This method provides access to the full `HttpResponse`, allowing access to response headers.
    * To access only the response body, use `getCommuneCatalogue()` instead.
@@ -301,7 +301,7 @@ export class LittoraService extends BaseService {
   }
 
   /**
-   * Commune boundary and partial catalogue. May collect and persist OSM entries.
+   * Commune boundary and local catalogue, read-only. Coverage is partial.
    *
    * This method provides access only to the response body.
    * To access the full response (for headers, for example), `getCommuneCatalogue$Response()` instead.

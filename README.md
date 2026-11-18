@@ -7,10 +7,12 @@
 > aux personnes autorisées. Elles ne constituent pas une permission d'usage.
 >
 > L'[audit du 16 novembre 2026](docs/AUDIT-2026-11-16.md) distingue les fonctions
-> existantes des simulations et des connecteurs à développer. Les anciennes
-> mentions « prêt » ci-dessous doivent être lues à la lumière de cet audit.
+> existantes à cette date des simulations et des connecteurs à développer.
 
-Application web de recommandation plage et mer : Angular + NestJS + PostgreSQL/PostGIS + Redis + Docker Compose, avec API météo/marine branchées et fallbacks locaux pour travailler sans clé payante.
+Littora aide à comparer les conditions de baignade et de loisirs nautiques en
+France métropolitaine, Corse comprise. Le [périmètre V1](docs/PERIMETRE-V1.md)
+distingue les fonctionnalités retenues, les sources indisponibles, les reports
+et les seuils à vérifier avant l'ouverture gratuite du service.
 
 ## Lancer en local
 Voir le [guide d'exploitation locale](docs/architecture/EXPLOITATION-LOCALE.md)
@@ -74,28 +76,14 @@ en service ; ce lot ne valide pas le deploiement de production (#29).
 
 Le reverse proxy Caddy expose le front et route `/api/*` vers NestJS.
 
-## Fonctionnalités incluses
-- Référentiel plages Postgres/PostGIS
-- Scores baignade, famille, paddle, bateau
-- Open-Meteo Forecast API fonctionnelle avec cache Redis et fallback local
-- Open-Meteo Marine API fonctionnelle avec cache Redis et fallback local
-- Connecteur SHOM prêt via `SHOM_API_KEY` avec fallback local non navigable
-- Connecteur Météo-France prêt via `METEOFRANCE_API_KEY` avec fallback Open-Meteo
-- Module qualité des eaux : ingestion officielle encore à développer ; aucune mesure sanitaire dans le seed de référence
-- Signalements communautaires
-- Recommandation des meilleures plages autour d'une position
-- Docker local/prod + Caddy
+## Ce que l'on peut consulter
+- Catalogue PostGIS et recherche par commune, zone et critères. La liste est partielle ; un équipement inconnu ne signifie pas absent.
+- Prévisions Open-Meteo et Open-Meteo Marine collectées par le worker. Le site distingue collecte et validité ; les calculs ne remplacent pas une mesure ou un drapeau officiel.
+- Fiches, scores par usage lorsque les données suffisent, et signalements communautaires distincts des informations officielles.
+- Aucun flux direct de marées SHOM, de vigilance Météo-France ou d'ingestion sanitaire ARS n'est garanti par la présence d'une clé ou d'une URL dans la configuration.
 
-## Sources de données
-- Météo et prévisions mer : Open-Meteo est actif par défaut pour disposer d'une API temps réel sans clé. Météo-France peut être branché via `METEOFRANCE_API_KEY` après choix du produit API officiel.
-- Référentiel plages : découverte par zone via OpenStreetMap Overpass (`OVERPASS_API_URL`) puis Nominatim (`NOMINATIM_API_URL`) en fallback, avec persistance PostgreSQL/PostGIS et fallback base locale.
-- Vagues/houle : Open-Meteo Marine est actif par défaut. Les modèles Météo-France type MFWAM demandent un mapping produit spécifique.
-- Marées : fallback local non navigable en développement. Les services SHOM SUP/SAPM nécessitent une clé d'abonnement `SHOM_API_KEY`.
-- Qualité des eaux : aucune mesure ajoutée au démarrage ou par le seed de référence. Les exemples synthétiques exigent une base de démonstration séparée. L'ingestion officielle reste suivie dans #18 ; renseigner `WATER_QUALITY_DATASET_URL` ne suffit pas à l'implémenter.
-- Signalements : stockés dans PostgreSQL et pris en compte dans le score des dernières 24h.
-
-## Notes importantes production
-SHOM SUP/SAPM nécessite une clé d'abonnement. Météo-France nécessite de choisir les produits API et mapper les réponses. Les données baignade doivent être importées depuis une ressource officielle data.gouv / baignades.sante.gouv compatible avec votre usage.
+Pour mesurer la couverture du catalogue servi, sans import :
+`npm run check:v1-coverage -- http://127.0.0.1:4200`.
 
 ## Variables principales
 Voir `.env.example`.
@@ -109,11 +97,10 @@ Voir `.env.example`.
 - `POST /api/reports`
 
 ## Avant publication
-1. Obtenir clé SHOM SUP/SAPM si besoin marées officielles.
-2. Obtenir/choisir produits Météo-France API pour vigilance/BMS/modèles.
-3. Fixer le dataset officiel qualité baignade et son mapping.
-4. Ajouter authentification complète et modération reports.
-5. Ajouter mentions légales, politique RGPD, disclaimer sécurité mer.
+Suivre la [matrice de recette V1](docs/PERIMETRE-V1.md), le registre de
+[préversion #43](https://github.com/ActuatorIO-Foundry/littora/issues/43) et
+les blocages de mise en service. Ni la disponibilité des fournisseurs ni
+l'autorisation de diffusion ne se déduisent d'un build réussi.
 
 ## Vérifications utiles
 La [décision d'architecture](docs/architecture/ADR-001-monolithe-modulaire.md)

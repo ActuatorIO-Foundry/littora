@@ -4,11 +4,20 @@
 export interface WaterQuality {
   classification?: string | null;
   isDemo: false;
+  lastSample?: ({
+'date': string;
+
+/**
+ * Historical sample result; never a current bathing authorization.
+ */
+'result': string;
+'source': string;
+}) | null;
   provider: string;
   reliability?: string;
 
   /**
-   * Legacy sample date; not a forecast validity time.
+   * Date of the last dated sample; never a clearance to swim.
    */
   sample_date?: string | null;
   status: string;

@@ -1,6 +1,6 @@
 import { finiteMetric, refreshSeconds } from '../../shared/forecast-data';
 
-export const conditionKey = (id: string) => `search:conditions:v1:${id.toLowerCase()}`;
+export const conditionKey = (id: string) => `search:conditions:v2:${id.toLowerCase()}`;
 export const emptyScores = () => ({ bathing: null, family: null, paddle: null, boat: null });
 type Row = Record<string, any>;
 

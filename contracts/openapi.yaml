@@ -630,7 +630,15 @@ components:
         provider: {type: string}
         status: {type: string}
         classification: {type: string, nullable: true}
-        sample_date: {type: string, nullable: true, description: Legacy sample date; not a forecast validity time.}
+        sample_date: {type: string, nullable: true, description: Date of the last dated sample; never a clearance to swim.}
+        lastSample:
+          type: object
+          nullable: true
+          required: [date, result, source]
+          properties:
+            date: {type: string, format: date}
+            result: {type: string, description: Historical sample result; never a current bathing authorization.}
+            source: {type: string}
         reliability: {type: string}
         warning: {type: string}
         isDemo: {type: boolean, enum: [false]}

@@ -1,26 +1,9 @@
+import { boundedJson } from '../shared/bounded-json';
 import { CacheService } from '../cache/cache.service';
 import { Cached, cacheKey, freshnessMs, parseBulletin } from '../modules/alerts/vigilance';
 
 const endpoint = 'https://public-api.meteofrance.fr/public/DPVigilance/v1/cartevigilance/encours';
 const maxBytes = 4 * 1024 * 1024;
-
-async function readProduct(response:Response) {
-  if (!response.body || Number(response.headers.get('content-length')) > maxBytes) {
-    await response.body?.cancel(); throw new Error('Invalid size');
-  }
-  const reader = response.body.getReader(), chunks:Buffer[] = [];
-  let size = 0;
-  try {
-    for (;;) {
-      const { done,value } = await reader.read();
-      if (done) break;
-      size += value.length;
-      if (size > maxBytes) { await reader.cancel(); throw new Error('Invalid size'); }
-      chunks.push(Buffer.from(value));
-    }
-  } finally { reader.releaseLock(); }
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
-}
 
 export async function collectVigilance(cache:Pick<CacheService,'getJson'|'setJson'>,
     key = process.env.METEOFRANCE_API_KEY, request = fetch, now = Date.now()) {
@@ -40,7 +23,7 @@ export async function collectVigilance(cache:Pick<CacheService,'getJson'|'setJso
         result = {reason:'rate_limited'};
       } else result = {reason:[401,403].includes(response.status) ? 'unauthorized':'unavailable'};
     } else {
-      const bulletin = parseBulletin(await readProduct(response),now);
+      const bulletin = parseBulletin(await boundedJson(response,maxBytes),now);
       if (previous && 'bulletin' in previous && bulletin.issued < previous.bulletin.issued) throw new Error('Older bulletin');
       result = {bulletin};
     }

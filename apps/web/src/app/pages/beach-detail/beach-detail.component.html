@@ -462,7 +462,17 @@
         </div>
         <div>
           <dt>Marées</dt>
-          <dd>{{ providerLabel(score?.providers?.["tides"]) }}</dd>
+          <dd *ngIf="score?.current?.tides?.portReference as port; else noTidePort">
+            <a [href]="port.timetableUrl" target="_blank" rel="noopener noreferrer">Horaires Shom · {{ port.name }}</a>
+            (port à {{ port.distanceKm | number:'1.0-1' }} km).
+            <ng-container *ngIf="activeHeightReference as h">
+              Extrêmes astronomiques au port : {{ h.lowestAstronomical }} à {{ h.highestAstronomical }} m par rapport au zéro hydrographique local (RAM).
+            </ng-container>
+            <ng-container *ngIf="activeCurrentReference as c">
+              Atlas de surface au port, coefficient 95 : classe VMAX {{ c.vmaxClass }} nd. Ce n’est pas le courant actuel.
+            </ng-container>
+          </dd>
+          <ng-template #noTidePort><dd>Port de référence indisponible</dd></ng-template>
         </div>
         <div>
           <dt>Qualité de l’eau</dt>

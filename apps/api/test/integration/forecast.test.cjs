@@ -14,6 +14,8 @@ const { collectOne } = require('../../dist/jobs/forecast-collector');
 const { ForecastStore } = require('../../dist/shared/forecast-store');
 const { conditionKey } = require('../../dist/modules/search/search-conditions');
 const { cacheKey: vigilanceKey } = require('../../dist/modules/alerts/vigilance');
+const { ports } = require('../../dist/modules/tides/shom-ports');
+const { shomKey } = require('../../dist/modules/tides/shom-reference');
 
 async function until(check) {
   for (let i=0;i<160;i++) { if (await check()) return; await sleep(250); }
@@ -38,7 +40,7 @@ test('weather worker: shared collection, search projection, restart, durable coo
   };
   t.after(async()=>{
     await stop();await queue.obliterate({force:true});await queue.close();
-    await redis.del(vigilanceKey,...ids.map(conditionKey));await redis.quit();await pool.end();
+    await redis.del(vigilanceKey,...ports.map(shomKey),...ids.map(conditionKey));await redis.quit();await pool.end();
     try{await admin.query(`drop database "${name}"`);}finally{await admin.end();}
   });
   await migrate(pool);
@@ -56,6 +58,10 @@ test('weather worker: shared collection, search projection, restart, durable coo
   const vigilance=await queue.add('vigilance',{});
   await until(async()=>await vigilance.getState()==='completed');
   assert.deepEqual(JSON.parse(await redis.get(vigilanceKey)),{reason:'disabled'});
+  assert.equal(Number((await queue.getJobScheduler('shom')).every),60000);
+  const shom=await queue.add('shom',{});
+  await until(async()=>await shom.getState()==='completed');
+  assert.ok((await redis.mget(...ports.map(shomKey))).some(v=>v && JSON.parse(v).height?.high===7.9));
   await queue.add('project',{}); // Exercise the real processor without waiting for its minute tick.
   await until(async()=>(await redis.mget(...ids.map(conditionKey))).every(v=>v && JSON.parse(v).airTemp===17));
   await stop();

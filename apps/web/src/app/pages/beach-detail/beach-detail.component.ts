@@ -117,6 +117,24 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
   private beachRequests = new Subscription();
   private scoreRequest?: Subscription;
   private scoreTimer?: ReturnType<typeof setTimeout>;
+  private shomExpiry?: ReturnType<typeof setTimeout>;
+  get activeHeightReference() {
+    const r=this.score?.current?.tides?.heightReference;
+    return r && Date.parse(r.expiresAt)>Date.now() ? r : null;
+  }
+  get activeCurrentReference() {
+    const r=this.score?.current?.tides?.currentReference;
+    return r && Date.parse(r.expiresAt)>Date.now() ? r : null;
+  }
+  private updateShomExpiry(): void {
+    clearTimeout(this.shomExpiry);
+    const ends=[this.activeHeightReference,this.activeCurrentReference]
+      .flatMap(r=>r ? [Date.parse(r.expiresAt)] : []);
+    if (ends.length) this.shomExpiry=setTimeout(()=>{
+      this.cdr.markForCheck();
+      this.updateShomExpiry();
+    },Math.max(1,Math.min(...ends)-Date.now()+1));
+  }
   constructor(
     private readonly route: ActivatedRoute,
     private readonly api: LittoraApiService,
@@ -126,6 +144,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     this.subscriptions.add(this.route.paramMap.subscribe(params => this.loadBeach(params.get("id"))));
   }
   private loadBeach(id: string | null): void {
+    clearTimeout(this.shomExpiry);
     clearTimeout(this.vigilanceTimer);
     this.vigilance = null;
     clearTimeout(this.scoreTimer);
@@ -216,6 +235,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (r) => {
           this.score = r;
+          this.updateShomExpiry();
           const now = Date.now();
           const times = Object.values(r.dataStatus ?? {}).flatMap(s => [
             s.nextCheckAt ? Date.parse(s.nextCheckAt) - now : Infinity,
@@ -399,6 +419,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
         }).format(d);
   }
   ngOnDestroy(): void {
+    clearTimeout(this.shomExpiry);
     clearTimeout(this.vigilanceTimer);
     clearTimeout(this.scoreTimer);
     this.subscriptions.unsubscribe();

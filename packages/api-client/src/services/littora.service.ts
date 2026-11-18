@@ -373,6 +373,8 @@ export class LittoraService extends BaseService {
   static readonly GetTidesPath = '/tides';
 
   /**
+   * Timetable status (not imported), nearby reference port and independently verified SHOM reference products. Neither reference is a current measurement or a prediction at the beach.
+   *
    * This method provides access to the full `HttpResponse`, allowing access to response headers.
    * To access only the response body, use `getTides()` instead.
    *
@@ -384,6 +386,8 @@ export class LittoraService extends BaseService {
   }
 
   /**
+   * Timetable status (not imported), nearby reference port and independently verified SHOM reference products. Neither reference is a current measurement or a prediction at the beach.
+   *
    * This method provides access only to the response body.
    * To access the full response (for headers, for example), `getTides$Response()` instead.
    *

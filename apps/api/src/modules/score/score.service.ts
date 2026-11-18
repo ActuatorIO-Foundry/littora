@@ -73,7 +73,7 @@ export class ScoreService {
       reliability: {
         weather: weather.status ?? 'unknown',
         marine: marine.status ?? 'unknown',
-        tides: tides.reliability ?? 'medium',
+        tides: tides.reliability ?? 'unknown',
         waterQuality: waterQuality.reliability ?? 'medium',
         community: community.length || flagConsensus ? 'fresh' : 'none',
       },

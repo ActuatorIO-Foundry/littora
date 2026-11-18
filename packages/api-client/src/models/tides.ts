@@ -3,10 +3,41 @@
 
 export interface Tides {
   ageSeconds: number | null;
+  currentReference?: ({
+'source': 'shom-vmax';
+'kind': 'surface-atlas';
+'unit': 'kn';
+'coefficient': 95;
+
+/**
+ * Published polygon value in knots; not an instantaneous speed or a declaration of no current.
+ */
+'vmaxClass': number;
+'featureId': string;
+'fetchedAt': string;
+'expiresAt': string;
+}) | null;
   events: Array<{
 }>;
   fetchedAt: string | null;
   harbor: string | null;
+  heightReference?: ({
+'source': 'shom-ram';
+'kind': 'reference';
+'unit': 'm';
+'verticalDatum': 'local-chart-datum';
+'highestAstronomical': number;
+'lowestAstronomical': number;
+'fetchedAt': string;
+'expiresAt': string;
+}) | null;
+  portReference?: ({
+'name': string;
+'lat': number;
+'lon': number;
+'distanceKm': number;
+'timetableUrl': string;
+}) | null;
   provider: string;
   reliability: 'unknown';
   status: 'unknown';

@@ -118,12 +118,13 @@ paths:
     get:
       operationId: getTides
       tags: [Littora]
+      description: Timetable status (not imported), nearby reference port and independently verified SHOM reference products. Neither reference is a current measurement or a prediction at the beach.
       parameters:
         - {$ref: '#/components/parameters/Latitude'}
         - {$ref: '#/components/parameters/Longitude'}
         - {name: harbor, in: query, schema: {type: string, maxLength: 100}}
       responses:
-        '200': {description: Unknown until an official adapter is connected, content: {application/json: {schema: {$ref: '#/components/schemas/Tides'}}}}
+        '200': {description: Port and source references where available; no synthetic tide events, content: {application/json: {schema: {$ref: '#/components/schemas/Tides'}}}}
         default: {$ref: '#/components/responses/Error'}
   /water-quality:
     get:
@@ -586,6 +587,42 @@ components:
         harbor: {type: string, nullable: true}
         events: {type: array, maxItems: 0, items: {type: object}}
         warning: {type: string}
+        portReference:
+          type: object
+          nullable: true
+          required: [name, lat, lon, distanceKm, timetableUrl]
+          properties:
+            name: {type: string}
+            lat: {type: number}
+            lon: {type: number}
+            distanceKm: {type: number, minimum: 0, maximum: 5}
+            timetableUrl: {type: string, format: uri}
+        heightReference:
+          type: object
+          nullable: true
+          required: [source, kind, unit, verticalDatum, highestAstronomical, lowestAstronomical, fetchedAt, expiresAt]
+          properties:
+            source: {type: string, enum: [shom-ram]}
+            kind: {type: string, enum: [reference]}
+            unit: {type: string, enum: [m]}
+            verticalDatum: {type: string, enum: [local-chart-datum]}
+            highestAstronomical: {type: number}
+            lowestAstronomical: {type: number}
+            fetchedAt: {type: string, format: date-time}
+            expiresAt: {type: string, format: date-time}
+        currentReference:
+          type: object
+          nullable: true
+          required: [source, kind, unit, coefficient, vmaxClass, featureId, fetchedAt, expiresAt]
+          properties:
+            source: {type: string, enum: [shom-vmax]}
+            kind: {type: string, enum: [surface-atlas]}
+            unit: {type: string, enum: [kn]}
+            coefficient: {type: integer, enum: [95]}
+            vmaxClass: {type: number, minimum: 0, description: Published polygon value in knots; not an instantaneous speed or a declaration of no current.}
+            featureId: {type: string}
+            fetchedAt: {type: string, format: date-time}
+            expiresAt: {type: string, format: date-time}
     WaterQuality:
       type: object
       required: [provider, status, isDemo]

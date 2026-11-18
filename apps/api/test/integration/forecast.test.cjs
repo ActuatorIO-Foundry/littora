@@ -63,7 +63,7 @@ test('weather worker: shared collection, search projection, restart, durable coo
   await until(async()=>await shom.getState()==='completed');
   assert.ok((await redis.mget(...ports.map(shomKey))).some(v=>v && JSON.parse(v).height?.high===7.9));
   await queue.add('project',{}); // Exercise the real processor without waiting for its minute tick.
-  await until(async()=>(await redis.mget(...ids.map(conditionKey))).every(v=>v && JSON.parse(v).airTemp===17));
+  await until(async()=>(await redis.mget(...ids.map(conditionKey))).every(v=>v && JSON.parse(v).weather.temperature_2m===17));
   await stop();
   const store=new ForecastStore(pool);
   const first=await store.get('open-meteo',43,6);

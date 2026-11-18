@@ -20,13 +20,13 @@ export class RecommendationsService {
     const snapshots = await this.cache.getManyJson<Record<string, any>>(beaches.map(b => conditionKey(b.id)));
     const now = Date.now();
     const enriched = beaches.map((beach,i) => {
-      const { scores, waterTemp, airTemp, conditions } = searchConditions(beach,snapshots[i],now);
-      if(closed.has(beach.id)){scores.bathing=0;scores.family=0;}
+      const { scores, explanations, waterTemp, airTemp, conditions } = searchConditions(beach,snapshots[i],now,closed.has(beach.id));
       const dataStatus = Object.fromEntries(Object.entries({ weather: conditions.weather, marine: conditions.marine }).filter(([,v]) => v));
-      return { ...beach, scores, selectedScore: scores[selectedUsage], waterTemp, airTemp, dataStatus,
+      return { ...beach, scores, scoreExplanation:explanations[selectedUsage], selectedScore: scores[selectedUsage], waterTemp, airTemp, dataStatus,
         bathingRestriction: closed.has(beach.id) ? 'closed' : 'unknown',
         flag: !closed.has(beach.id) && conditions.weather && conditions.marine ? snapshots[i]?.estimatedFlag ?? 'unknown' : 'unknown' };
     });
-    return enriched.filter(b=>!['bathing','family'].includes(selectedUsage)||!closed.has(b.id)).sort((a, b) => (b.selectedScore ?? -1) - (a.selectedScore ?? -1));
+    return enriched.filter(b => b.scoreExplanation.status === 'calculated' && (b.selectedScore ?? 0) > 0)
+      .sort((a,b) => b.selectedScore! - a.selectedScore!);
   }
 }

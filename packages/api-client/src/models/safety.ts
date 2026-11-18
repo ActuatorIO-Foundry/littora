@@ -6,7 +6,7 @@ export interface Safety {
   alerts: Array<string>;
   calculatedConditions: {
 'level': 'favorable' | 'caution' | 'unfavorable' | 'unknown';
-'source': 'littora-score-v1';
+'source': 'littora-score-v1' | 'confort-2';
 };
   communityFlag: CommunityFlag | null;
 

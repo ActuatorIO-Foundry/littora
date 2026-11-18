@@ -412,8 +412,9 @@ components:
       allOf:
         - {$ref: '#/components/schemas/Beach'}
         - type: object
-          required: [selectedScore, scores, waterTemp, airTemp, flag, flagSource, recentRedAt, conditions]
+          required: [selectedScore, scores, waterTemp, airTemp, flag, flagSource, recentRedAt, conditions, scoreExplanation]
           properties:
+            scoreExplanation: {$ref: '#/components/schemas/ScoreExplanation'}
             bathingRestriction: {type: string, enum: [closed, unknown], description: Separate from observed or estimated flags.}
             selectedScore: {type: number, minimum: 0, maximum: 100, nullable: true}
             scores: {$ref: '#/components/schemas/Scores'}
@@ -778,7 +779,7 @@ components:
           required: [level, source]
           properties:
             level: {type: string, enum: [favorable, caution, unfavorable, unknown]}
-            source: {type: string, enum: [littora-score-v1]}
+            source: {type: string, enum: [littora-score-v1, confort-2]}
         alerts: {type: array, items: {type: string}}
     MetricPoint:
       type: object
@@ -786,10 +787,37 @@ components:
       properties:
         time: {type: string, format: date-time}
         value: {type: number, nullable: true}
+    ScoreExplanation:
+      type: object
+      required: [version, status, score, required, available, missing, factors]
+      properties:
+        version: {type: string}
+        status: {type: string, enum: [calculated, insufficient, not-applicable, closed]}
+        score: {type: integer, minimum: 0, maximum: 100, nullable: true}
+        required: {type: integer, minimum: 0}
+        available: {type: integer, minimum: 0}
+        missing: {type: array, items: {type: string}}
+        factors:
+          type: array
+          items:
+            type: object
+            required: [label, points]
+            properties:
+              label: {type: string}
+              points: {type: integer, maximum: 0}
+    UsageExplanations:
+      type: object
+      required: [bathing, family, paddle, boat]
+      properties:
+        bathing: {$ref: '#/components/schemas/ScoreExplanation'}
+        family: {$ref: '#/components/schemas/ScoreExplanation'}
+        paddle: {$ref: '#/components/schemas/ScoreExplanation'}
+        boat: {$ref: '#/components/schemas/ScoreExplanation'}
     BeachScore:
       type: object
-      required: [beach, current, scores, safety, summary, forecast, reliability, dataStatus, providers, disclaimer, measurements]
+      required: [beach, current, scores, explanations, safety, summary, forecast, reliability, dataStatus, providers, disclaimer, measurements]
       properties:
+        explanations: {$ref: '#/components/schemas/UsageExplanations'}
         beach: {$ref: '#/components/schemas/Beach'}
         current:
           type: object
@@ -824,8 +852,9 @@ components:
       allOf:
         - {$ref: '#/components/schemas/Beach'}
         - type: object
-          required: [scores, selectedScore, flag, waterTemp, airTemp, dataStatus]
+          required: [scores, selectedScore, flag, waterTemp, airTemp, dataStatus, scoreExplanation]
           properties:
+            scoreExplanation: {$ref: '#/components/schemas/ScoreExplanation'}
             bathingRestriction: {type: string, enum: [closed, unknown]}
             scores: {$ref: '#/components/schemas/Scores'}
             selectedScore: {type: integer, nullable: true, minimum: 0, maximum: 100}

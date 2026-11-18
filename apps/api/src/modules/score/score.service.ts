@@ -6,10 +6,9 @@ import { TidesService, unavailableTides } from '../tides/tides.service';
 import { WaterQualityService } from '../water-quality/water-quality.service';
 import { WeatherService } from '../weather/weather.service';
 import { finiteMetric } from '../../shared/forecast-data';
+import { measured } from './comfort-model';
 import { CacheService } from '../../cache/cache.service';
-import { conditionKey, conditionSnapshot } from '../search/search-conditions';
-
-const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
+import { conditionKey, conditionSnapshot, searchConditions } from '../search/search-conditions';
 
 @Injectable()
 export class ScoreService {
@@ -36,33 +35,25 @@ export class ScoreService {
 
     const wc = weather.current;
     const mc = marine.current;
-    const wind = finiteMetric(wc.wind_speed_10m);
-    const gust = finiteMetric(wc.wind_gusts_10m);
-    const uv = finiteMetric(wc.uv_index);
-    const wave = finiteMetric(mc.wave_height);
-    const current = finiteMetric(mc.ocean_current_velocity);
-    const waterTemp = finiteMetric(mc.sea_surface_temperature);
-    const communityPenalty = this.communityPenalty(community);
-    const qualityStatus = waterQuality.status;
-    const qualityPenalty = qualityStatus === 'poor' ? 35 : 0;
-
-    const fresh = ![weather.status, marine.status].some(s => s === 'unknown' || s === 'stale');
-    const closed = qualityStatus === 'closed';
-    const bathing = closed ? 0 : fresh && wind !== null && gust !== null && uv !== null && wave !== null && current !== null && waterTemp !== null
-      ? clamp(92 - wind * 1.3 - gust * 0.6 - uv * 2.2 - wave * 18 - current * 40 - Math.abs(24 - waterTemp) * 2 - qualityPenalty - communityPenalty.bathing) : null;
-    const family = closed ? 0 : bathing !== null && uv !== null && wave !== null
-      ? clamp(bathing - uv * 1.5 - wave * 10 + (beach.has_lifeguard ? 6 : -8) + (beach.has_toilets ? 3 : 0) + (beach.has_parking ? 3 : 0) - communityPenalty.family) : null;
-    const paddle = fresh && wind !== null && gust !== null && wave !== null && current !== null
-      ? clamp(88 - wind * 2.2 - gust * 0.8 - wave * 24 - current * 60 - communityPenalty.paddle) : null;
-    const boat = fresh && wind !== null && gust !== null && wave !== null && current !== null
-      ? clamp(84 - wind * 1.1 - gust * 0.9 - wave * 22 - current * 35 - communityPenalty.boat) : null;
+    const dataStatus = { weather: this.dataStatus(weather), marine: this.dataStatus(marine) };
+    const current = { weather: wc, marine: mc, tides, waterQuality, community };
+    const closed = waterQuality.status === 'closed';
+    const projection = conditionSnapshot({ beach, current, dataStatus });
+    const { scores, explanations, conditions } = searchConditions(beach, projection, Date.now(), closed);
+    const { bathing } = scores;
+    const metric = (group: 'weather' | 'marine', key: string) => conditions[group]
+      ? measured(key,current[group][key],dataStatus[group].units[key]) : null;
+    const labels:Record<string,string> = {jellyfish:'Signalements méduses',current:'Signalements courant',pollution:'Signalements pollution',crowd:'Affluence signalée'};
+    const communityAlerts = Object.entries(labels).filter(([type]) => community.some((r:{type:string}) => r.type===type)).map(([,label])=>label);
 
     const result = {
       beach,
-      current: { weather: wc, marine: mc, tides, waterQuality, community },
-      scores: { bathing, family, paddle, boat },
-      safety: this.safety(bathing, fresh ? wave : null, fresh ? current : null, fresh ? uv : null, fresh ? wind : null, qualityStatus, communityPenalty.alerts, flagConsensus),
-      summary: { ...this.summary(bathing, family, paddle, boat), ...(closed ? { bathing: 'Baignade interdite', family: 'Baignade interdite' } : {}) },
+      current, scores, explanations,
+      safety: this.safety(bathing, metric('marine','wave_height'), metric('marine','ocean_current_velocity'),
+        metric('weather','uv_index'), metric('weather','wind_speed_10m'), waterQuality.status, communityAlerts, flagConsensus),
+      summary: Object.fromEntries(Object.entries(explanations).map(([usage,e])=>[usage,
+        e.status === 'closed' ? 'Baignade interdite' : e.status === 'not-applicable' ? 'Modèle marin non applicable' :
+        e.score === null ? 'Données insuffisantes' : `Indice de confort : ${e.score}/100`])),
       forecast: {
         uv: this.series(weather.raw?.hourly, 'uv_index'),
         air: this.series(weather.raw?.hourly, 'temperature_2m'),
@@ -77,7 +68,7 @@ export class ScoreService {
         waterQuality: waterQuality.reliability ?? 'unknown',
         community: community.length || flagConsensus ? 'fresh' : 'none',
       },
-      dataStatus: { weather: this.dataStatus(weather), marine: this.dataStatus(marine) },
+      dataStatus,
       providers: {
         weather: weather.provider,
         marine: marine.provider,
@@ -87,7 +78,7 @@ export class ScoreService {
       },
       disclaimer: 'Scores indicatifs. Ne remplacent jamais les consignes officielles, drapeaux, postes de secours, BMS ou autorités locales.',
     };
-    const published = await this.cache.setJson(conditionKey(id), conditionSnapshot(result), 900);
+    const published = await this.cache.setJson(conditionKey(id), { ...projection, estimatedFlag:result.safety.estimatedFlag }, 900);
     if (requireProjection && !published) throw new Error('Search cache unavailable');
     return result;
   }
@@ -115,14 +106,6 @@ export class ScoreService {
     };
   }
 
-  summary(bathing: number | null, family: number | null, paddle: number | null, boat: number | null) {
-    return {
-      bathing: bathing === null ? 'Données insuffisantes' : bathing > 80 ? 'Conditions météo-marines favorables' : bathing > 60 ? 'Conditions météo-marines à surveiller' : 'Baignade défavorable ou incertaine',
-      family: family === null ? 'Données insuffisantes' : family > 75 ? 'Adaptée famille' : 'À vérifier pour famille',
-      paddle: paddle === null ? 'Données insuffisantes' : paddle > 75 ? 'Bon créneau paddle' : 'Paddle à éviter si vent/courant augmente',
-      boat: boat === null ? 'Données insuffisantes' : boat > 75 ? 'Sortie bateau favorable' : 'Navigation à préparer avec prudence',
-    };
-  }
 
   private series(hourly: Record<string, any[]> | undefined, key: string) {
     const times = Array.isArray(hourly?.time) ? hourly?.time : [];
@@ -146,34 +129,4 @@ export class ScoreService {
       units: data.units ?? {}, provider: data.provider, warning: data.warning ?? null };
   }
 
-  private communityPenalty(reports: Array<{ type: string; count: number; confidence: number }>) {
-    const penalty = { bathing: 0, family: 0, paddle: 0, boat: 0, alerts: [] as string[] };
-
-    for (const report of reports) {
-      const weight = Math.min(1, Number(report.count) * Number(report.confidence ?? 0.5));
-      if (report.type === 'jellyfish') {
-        penalty.bathing += 12 * weight;
-        penalty.family += 10 * weight;
-        penalty.alerts.push('Signalements méduses');
-      }
-      if (report.type === 'current') {
-        penalty.bathing += 10 * weight;
-        penalty.paddle += 14 * weight;
-        penalty.boat += 7 * weight;
-        penalty.alerts.push('Signalements courant');
-      }
-      if (report.type === 'pollution') {
-        penalty.bathing += 22 * weight;
-        penalty.family += 18 * weight;
-        penalty.alerts.push('Signalements pollution');
-      }
-      if (report.type === 'crowd') {
-        penalty.family += 6 * weight;
-        penalty.alerts.push('Affluence signalée');
-      }
-    }
-
-    penalty.alerts = Array.from(new Set(penalty.alerts));
-    return penalty;
-  }
 }

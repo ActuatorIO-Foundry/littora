@@ -1,0 +1,30 @@
+# Indices de confort par usage (#21)
+
+`confort-2` est un modèle éditorial expérimental de comparaison des **plages de mer**, pas une probabilité, un indice réglementaire, un drapeau ni un outil de navigation. Les coefficients ne sont pas validés cliniquement ou par un organisme de secours. Les [prévisions marines de Météo-France](https://meteofrance.com/meteo-a-z/meteo-france-et-la-mer) motivent la prise en compte du vent et de l'état de mer ; l'[indice UV de l'OMS](https://www.who.int/news-room/questions-and-answers/item/radiation-the-ultraviolet-%28UV%29-INDEX) motive la prise en compte de l'exposition à partir de 3. Aucune de ces références ne valide les points Littora.
+
+## Règle reproductible
+
+Base 100. Chaque cellule est une déduction par unité canonique, arrondie séparément au point entier le plus proche (demi-point vers le haut). Vagues : hauteur significative prévue, pas hauteur au bord de la plage. Température : distance en degrés à la plage éditoriale 20–25 °C ; UV : partie au-dessus de 2. Un tiret signifie non utilisé.
+
+| Usage | Vent km/h | Rafales km/h | Vagues m | Courant m/s | UV | Eau °C |
+|---|---:|---:|---:|---:|---:|---:|
+| Baignade | 1 | 0,5 | 20 | 40 | 2 | 3 |
+| Famille | 1 | 0,6 | 28 | 50 | 3 | 4 |
+| Paddle de loisir | 2 | 1 | 28 | 55 | – | – |
+| Bateau de plaisance | 1 | 0,6 | 22 | 35 | – | – |
+
+Le profil famille accorde plus de poids aux vagues, aux UV, à la température et au courant ; le profil paddle au vent. Aucun bonus de parking, de sauveteur supposé présent ou de qualité sanitaire « bonne ». Un prélèvement récent défavorable enlève 35 points aux profils baignade/famille. Les pénalités communautaires sont plafonnées par catégorie : pollution 22 et méduses 12 pour baignade/famille ; courant 10/10/14/7 ; affluence 6 pour famille. Le plafond est pondéré par le nombre et la confiance des observations retenues. Le total ne descend pas en dessous de zéro.
+
+## Couverture et restrictions
+
+Les 6 mesures essentielles (baignade/famille) ou 4 (paddle/bateau) doivent toutes avoir la bonne unité, être physiquement plausibles et provenir de prévisions datées utilisables. Sinon : score nul au sens JSON (`null`), couverture et mesures manquantes, jamais 0/100 par défaut. Une valeur mesurée de zéro reste valide. Lac, rivière et milieu inconnu : modèle non applicable. Aucun courant d'atlas SHOM, température marine ou coefficient de marée ne remplace une mesure locale manquante.
+
+Une interdiction officielle active neutralise baignade et famille (0, statut `closed`), quel que soit le milieu, sans fabriquer de drapeau. Après levée, une projection datant de la fermeture est écartée. Surveillance sur place, dangers localisés, vigilance, compétences et embarcation ne sont pas validés par le modèle.
+
+La liste, les recommandations et la fiche utilisent les mêmes contributions ; une liste est datée et figée pendant la pagination (2 min), la fiche relit les dernières données. Les entrées projetées expirent après 15 min et sont revérifiées à la lecture. Un rafraîchissement ou un nouveau signalement peut légitimement changer le résultat. Aucun calcul ne déclenche d'appel météo par résultat de recherche.
+
+Les recommandations excluent les indices inconnus, non applicables, nuls et les usages interdits. La recherche sans filtre conserve ces plages pour consultation.
+
+## Scénarios de régression
+
+Vent 8, rafales 10, vagues 0,3, courant 0,05, UV 3, eau 22 : **77 / 72 / 63 / 77** (ordre du tableau). Mêmes entrées avec vagues 4 et courant 1 : **0 / 0 / 0 / 0**. Avec eau manquante seulement : **indisponible / indisponible / 63 / 77**. Avec prélèvement récent défavorable et signalement pollution au plafond : **20 / 15 / 63 / 77**. Le gel des scénarios vérifie le calcul, pas sa capacité prédictive. Ne pas généraliser aux eaux intérieures sans données et calibration propres.

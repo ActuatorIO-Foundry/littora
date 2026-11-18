@@ -47,9 +47,10 @@ export class ScoreService {
     const qualityPenalty = qualityStatus === 'poor' ? 35 : 0;
 
     const fresh = ![weather.status, marine.status].some(s => s === 'unknown' || s === 'stale');
-    const bathing = fresh && wind !== null && gust !== null && uv !== null && wave !== null && current !== null && waterTemp !== null
+    const closed = qualityStatus === 'closed';
+    const bathing = closed ? 0 : fresh && wind !== null && gust !== null && uv !== null && wave !== null && current !== null && waterTemp !== null
       ? clamp(92 - wind * 1.3 - gust * 0.6 - uv * 2.2 - wave * 18 - current * 40 - Math.abs(24 - waterTemp) * 2 - qualityPenalty - communityPenalty.bathing) : null;
-    const family = bathing !== null && uv !== null && wave !== null
+    const family = closed ? 0 : bathing !== null && uv !== null && wave !== null
       ? clamp(bathing - uv * 1.5 - wave * 10 + (beach.has_lifeguard ? 6 : -8) + (beach.has_toilets ? 3 : 0) + (beach.has_parking ? 3 : 0) - communityPenalty.family) : null;
     const paddle = fresh && wind !== null && gust !== null && wave !== null && current !== null
       ? clamp(88 - wind * 2.2 - gust * 0.8 - wave * 24 - current * 60 - communityPenalty.paddle) : null;
@@ -61,7 +62,7 @@ export class ScoreService {
       current: { weather: wc, marine: mc, tides, waterQuality, community },
       scores: { bathing, family, paddle, boat },
       safety: this.safety(bathing, fresh ? wave : null, fresh ? current : null, fresh ? uv : null, fresh ? wind : null, qualityStatus, communityPenalty.alerts, flagConsensus),
-      summary: this.summary(bathing, family, paddle, boat),
+      summary: { ...this.summary(bathing, family, paddle, boat), ...(closed ? { bathing: 'Baignade interdite', family: 'Baignade interdite' } : {}) },
       forecast: {
         uv: this.series(weather.raw?.hourly, 'uv_index'),
         air: this.series(weather.raw?.hourly, 'temperature_2m'),
@@ -92,12 +93,12 @@ export class ScoreService {
   }
 
   safety(bathing: number | null, wave: number | null, current: number | null, uv: number | null, wind: number | null, quality?: string, communityAlerts: string[] = [], communityFlag?: any) {
-    const estimatedFlag = bathing === null || wave === null || current === null ? 'unknown'
+    const estimatedFlag = quality === 'closed' ? 'unknown' : bathing === null || wave === null || current === null ? 'unknown'
       : bathing >= 78 && wave < 0.8 && current < 0.18 ? 'green' : bathing >= 55 && wave < 1.3 && current < 0.32 ? 'yellow' : 'red';
     return {
       flag: estimatedFlag,
       estimatedFlag,
-      source: estimatedFlag === 'unknown' ? 'Conditions insuffisantes. Le drapeau officiel reste celui affiché sur place.'
+      source: quality === 'closed' ? 'Interdiction officielle de baignade, indépendante du drapeau des sauveteurs.' : estimatedFlag === 'unknown' ? 'Conditions insuffisantes. Le drapeau officiel reste celui affiché sur place.'
           : 'Estimation Littora: météo, vagues, courant, UV, qualité d’eau et signalements. Le drapeau officiel reste celui affiché sur place.',
       official: false,
       communityFlag: communityFlag ?? null,
@@ -106,7 +107,7 @@ export class ScoreService {
         ...(wind !== null && wind >= 28 ? ['Vent soutenu'] : []),
         ...(wave !== null && wave >= 1.2 ? ['Mer agitée'] : []),
         ...(current !== null && current >= 0.28 ? ['Courant marqué'] : []),
-        ...(quality === 'poor' ? ['Qualité d’eau défavorable au dernier prélèvement récent'] : ['Qualité sanitaire actuelle non confirmée']),
+        ...(quality === 'closed' ? ['Baignade interdite par décision officielle'] : quality === 'poor' ? ['Qualité d’eau défavorable au dernier prélèvement récent'] : ['Qualité sanitaire actuelle non confirmée']),
         ...(communityFlag ? [`Drapeaux signalés: ${communityFlag.counts.green} vert, ${communityFlag.counts.yellow} jaune, ${communityFlag.counts.red} rouge`] : []),
         ...(communityFlag?.recentRedAt ? [`Drapeau rouge observé le ${new Date(communityFlag.recentRedAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris'})}. Signalement communautaire, non officiel.`] : []),
         ...communityAlerts,

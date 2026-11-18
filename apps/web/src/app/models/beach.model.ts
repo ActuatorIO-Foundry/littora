@@ -22,7 +22,7 @@ export interface BeachScore {
     weather?: Record<string, unknown>;
     marine?: Record<string, unknown>;
     tides?: import('@littora/api-client/models').Tides;
-    waterQuality?: Record<string, unknown>;
+    waterQuality?: import('@littora/api-client/models').WaterQuality;
   };
   scores: {
     bathing: number | null;

@@ -4,6 +4,11 @@
 import { Beach } from '../models/beach';
 import { Scores } from '../models/scores';
 export type SearchBeach = Beach & {
+
+/**
+ * Separate from observed or estimated flags.
+ */
+'bathingRestriction'?: 'closed' | 'unknown';
 'selectedScore': number | null;
 'scores': Scores;
 'waterTemp': number | null;

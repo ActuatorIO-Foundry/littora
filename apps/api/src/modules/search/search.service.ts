@@ -7,7 +7,7 @@ import { ReportsService } from '../reports/reports.service';
 import { conditionKey, searchConditions } from './search-conditions';
 import { SearchInput, validateSearch } from './search-input';
 
-type Snapshot = { hash: string; asOf: string; expiresAt: string; items: any[];
+type Snapshot = { closedKey: string; hash: string; asOf: string; expiresAt: string; items: any[];
   commune: any; coverage: { candidates: number; waterTemperature: number; airTemperature: number; scores: number; flags: number } };
 
 @Injectable()
@@ -20,13 +20,15 @@ export class SearchService {
     const { cursor, ...criteria } = input;
     const limit = input.limit ?? 200;
     const hash = createHash('sha256').update(JSON.stringify(Object.entries(criteria).sort(([a],[b]) => a.localeCompare(b)))).digest('hex');
+    const closed=await this.beaches.closedForBathing();
+    const closedKey=createHash('sha256').update([...closed].join(',')).digest('hex');
     let snapshot: Snapshot, id = randomUUID(), offset = 0;
     if (cursor) {
       const match = /^([a-f0-9-]{36}):([1-9][0-9]*)$/.exec(cursor);
       if (!match) throw new BadRequestException('Invalid search cursor');
       id = match[1] as typeof id; offset = Number(match[2]);
-      const saved = await this.cache.getJson<Snapshot>(`search:page:v2:${id}`);
-      if (!saved || Date.parse(saved.expiresAt) <= Date.now()) throw new ConflictException('Search expired; restart from first page');
+      const saved = await this.cache.getJson<Snapshot>(`search:page:v3:${id}`);
+      if (!saved || saved.closedKey!==closedKey || Date.parse(saved.expiresAt) <= Date.now()) throw new ConflictException('Search expired; restart from first page');
       if (saved.hash !== hash || !Number.isSafeInteger(offset) || offset >= saved.items.length || offset % limit) {
         throw new BadRequestException('Cursor does not match search');
       }
@@ -39,8 +41,9 @@ export class SearchService {
       const now = Date.now(), usage = input.usage ?? 'bathing';
       const enriched = candidates.map((beach, i) => {
         const conditions = searchConditions(beach, cached[i], now);
+        if(closed.has(beach.id)) conditions.scores={...conditions.scores,bathing:0,family:0};
         const community = flags.get(beach.id);
-        return { ...beach, ...conditions, selectedScore: conditions.scores[usage],
+        return { ...beach, ...conditions, bathingRestriction:closed.has(beach.id)?'closed':'unknown', selectedScore: conditions.scores[usage],
           flag: community?.flag ?? null, flagSource: community?.flag ? 'community' : null,
           recentRedAt: community?.recentRedAt ?? null };
       });
@@ -53,12 +56,12 @@ export class SearchService {
       items.sort((a,b) => (input.sort === 'score' ? (b.selectedScore ?? -1) - (a.selectedScore ?? -1)
         : input.sort === 'distance' ? (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity)
         : names.compare(a.name,b.name)) || a.id.localeCompare(b.id));
-      snapshot = { hash, asOf: new Date(now).toISOString(), expiresAt: new Date(now + 120_000).toISOString(), items, commune,
+      snapshot = { closedKey, hash, asOf: new Date(now).toISOString(), expiresAt: new Date(now + 120_000).toISOString(), items, commune,
         coverage: { candidates: candidates.length, waterTemperature: enriched.filter(b => b.waterTemp !== null).length,
           airTemperature: enriched.filter(b => b.airTemp !== null).length,
           scores: enriched.filter(b => b.selectedScore !== null).length, flags: enriched.filter(b => b.flag !== null).length } };
       // A frozen short-lived result prevents changing weather or reports from duplicating/skipping pages.
-      if (items.length > limit && !await this.cache.setJson(`search:page:v2:${id}`, snapshot, 120)) {
+      if (items.length > limit && !await this.cache.setJson(`search:page:v3:${id}`, snapshot, 120)) {
         throw new ServiceUnavailableException('Stable pagination unavailable');
       }
     }

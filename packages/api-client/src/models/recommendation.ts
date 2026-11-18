@@ -5,6 +5,7 @@ import { Beach } from '../models/beach';
 import { DataStatus } from '../models/data-status';
 import { Scores } from '../models/scores';
 export type Recommendation = Beach & {
+'bathingRestriction'?: 'closed' | 'unknown';
 'scores': Scores;
 'selectedScore': number | null;
 'flag': 'green' | 'yellow' | 'red' | 'unknown';

@@ -12,6 +12,8 @@ export type { Alerts } from './models/alerts';
 export type { Amenities } from './models/amenities';
 export type { Amenity } from './models/amenity';
 export type { ApiError } from './models/api-error';
+export type { ArsMeasurement } from './models/ars-measurement';
+export type { ArsPeriod } from './models/ars-period';
 export type { AuthStatus } from './models/auth-status';
 export type { Beach } from './models/beach';
 export type { BeachPage } from './models/beach-page';

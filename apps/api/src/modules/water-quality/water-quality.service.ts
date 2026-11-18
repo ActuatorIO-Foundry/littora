@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PG } from '../../database/database.module';
 
+import { bathingEvidence } from './ars-read';
+
 type SampleRow = { date: string; result: string; source: string; age_days: number };
 
 @Injectable()
@@ -22,14 +24,20 @@ export class WaterQualityService {
     }
     // A recent adverse sample warrants caution. No sample establishes permission to swim.
     const caution = sample?.result === 'poor' && sample.age_days <= 1;
+    const {archive,restriction}=beachId?await bathingEvidence(this.db,beachId):{archive:null,restriction:{status:'unknown',decisions:[]}};
+    const latest=archive?.samples.find(s=>s.ecoli.value!==null || s.enterococci.value!==null);
+    const lastSample=latest && (!sample||latest.date>sample.date)
+      ? {date:latest.date,result:'laboratory-analysis',source:'ars-rapportage'}
+      : sample ? {date:sample.date,result:sample.result,source:sample.source} : null;
+    const closed=restriction.status==='closed';
     return {
-      provider: sample?.source ?? 'unknown',
-      status: caution ? 'poor' : 'unknown',
+      provider: lastSample?.source ?? 'unknown',
+      status: closed ? 'closed' : caution ? 'poor' : 'unknown',
       classification: null,
-      sample_date: sample?.date ?? null,
-      lastSample: sample ? { date: sample.date, result: sample.result, source: sample.source } : null,
-      reliability: caution ? 'recent-sample' : 'unknown',
-      warning: caution ? 'Prélèvement récent défavorable. Vérifiez les consignes sur place.'
+      sample_date: lastSample?.date ?? null,
+      lastSample,archive,restriction,
+      reliability: closed ? 'official-decision' : caution ? 'recent-sample' : 'unknown',
+      warning: closed ? 'Baignade interdite par décision officielle.' : caution ? 'Prélèvement récent défavorable. Vérifiez les consignes sur place.'
         : 'État sanitaire actuel non confirmé. Un prélèvement ne vaut pas autorisation de baignade.',
     };
   }

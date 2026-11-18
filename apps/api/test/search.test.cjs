@@ -19,7 +19,7 @@ function fixture() {
   const cache={getJson:async k=>structuredClone(stored.get(k)??null),
     getManyJson:async keys=>keys.map(k=>stored.get(k)??null),
     setJson:async(k,v)=>{stored.set(k,structuredClone(v));return true;}};
-  const service=new SearchService({searchCandidates:async()=>{reads++;return rows;}},
+  const service=new SearchService({closedForBathing:async()=>new Set(),searchCandidates:async()=>{reads++;return rows;}},
     {get:async()=>{throw Error('Unexpected geographic request');}}, {flagConsensuses:async()=>new Map()},cache);
   return {service,cache,stored,reads:()=>reads};
 }
@@ -72,4 +72,15 @@ test('search: score publication retains source times, nulls and never the calcul
   assert.equal(saved.key,conditionKey(rows[0].id));assert.equal(saved.ttl,900);
   assert.equal(saved.value.waterTemp,22);assert.equal(saved.value.flag,undefined);
   assert.equal(searchConditions(saved.value,saved.value,Date.now()).waterTemp,null,'Undated test providers are not searchable forecasts');
+});
+
+test('search: a new official closure overrides cached scores and expires outstanding cursors',async()=>{
+  const {service,stored}=fixture();
+  stored.set(conditionKey(rows[0].id),snapshot());
+  const page=await service.search({limit:2});
+  service.beaches.closedForBathing=async()=>new Set([rows[0].id]);
+  await assert.rejects(service.search({limit:2,cursor:page.pageInfo.nextCursor}),e=>e.getStatus()===409);
+  assert.equal((await service.search({minScore:65,usage:'family'})).total,0);
+  assert.equal((await service.search({})).items.find(b=>b.id===rows[0].id).bathingRestriction,'closed');
+  assert.equal((await service.search({minScore:20,usage:'paddle'})).total,1);
 });

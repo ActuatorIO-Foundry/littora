@@ -85,6 +85,10 @@ export class LittoraApiService {
         return this.client.getBeach({ id: beachId }).pipe(map(beachView));
     }
 
+    getVigilance(beachId: string) {
+        return this.client.getAlerts({ beachId });
+    }
+
     getBeachAmenities(beachId: string): Observable<BeachAmenitiesResponse> {
         return this.client.getBeachAmenities({ id: beachId });
     }

@@ -122,6 +122,22 @@ test.beforeEach(async ({ page }) => {
   await mockApi(page);
 });
 
+test('vigilance officielle : source et échéance indépendantes du score', async ({page}) => {
+  await page.clock.install({time:new Date('2026-11-18T19:00:00Z')});
+  let valid=true;
+  await page.route('**/api/alerts?beachId=test-sea',route=>route.fulfill({json:valid ? {
+    status:'available',department:'83',alerts:[{level:'orange'}],issuedAt:'2026-11-18T18:00:00Z',
+    validFrom:'2026-11-18T19:00:00Z', validUntil:'2026-11-18T20:00:00Z', checkBy:'2026-11-18T19:01:00Z',
+  } : {status:'unknown', alerts:[]}}));
+  await page.goto('/plages/test-sea');
+  const caption=page.locator('p.caption').filter({hasText:'Vagues-submersion'});
+  await expect(caption).toContainText('vigilance orange sur le littoral 83');
+  await expect(caption.getByRole('link')).toHaveAttribute('href','https://vigilance.meteofrance.fr/fr/vagues-submersion');
+  valid=false; await page.clock.fastForward(61000);
+  await expect(caption).toContainText('indisponible');
+  await expect(caption).not.toContainText('orange');
+});
+
 test('prévisions : courant en m/s et interruption de courbe pour une mesure absente', async ({ page }) => {
   await page.route('**/api/score/beach/*', route => route.fulfill({ json: {
     ...score, forecast: { current: [

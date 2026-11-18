@@ -80,7 +80,6 @@ export function present(operation: string, data: any, query: Row): unknown {
     case 'getBeachScore': return presentScore(data);
     case 'getWeather': case 'getMarine': return presentForecast(data);
     case 'getWaterQuality': return { ...data, isDemo: false };
-    case 'getAlerts': return { ...data, status: 'unknown' };
     case 'createReport': return presentReport(data);
     case 'getReports': return data.map(presentReport);
     default: return data;

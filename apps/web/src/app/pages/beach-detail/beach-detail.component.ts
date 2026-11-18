@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from "@angular/core";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { Subscription, timeout } from "rxjs";
+import type { Alerts } from "@littora/api-client/models";
 import {
   Beach,
   BeachAmenity,
@@ -42,6 +43,9 @@ interface Report {
 export class BeachDetailComponent implements OnInit, OnDestroy {
   beach: Beach | null = null;
   score: BeachScore | null = null;
+  vigilance: Alerts | null = null;
+  readonly vigilanceLabels = { yellow:"jaune", orange:"orange", red:"rouge" };
+  private vigilanceTimer?: ReturnType<typeof setTimeout>;
   amenities: BeachAmenitiesResponse | null = null;
   reports: Report[] = [];
   loading = true;
@@ -122,6 +126,8 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     this.subscriptions.add(this.route.paramMap.subscribe(params => this.loadBeach(params.get("id"))));
   }
   private loadBeach(id: string | null): void {
+    clearTimeout(this.vigilanceTimer);
+    this.vigilance = null;
     clearTimeout(this.scoreTimer);
     this.beachRequests.unsubscribe();
     this.beachRequests = new Subscription();
@@ -152,6 +158,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
         .subscribe({
           next: (b) => {
             this.beach = b;
+            if (b.waterType === 'sea') this.loadVigilance(id);
             this.loading = false;
             this.cdr.markForCheck();
           },
@@ -182,6 +189,21 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
         }),
     );
     this.loadReports(id);
+  }
+  private loadVigilance(id: string): void {
+    const update = (result: Alerts | null) => {
+      const remaining = result?.checkBy ? Date.parse(result.checkBy) - Date.now() : 0;
+      this.vigilance = result?.status === 'available' && remaining > 0 ? result : null;
+      this.cdr.markForCheck();
+      this.vigilanceTimer = setTimeout(() => {
+        this.vigilance = null;
+        this.cdr.markForCheck();
+        this.loadVigilance(id);
+      }, this.vigilance ? Math.min(remaining, 300000) : 60000);
+    };
+    this.beachRequests.add(this.api.getVigilance(id).pipe(timeout(10000)).subscribe({
+      next: update, error: () => update(null),
+    }));
   }
   loadScore(id: string, background = false): void {
     clearTimeout(this.scoreTimer);
@@ -377,6 +399,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
         }).format(d);
   }
   ngOnDestroy(): void {
+    clearTimeout(this.vigilanceTimer);
     clearTimeout(this.scoreTimer);
     this.subscriptions.unsubscribe();
     this.beachRequests.unsubscribe();

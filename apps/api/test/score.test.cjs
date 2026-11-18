@@ -81,3 +81,13 @@ test('scores: missing water temperature never becomes 22 degrees', async () => {
   assert.equal(result.scores.family, null);
   assert.ok(Number.isFinite(result.scores.paddle));
 });
+
+test('scores: a favorable sample never gives a bathing bonus or a sanitary clearance', async () => {
+  const baseline = await scoreFixture({quality:'unknown'}).scoreBeach(beach.id);
+  for (const quality of ['good','excellent']) {
+    const result = await scoreFixture({quality}).scoreBeach(beach.id);
+    assert.deepEqual(result.scores,baseline.scores);
+    assert.equal(result.safety.official,false);
+    assert.ok(result.safety.alerts.some(a=>a.includes('sanitaire actuelle non confirmée')));
+  }
+});

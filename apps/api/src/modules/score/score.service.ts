@@ -43,13 +43,12 @@ export class ScoreService {
     const current = finiteMetric(mc.ocean_current_velocity);
     const waterTemp = finiteMetric(mc.sea_surface_temperature);
     const communityPenalty = this.communityPenalty(community);
-    const qualityStatus = waterQuality.is_demo || waterQuality.raw?.demo === true || waterQuality.raw?.demo === 'true' ||
-      ['local-seed', 'demo-seed'].includes(waterQuality.source) ? 'unknown' : waterQuality.status;
-    const qualityBonus = qualityStatus === 'excellent' ? 10 : qualityStatus === 'good' ? 5 : qualityStatus === 'poor' ? -35 : 0;
+    const qualityStatus = waterQuality.status;
+    const qualityPenalty = qualityStatus === 'poor' ? 35 : 0;
 
     const fresh = ![weather.status, marine.status].some(s => s === 'unknown' || s === 'stale');
     const bathing = fresh && wind !== null && gust !== null && uv !== null && wave !== null && current !== null && waterTemp !== null
-      ? clamp(92 - wind * 1.3 - gust * 0.6 - uv * 2.2 - wave * 18 - current * 40 - Math.abs(24 - waterTemp) * 2 + qualityBonus - communityPenalty.bathing) : null;
+      ? clamp(92 - wind * 1.3 - gust * 0.6 - uv * 2.2 - wave * 18 - current * 40 - Math.abs(24 - waterTemp) * 2 - qualityPenalty - communityPenalty.bathing) : null;
     const family = bathing !== null && uv !== null && wave !== null
       ? clamp(bathing - uv * 1.5 - wave * 10 + (beach.has_lifeguard ? 6 : -8) + (beach.has_toilets ? 3 : 0) + (beach.has_parking ? 3 : 0) - communityPenalty.family) : null;
     const paddle = fresh && wind !== null && gust !== null && wave !== null && current !== null
@@ -74,7 +73,7 @@ export class ScoreService {
         weather: weather.status ?? 'unknown',
         marine: marine.status ?? 'unknown',
         tides: tides.reliability ?? 'unknown',
-        waterQuality: waterQuality.reliability ?? 'medium',
+        waterQuality: waterQuality.reliability ?? 'unknown',
         community: community.length || flagConsensus ? 'fresh' : 'none',
       },
       dataStatus: { weather: this.dataStatus(weather), marine: this.dataStatus(marine) },
@@ -107,7 +106,7 @@ export class ScoreService {
         ...(wind !== null && wind >= 28 ? ['Vent soutenu'] : []),
         ...(wave !== null && wave >= 1.2 ? ['Mer agitée'] : []),
         ...(current !== null && current >= 0.28 ? ['Courant marqué'] : []),
-        ...(quality === 'poor' ? ['Qualité d’eau défavorable'] : []),
+        ...(quality === 'poor' ? ['Qualité d’eau défavorable au dernier prélèvement récent'] : ['Qualité sanitaire actuelle non confirmée']),
         ...(communityFlag ? [`Drapeaux signalés: ${communityFlag.counts.green} vert, ${communityFlag.counts.yellow} jaune, ${communityFlag.counts.red} rouge`] : []),
         ...(communityFlag?.recentRedAt ? [`Drapeau rouge observé le ${new Date(communityFlag.recentRedAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris'})}. Signalement communautaire, non officiel.`] : []),
         ...communityAlerts,
@@ -117,7 +116,7 @@ export class ScoreService {
 
   summary(bathing: number | null, family: number | null, paddle: number | null, boat: number | null) {
     return {
-      bathing: bathing === null ? 'Données insuffisantes' : bathing > 80 ? 'Excellente baignade probable' : bathing > 60 ? 'Baignade correcte avec vigilance' : 'Baignade défavorable ou incertaine',
+      bathing: bathing === null ? 'Données insuffisantes' : bathing > 80 ? 'Conditions météo-marines favorables' : bathing > 60 ? 'Conditions météo-marines à surveiller' : 'Baignade défavorable ou incertaine',
       family: family === null ? 'Données insuffisantes' : family > 75 ? 'Adaptée famille' : 'À vérifier pour famille',
       paddle: paddle === null ? 'Données insuffisantes' : paddle > 75 ? 'Bon créneau paddle' : 'Paddle à éviter si vent/courant augmente',
       boat: boat === null ? 'Données insuffisantes' : boat > 75 ? 'Sortie bateau favorable' : 'Navigation à préparer avec prudence',

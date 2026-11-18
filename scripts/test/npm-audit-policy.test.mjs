@@ -39,6 +39,12 @@ test('npm audit: incomplete reports and cycles cannot become successful audits',
   report.vulnerabilities.picomatch.via=['builder'];
   assert.equal(checkNpmAudit(report,lock,[exception],'2026-11-17').blocked.length,2);
 });
+test('npm audit: the retired advisory is no longer accepted by repository policy',()=>{
+  const active=JSON.parse(readFileSync(new URL('../../infra/npm-security-exceptions.json',import.meta.url),'utf8'));
+  const {lock,report}=fixture();
+  assert.ok(!active.some(e=>e.id===exception.id));
+  assert.deepEqual(checkNpmAudit(report,lock,active,'2026-11-18').blocked.sort(),['builder','picomatch']);
+});
 test('npm audit: installed picomatch occurrences are all development-only and pinned',()=>{
   const lock=JSON.parse(readFileSync(new URL('../../package-lock.json',import.meta.url),'utf8'));
   const entries=Object.entries(lock.packages).filter(([path])=>path.endsWith('/picomatch'));

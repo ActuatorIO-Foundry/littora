@@ -1,11 +1,1 @@
-[
-  {
-    "id": "GHSA-fc5q-39xc-vjpf",
-    "package": "picomatch",
-    "versions": ["2.3.2", "4.0.4"],
-    "scope": "development-only",
-    "expires": "2026-11-24",
-    "issue": "https://github.com/ActuatorIO-Foundry/littora/issues/45",
-    "reason": "No patched release published. All occurrences are development-only, absent from runtime dependencies. Public deployment remains blocked."
-  }
-]
+[]

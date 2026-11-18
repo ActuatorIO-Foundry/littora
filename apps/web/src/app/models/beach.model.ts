@@ -17,6 +17,7 @@ export interface Beach {
 }
 
 export interface BeachScore {
+  explanations?: import('@littora/api-client/models').UsageExplanations;
   beach: Beach;
   current?: {
     weather?: Record<string, unknown>;

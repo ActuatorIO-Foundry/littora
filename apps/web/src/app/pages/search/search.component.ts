@@ -8,12 +8,14 @@ import { Beach, BeachScore } from "../../models/beach.model";
 import { Commune } from "../../models/commune.model";
 import { LittoraApiService } from "../../services/littora-api.service";
 import { IconComponent } from "../../shared/icon.component";
+import { ComfortExplanationComponent } from '../../shared/comfort-explanation.component';
 import { LoadingComponent } from "../../shared/loading.component";
 import { CoastMapComponent } from "../../shared/coast-map.component";
 import { COASTAL_ZONES, CoastalZone } from "../../shared/coastal-zones";
 import { metricValue, providerLabel, dataStatusLabel } from "../../shared/presentation";
 type Result = Beach & {
   selectedScore?: number | null;
+  scoreExplanation?: import('@littora/api-client/models').ScoreExplanation;
   scores?: BeachScore["scores"];
   flag?: string | null;
   bathingRestriction?: 'closed' | 'unknown';
@@ -27,6 +29,7 @@ type Result = Beach & {
     FormsModule,
     RouterLink,
     IconComponent,
+    ComfortExplanationComponent,
     LoadingComponent,
     CoastMapComponent,
   ],

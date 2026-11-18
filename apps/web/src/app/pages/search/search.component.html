@@ -288,6 +288,7 @@
               >{{ beach.department }}
             </p>
             <div class="beach-tags">
+              <span *ngIf="beach.scoreExplanation?.status === 'calculated'">Confort : {{ beach.selectedScore }}/100</span>
               <span *ngIf="beach.bathingRestriction === 'closed'"><app-icon name="alert" [size]="13" />Baignade interdite</span>
               <span>{{ waterLabel(beach.waterType) }}</span><span
                 *ngIf="beach.has_parking"
@@ -308,6 +309,7 @@
           /></a>
         </div>
         <div class="beach-overview" *ngIf="selectedBeach?.id === beach.id">
+          <app-comfort-explanation [value]="beach.scoreExplanation" />
           <app-loading
             *ngIf="loadingScore"
             label="Chargement des conditions…"

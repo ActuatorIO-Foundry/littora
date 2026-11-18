@@ -170,8 +170,9 @@
             <app-icon name="info" [size]="19" />
             <div>
               <h3>{{ selectedUsageInfo.label }}</h3>
-              <p>{{ selectedUsageInfo.text }}</p>
-              <p *ngIf="score.scores[selectedUsage] == null" class="caption">Score indisponible : données récentes insuffisantes.</p>
+              <p *ngIf="!['closed','not-applicable'].includes(score.explanations?.[selectedUsage]?.status ?? '')">{{ selectedUsageInfo.text }}</p>
+              <app-comfort-explanation [value]="score.explanations?.[selectedUsage]" />
+              <p *ngIf="!score.explanations && score.scores[selectedUsage] == null" class="caption">Score indisponible : données récentes insuffisantes.</p>
               <small
                 >Indice expérimental, pas une autorisation de baignade ni de
                 navigation.</small

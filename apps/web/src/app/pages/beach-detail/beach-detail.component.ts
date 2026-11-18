@@ -13,6 +13,7 @@ import {
 } from "../../models/beach.model";
 import { LittoraApiService } from "../../services/littora-api.service";
 import { IconComponent } from "../../shared/icon.component";
+import { ComfortExplanationComponent } from '../../shared/comfort-explanation.component';
 import { LoadingComponent } from "../../shared/loading.component";
 import { CoastMapComponent } from "../../shared/coast-map.component";
 import {
@@ -34,6 +35,7 @@ interface Report {
     CommonModule,
     RouterLink,
     IconComponent,
+    ComfortExplanationComponent,
     LoadingComponent,
     CoastMapComponent,
   ],
@@ -85,7 +87,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
       key: "family",
       label: "Famille",
       icon: "family",
-      text: "Conditions de baignade et équipements référencés à proximité.",
+      text: "Vent, vagues, courant, UV et température de l’eau. Les équipements sont indiqués séparément.",
     },
     {
       key: "paddle",
@@ -146,6 +148,9 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     private readonly cdr: ChangeDetectorRef,
   ) {}
   ngOnInit(): void {
+    this.subscriptions.add(this.route.queryParamMap.subscribe(p => {
+      this.selectedUsage = this.usages.find(u => u.key === p.get('usage'))?.key ?? 'bathing';
+    }));
     this.subscriptions.add(this.route.paramMap.subscribe(params => this.loadBeach(params.get("id"))));
   }
   private loadBeach(id: string | null): void {

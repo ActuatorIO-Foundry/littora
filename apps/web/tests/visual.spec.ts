@@ -151,6 +151,23 @@ test.describe('Dates civiles en France métropolitaine', () => {
   });
 });
 
+test('Confort : le même profil et les mêmes points dans la liste et la fiche',async({page})=>{
+  const family={version:'confort-2',score:68,status:'calculated',available:6,required:6,missing:[],factors:[{label:'Vagues',points:-32}]};
+  const bathing={...family,score:null,status:'insufficient',available:5,missing:['Température de l’eau']};
+  await page.route('**/api/search/beaches',route=>route.fulfill({json:searchResult(route.request().postDataJSON(),
+    [{...beaches[0],selectedScore:68,scoreExplanation:family}])}));
+  await page.route('**/api/score/beach/*',route=>route.fulfill({json:{...score,scores:{...score.scores,family:68,bathing:null},explanations:{family,bathing}}}));
+  await page.goto('/recherche?usage=family');
+  await expect(page.locator('.beach-tags')).toContainText('Confort : 68/100');
+  await page.getByRole('button',{name:'Plage des Pins'}).click();
+  await expect(page.locator('.beach-overview')).toContainText('Vagues : -32');
+  await page.getByRole('link',{name:/Détails/}).first().click();
+  await expect(page.locator('.score-explanation')).toContainText('Vagues : -32');
+  await page.getByRole('button',{name:/Baignade/}).first().click();
+  await expect(page.locator('.score-explanation')).toContainText('5/6');
+  await expect(page.locator('.score-explanation')).toContainText('Température de l’eau');
+});
+
 test('SHOM : références du port distinctes des horaires et retrait à échéance', async ({page})=>{
   await page.clock.install({time:new Date('2026-11-18T22:59:45Z')});
   await page.route('**/api/score/beach/*', route=>route.fulfill({json:{...score,current:{...score.current,tides:{

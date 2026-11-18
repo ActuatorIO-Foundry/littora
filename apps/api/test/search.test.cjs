@@ -81,5 +81,6 @@ test('search: a new official closure overrides cached scores and expires outstan
   service.beaches.closedForBathing=async()=>new Set([rows[0].id]);
   await assert.rejects(service.search({limit:2,cursor:page.pageInfo.nextCursor}),e=>e.getStatus()===409);
   assert.equal((await service.search({minScore:65,usage:'family'})).total,0);
+  assert.equal((await service.search({})).items.find(b=>b.id===rows[0].id).bathingRestriction,'closed');
   assert.equal((await service.search({minScore:20,usage:'paddle'})).total,1);
 });

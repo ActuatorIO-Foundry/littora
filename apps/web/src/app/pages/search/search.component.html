@@ -288,6 +288,7 @@
               >{{ beach.department }}
             </p>
             <div class="beach-tags">
+              <span *ngIf="beach.bathingRestriction === 'closed'"><app-icon name="alert" [size]="13" />Baignade interdite</span>
               <span>{{ waterLabel(beach.waterType) }}</span><span
                 *ngIf="beach.has_parking"
                 ><app-icon name="parking" [size]="13" />Parking</span

@@ -414,6 +414,7 @@ components:
         - type: object
           required: [selectedScore, scores, waterTemp, airTemp, flag, flagSource, recentRedAt, conditions]
           properties:
+            bathingRestriction: {type: string, enum: [closed, unknown], description: Separate from observed or estimated flags.}
             selectedScore: {type: number, minimum: 0, maximum: 100, nullable: true}
             scores: {$ref: '#/components/schemas/Scores'}
             waterTemp: {type: number, nullable: true}
@@ -825,6 +826,7 @@ components:
         - type: object
           required: [scores, selectedScore, flag, waterTemp, airTemp, dataStatus]
           properties:
+            bathingRestriction: {type: string, enum: [closed, unknown]}
             scores: {$ref: '#/components/schemas/Scores'}
             selectedScore: {type: integer, nullable: true, minimum: 0, maximum: 100}
             flag: {type: string, enum: [green, yellow, red, unknown]}

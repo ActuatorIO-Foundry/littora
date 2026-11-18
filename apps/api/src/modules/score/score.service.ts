@@ -93,12 +93,12 @@ export class ScoreService {
   }
 
   safety(bathing: number | null, wave: number | null, current: number | null, uv: number | null, wind: number | null, quality?: string, communityAlerts: string[] = [], communityFlag?: any) {
-    const estimatedFlag = quality === 'closed' ? 'red' : bathing === null || wave === null || current === null ? 'unknown'
+    const estimatedFlag = quality === 'closed' ? 'unknown' : bathing === null || wave === null || current === null ? 'unknown'
       : bathing >= 78 && wave < 0.8 && current < 0.18 ? 'green' : bathing >= 55 && wave < 1.3 && current < 0.32 ? 'yellow' : 'red';
     return {
       flag: estimatedFlag,
       estimatedFlag,
-      source: estimatedFlag === 'unknown' ? 'Conditions insuffisantes. Le drapeau officiel reste celui affiché sur place.'
+      source: quality === 'closed' ? 'Interdiction officielle de baignade, indépendante du drapeau des sauveteurs.' : estimatedFlag === 'unknown' ? 'Conditions insuffisantes. Le drapeau officiel reste celui affiché sur place.'
           : 'Estimation Littora: météo, vagues, courant, UV, qualité d’eau et signalements. Le drapeau officiel reste celui affiché sur place.',
       official: false,
       communityFlag: communityFlag ?? null,

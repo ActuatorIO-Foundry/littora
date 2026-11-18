@@ -44,6 +44,7 @@ test('ARS: immutable ingestion, archive vs live closure, explicit lift, worker a
   await pool.query("insert into water_quality(beach_id,status,source,sample_date) values($1,'excellent','fixture-analysis',current_date)",[id]);
   const score=scoreFixture();score.water={get:read};let result=await score.scoreBeach(id);
   assert.equal(result.current.waterQuality.restriction.status,'closed');assert.equal(result.scores.bathing,0);assert.equal(result.scores.family,0);
+  assert.equal(result.safety.estimatedFlag,'unknown','A municipal closure does not report a lifeguard flag');
   await recordDecision(pool,{...event,reference:'another'});
   await recordDecision(pool,{...event,action:'lift',day:'2025-07-13'});
   assert.equal((await read()).status,'closed','Lifting one order cannot lift another');

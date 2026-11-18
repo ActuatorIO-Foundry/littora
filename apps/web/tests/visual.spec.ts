@@ -139,6 +139,10 @@ test('ARS : archive saisonnière et interdiction officielle distinctes', async (
   closed=true;await page.reload();
   await expect(sources).toContainText('Baignade interdite par décision officielle');
   await expect(sources.getByRole('link',{name:/Ville de Bandol/})).toHaveAttribute('href','https://www.bandol.fr/acte');
+  await page.route('**/api/search/beaches',route=>route.fulfill({json:searchResult(route.request().postDataJSON(),
+    [{...beaches[0],bathingRestriction:'closed',flag:'green'}])}));
+  await page.goto('/recherche');
+  await expect(page.locator('.beach-tags')).toContainText('Baignade interdite');
 });
 
 test('SHOM : références du port distinctes des horaires et retrait à échéance', async ({page})=>{

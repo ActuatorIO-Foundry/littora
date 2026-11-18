@@ -43,7 +43,7 @@ export class SearchService {
         const conditions = searchConditions(beach, cached[i], now);
         if(closed.has(beach.id)) conditions.scores={...conditions.scores,bathing:0,family:0};
         const community = flags.get(beach.id);
-        return { ...beach, ...conditions, selectedScore: conditions.scores[usage],
+        return { ...beach, ...conditions, bathingRestriction:closed.has(beach.id)?'closed':'unknown', selectedScore: conditions.scores[usage],
           flag: community?.flag ?? null, flagSource: community?.flag ? 'community' : null,
           recentRedAt: community?.recentRedAt ?? null };
       });

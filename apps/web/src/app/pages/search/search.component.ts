@@ -16,6 +16,7 @@ type Result = Beach & {
   selectedScore?: number | null;
   scores?: BeachScore["scores"];
   flag?: string | null;
+  bathingRestriction?: 'closed' | 'unknown';
   waterTemp?: number | null;
 };
 @Component({

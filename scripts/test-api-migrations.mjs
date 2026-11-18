@@ -76,8 +76,8 @@ try {
   assert.match(logs.stdout + logs.stderr, /Database migrations required/);
   assert.equal(sql("select to_regclass('public.schema_migrations')"), '', 'Startup must not modify the schema');
 
-  assert.equal(JSON.parse(command('status')).filter(row => !row.applied).length, 7);
-  assert.equal(JSON.parse(command('migrate')).applied.length, 7);
+  assert.equal(JSON.parse(command('status')).filter(row => !row.applied).length, 8);
+  assert.equal(JSON.parse(command('migrate')).applied.length, 8);
   assert.deepEqual(JSON.parse(command('migrate')).applied, []);
   assert.ok(JSON.parse(command('status')).every(row => row.applied));
   command('seed');

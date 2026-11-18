@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { importArs } from './modules/water-quality/ars-import';
 import { collectShom } from './jobs/shom-collector';
 import { collectVigilance } from './jobs/vigilance-collector';
 import { CacheService } from './cache/cache.service';
@@ -38,7 +39,15 @@ async function start() {
   }, { connection, concurrency: 1 });
   worker.on('failed', (job,e) => console.error('Weather job failed', job?.id, e.message));
   worker.on('error', e => console.error('Weather queue unavailable', e.name));
+  // A seasonal release must not block short-lived weather collection jobs.
+  const ars = process.env.ARS_IMPORT_ENABLED === 'true' ? new Worker('littora-ars', async job=>{
+    if(job.name!=='import')throw Error('Unknown ARS job');
+    return importArs(db);
+  },{connection,concurrency:1}) : null;
+  ars?.on('failed',()=>console.error('ARS import failed; no partial release published'));
+  ars?.on('error',()=>console.error('ARS queue unavailable'));
   const stop = async () => {
+    await ars?.close();
     await worker.close(); await queue.close(); await app.close(); await db.end();
   };
   process.once('SIGTERM', stop); process.once('SIGINT', stop);

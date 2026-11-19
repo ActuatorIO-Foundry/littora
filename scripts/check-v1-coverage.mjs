@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
 
 const { COASTAL_ZONES } = createRequire(import.meta.url)('../apps/web/src/app/shared/coastal-zones.ts');
 
@@ -62,19 +63,24 @@ export async function inspectCoverage(readPage) {
     seaTemperature80: water.sea > 0 && seaTemperature * 100 >= water.sea * 80,
     noMarineOnNonSea: inlandMarine === 0,
   };
-  return { asOf, total, water, coasts, classified, air, seaTemperature, inlandMarine, checks,
+  const catalogueIds = createHash('sha256').update([...ids].sort().join(',')).digest('hex');
+  return { asOf, total, catalogueIds, water, coasts, classified, air, seaTemperature, inlandMarine, checks,
     coverageMet: Object.values(checks).every(Boolean) };
+}
+
+export function measureSite(site = 'http://127.0.0.1:4200') {
+  const endpoint = new URL('/api/search/beaches',site);
+  return inspectCoverage(async body => {
+    const r = await fetch(endpoint, { method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body), redirect:'error', signal:AbortSignal.timeout(10000) });
+    if (!r.ok) throw new Error('Search HTTP ' + r.status);
+    return r.json();
+  });
 }
 
 if (import.meta.main) {
   try {
-    const endpoint = new URL('/api/search/beaches', process.argv[2] ?? 'http://127.0.0.1:4200');
-    const report = await inspectCoverage(async body => {
-      const r = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify(body), redirect: 'error', signal: AbortSignal.timeout(10000) });
-      if (!r.ok) throw new Error('Search HTTP ' + r.status);
-      return r.json();
-    });
+    const report = await measureSite(process.argv[2]);
     console.log(JSON.stringify(report, null, 2));
     if (!report.coverageMet) process.exitCode = 2;
   } catch (e) {

@@ -12,14 +12,16 @@ function read(since){
   return JSON.parse(output);
 }
 
-export async function waitForCoverage(ref,io) {
+export async function waitForCoverage(ref,io,mode='watch') {
   const start=Date.parse(ref.start);
   if(!Number.isFinite(start)||!/^[a-f0-9]{32}$/.test(ref.scope))throw Error('Invalid cycle reference');
-  let previous=start, completedBy=null;
+  if(!['watch','resume'].includes(mode))throw Error('Invalid observation mode');
+  let previous=start, completedBy=null, observingSince=mode==='resume'?null:start;
   async function sample(){
     const state=await io.read(ref.start),at=Date.parse(state.at);
     if(!Number.isFinite(at)||at<previous)throw Error('Invalid database time');
-    if(at-start>=8*60*minute)throw Error('Cycle timed out; no final public verdict');
+    observingSince??=at;
+    if(at-observingSince>=8*60*minute)throw Error('Cycle timed out; no final public verdict');
     previous=at;
     if(state.scope!==ref.scope)throw Error('Catalogue or forecast targets changed; restart the cycle');
     if(!Array.isArray(state.sources)||state.sources.length!==2 ||
@@ -53,15 +55,15 @@ if(import.meta.main){
     if(mode==='start'&&!start){
       const state=read('infinity');
       console.log(JSON.stringify({start:state.at,scope:state.scope,sources:state.sources},null,2));
-    }else if(mode==='watch'&&start&&scope&&!extra.length){
+    }else if(['watch','resume'].includes(mode)&&start&&scope&&!extra.length){
       const local=new URL(site??'http://127.0.0.1:4200');
       if(!['127.0.0.1','localhost','[::1]'].includes(local.hostname) || !['http:','https:'].includes(local.protocol) ||
         local.username || local.password) throw Error('Use a local site URL');
       const result=await waitForCoverage({start,scope},{read,measure:()=>measureSite(local),sleep,
         progress:(state,completedBy)=>console.log(state.at,state.sources.map(s=>s.source+' '+s.finished+'/'+s.targets).join(', '),
-          completedBy?'waiting for search refresh':'collecting')});
+          completedBy?'waiting for search refresh':'collecting')},mode);
       console.log(JSON.stringify(result,null,2));
       if(!result.public.coverageMet) process.exitCode=2;
-    }else throw Error('Use start or watch START SCOPE [LOCAL_SITE]');
+    }else throw Error('Use start, watch or resume START SCOPE [LOCAL_SITE]');
   }catch(e){console.error('Cycle not validated:',e.message);process.exitCode=1;}
 }

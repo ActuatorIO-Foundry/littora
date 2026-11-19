@@ -56,6 +56,11 @@ Les seuils restent 90 % des sites publics pour l’air, 80 % des sites marins po
 l’eau ; aucun indicateur marin en eau douce. Sortie 0 : seuils atteints à cet
 instant ; 2 : cycle mesuré sous les seuils ; 1 : pas de verdict (périmètre
 modifié, indisponibilité, horloge incohérente ou délai de huit heures).
+Après une interruption, utiliser `npm run check:v1-cycle -- resume HORODATAGE EMPREINTE`
+avec la référence initiale. Seule la fenêtre d’observation de huit heures repart :
+le périmètre et la date des passages restent les mêmes. Le contrôle attend à nouveau
+15 minutes après avoir constaté le dernier passage et mesure la fraîcheur à la date
+de la recherche. Une reprise après veille ne démontre pas que le cycle a duré six heures.
 Conserver les seuls agrégats dans le ticket, jamais le journal ni le cache.
 Un passage réussi n’établit pas une disponibilité continue ou de production.
 

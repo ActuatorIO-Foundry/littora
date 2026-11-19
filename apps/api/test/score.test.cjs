@@ -66,6 +66,16 @@ test('scores: no bathing score without weather and marine coverage', async () =>
   assert.ok(Object.values(result.scores).every(value => value === null));
 });
 
+test('forecast: missing hours are not filled with later values or conflicting duplicates', async t => {
+  t.mock.method(Date, 'now', () => Date.parse('2026-07-15T12:20:00Z'));
+  const time=['20:00','13:00','15:00','15:00','14:30','21:00','12:00']
+    .map(hour=>'2026-07-15T'+hour+':00Z');
+  const result=await scoreFixture({weather:{raw:{hourly:{time,temperature_2m:[10,0,7,8,88,99,3]}}}}).scoreBeach(beach.id);
+  assert.deepEqual(result.forecast.air,[
+    {time:time[1],value:0},{time:time[2],value:null},{time:time[0],value:10},
+  ]);
+});
+
 test('scores: stale data remains attributed but is excluded from recommendations', async () => {
   const result = await scoreFixture({ weather: { status: 'stale', fetchedAt: '2026-07-15T12:00:00Z', ageSeconds: 1800 } }).scoreBeach(beach.id);
   assert.equal(result.current.weather.temperature_2m, 24);

@@ -1,9 +1,16 @@
 import { DataStatus } from '../models/beach.model';
 
+export function freshnessDeadline(data: DataStatus): number {
+  return Date.parse(data.fetchedAt ?? '') + (data.collectionIntervalSeconds ?? NaN) * 1000;
+}
+export function forecastIsStale(data: DataStatus, now = Date.now()): boolean {
+  return data.status === 'stale' || (data.status !== 'unknown' && now >= freshnessDeadline(data));
+}
+
 export function dataStatusLabel(data?: DataStatus): string {
   if (!data) return '';
   const date = (v: string) => new Date(v).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-  return [({ unknown: 'Données indisponibles', stale: 'Prévisions périmées', partial: 'Prévisions partielles', available: 'Prévisions' })[data.status],
+  return [({ unknown: 'Données indisponibles', stale: 'Prévisions périmées', partial: 'Prévisions partielles', available: 'Prévisions' })[forecastIsStale(data) ? 'stale' : data.status],
     data.fetchedAt && `collecte : ${date(data.fetchedAt)}`,
     data.validAt && `échéance : ${date(data.validAt)}`,
     data.nextCheckAt && `prochaine vérification au plus tôt : ${date(data.nextCheckAt)}`,

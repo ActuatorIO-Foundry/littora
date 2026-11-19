@@ -46,6 +46,7 @@ export class ScoreService {
     const labels:Record<string,string> = {jellyfish:'Signalements méduses',current:'Signalements courant',pollution:'Signalements pollution',crowd:'Affluence signalée'};
     const communityAlerts = Object.entries(labels).filter(([type]) => community.some((r:{type:string}) => r.type===type)).map(([,label])=>label);
 
+    const now = Date.now();
     const result = {
       beach,
       current, scores, explanations,
@@ -55,11 +56,11 @@ export class ScoreService {
         e.status === 'closed' ? 'Baignade interdite' : e.status === 'not-applicable' ? 'Modèle marin non applicable' :
         e.score === null ? 'Données insuffisantes' : `Indice de confort : ${e.score}/100`])),
       forecast: {
-        uv: this.series(weather.raw?.hourly, 'uv_index'),
-        air: this.series(weather.raw?.hourly, 'temperature_2m'),
-        water: this.series(marine.raw?.hourly, 'sea_surface_temperature'),
-        wave: this.series(marine.raw?.hourly, 'wave_height'),
-        current: this.series(marine.raw?.hourly, 'ocean_current_velocity'),
+        uv: this.series(weather.raw?.hourly, 'uv_index', now),
+        air: this.series(weather.raw?.hourly, 'temperature_2m', now),
+        water: this.series(marine.raw?.hourly, 'sea_surface_temperature', now),
+        wave: this.series(marine.raw?.hourly, 'wave_height', now),
+        current: this.series(marine.raw?.hourly, 'ocean_current_velocity', now),
       },
       reliability: {
         weather: weather.status ?? 'unknown',
@@ -107,18 +108,20 @@ export class ScoreService {
   }
 
 
-  private series(hourly: Record<string, any[]> | undefined, key: string) {
-    const times = Array.isArray(hourly?.time) ? hourly?.time : [];
-    const values = Array.isArray(hourly?.[key]) ? hourly?.[key] : [];
-    const now = Date.now();
-    const first = times.findIndex((time) => new Date(time).getTime() >= now);
-    if (first < 0) return [];
-    const start = first;
-
-    return times
-      .slice(start, start + 8)
-      .map((time, index) => ({ time, value: finiteMetric(values[start + index]) }))
-      .filter((point) => point.time && Number.isFinite(Date.parse(point.time)));
+  private series(hourly: Record<string, unknown[]> | undefined, key: string, now: number) {
+    const hour = 3600_000;
+    const first = Math.ceil(now / hour) * hour;
+    const slots = new Map<number, {time:string; value:number|null}>();
+    hourly?.time?.forEach((time, i) => {
+      if (typeof time !== 'string') return;
+      const slot = (Date.parse(time) - first) / hour;
+      if (!Number.isInteger(slot) || slot < 0 || slot >= 8) return;
+      const value = finiteMetric(hourly[key]?.[i]);
+      const prior = slots.get(slot);
+      if (!prior) slots.set(slot, {time, value});
+      else if (prior.value !== value) prior.value = null;
+    });
+    return [...slots].sort(([a], [b]) => a - b).map(([,point]) => point);
   }
 
   private dataStatus(data: any) {

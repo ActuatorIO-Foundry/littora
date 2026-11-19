@@ -165,7 +165,8 @@ test('contract: invalid query/path/body never reaches a business service', async
   for (const path of ['/beaches?limit=0', '/beaches?limit=wat', '/beaches?lat=91&lon=0', '/beaches?lat=0',
     '/beaches?limit=1&limit=2', '/beaches?invented=true', '/beaches/not-a-uuid', '/beaches/catalogue?after=invalid',
     '/beaches/catalogue?bbox=44,5,43,6', '/weather?lat=nan&lon=0', '/marine?lat=0&lon=181',
-    '/recommendations?lat=0&lon=0&usage=invalid', '/reports', '/places/communes/invalid/beaches']) {
+    '/recommendations?lat=0&lon=0&usage=invalid', `/score/beach/${id}?source=average`,
+    '/reports', '/places/communes/invalid/beaches']) {
     const response = await fetch(`${url}/api${path}`);
     assert.equal(response.status, 400, path);
     const error = await response.json();

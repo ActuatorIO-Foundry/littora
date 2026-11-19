@@ -222,7 +222,7 @@ paths:
       operationId: getAdminHealth
       tags: [Littora]
       security: [{InternalKey: []}]
-      description: Internal scaffold health; moderationQueue is not a live queue measurement.
+      description: Protected status. moderationQueue is true only when an actionable report is waiting.
       responses:
         '200': {description: Internal health, content: {application/json: {schema: {$ref: '#/components/schemas/AdminHealth'}}}}
         default: {$ref: '#/components/responses/Error'}
@@ -755,6 +755,7 @@ components:
             type: object
             required: [flag, time, confidence]
             properties:
+              reportId: {type: string, format: uuid, description: Public report identifier for deduplication and review requests.}
               flag: {type: string, enum: [green, yellow, red]}
               time: {type: string, format: date-time}
               confidence: {type: number, minimum: 0, maximum: 1}
@@ -900,6 +901,7 @@ components:
             drapeau: {type: string, enum: [green, yellow, red, vert, verte, jaune, orange, rouge]}
             value: {type: string, maxLength: 100}
             note: {type: string, maxLength: 2000}
+            contests: {type: string, format: uuid, description: Private review request for an active report on the same beach. Only for type other.}
             severity: {type: string, maxLength: 50}
             source: {type: string, maxLength: 100, description: Untrusted client label; never an official provenance.}
         confidence: {type: number, minimum: 0, maximum: 1, deprecated: true, description: Ignored. The server assigns zero trust pending moderation.}

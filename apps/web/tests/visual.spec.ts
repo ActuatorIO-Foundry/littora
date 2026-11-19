@@ -485,6 +485,51 @@ test('drapeaux : majorite verte, historique rouge et alertes restent separes', a
   await page.locator('.community-flags').screenshot({path:info.outputPath('community-flags.png')});
 });
 
+test('hub : attente, publication, contestation privée, retrait et expiration sans rechargement',async({page})=>{
+  const now=Date.parse('2026-11-19T12:00:00Z');
+  await page.clock.install({time:new Date(now)});
+  const id='20000000-0000-4000-8000-000000000001';
+  const at=(ms:number)=>new Date(now+ms).toISOString();
+  const report={id,beach_id:beaches[0].id,type:'flag',value:{flag:'red'},status:'verified',
+    created_at:at(0),observed_at:at(0),expires_at:at(86400000),provenance:{verified:true,isDemo:false}};
+  let published=false, withdrawn=false, expiring=false, lastBody:any,unlock!:()=>void;
+  const gate=new Promise<void>(resolve=>unlock=resolve);
+  await page.route('**/api/reports?*',async route=>{
+    await gate;
+    return route.fulfill({json:expiring?[{...report,id:'20000000-0000-4000-8000-000000000002',
+      type:'pollution',value:{},expires_at:at(131000)}]:published&&!withdrawn?[report]:[]});
+  });
+  await page.route('**/api/reports',route=>{
+    lastBody=route.request().postDataJSON();return route.fulfill({status:201,json:{...report,status:'pending'}});
+  });
+  await page.route('**/api/score/**',route=>route.fulfill({json:{...score,safety:{...score.safety,
+    communityFlag:published&&!withdrawn?{participants:1,counts:{red:1,green:0,yellow:0},flag:null,
+      history:[{reportId:id,flag:'red',time:at(0),confidence:0}]}:null}}}));
+  await page.goto('/plages/test-sea');
+  const hub=page.locator('#communaute');
+  await expect(hub.locator('.badge')).toHaveText('Chargement…');
+  unlock();
+  await hub.getByText('Signaler un drapeau observé').click();
+  await hub.getByRole('button',{name:'Rouge'}).click();
+  await expect(hub.getByRole('status')).toContainText('attente de modération');
+  await expect(hub.locator('.report-row')).toHaveCount(0);
+  published=true;
+  await page.clock.fastForward(61000);
+  await hub.getByText('Historique récent des drapeaux').click();
+  await expect(hub.locator('.report-row')).toHaveCount(1);
+  await hub.getByRole('button',{name:'Contester'}).click();
+  await expect(hub.getByRole('status')).toContainText('Contestation reçue');
+  expect(lastBody).toMatchObject({type:'other',value:{contests:id}});
+  withdrawn=true;expiring=true;
+  await page.clock.fastForward(61000);
+  await expect(hub.locator('.community-flags')).toHaveCount(0);
+  await expect(hub.locator('.report-row')).toContainText('Pollution signalée');
+  await page.clock.fastForward(11000);
+  await expect(hub.locator('.report-row')).toHaveCount(0);
+  await expect(hub.locator('.badge')).toHaveText('0 observations');
+  await noOverflow(page);
+});
+
 test('drapeaux : un vert isole reste sans majorite',async({page})=>{
   await page.route('**/api/score/**',route=>route.fulfill({json:{...score,safety:{...score.safety,
     communityFlag:{flag:null,status:'insufficient',participants:1,agreement:null,confidence:0,counts:{green:1,yellow:0,red:0},history:[]}}}}));

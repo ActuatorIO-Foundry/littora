@@ -50,7 +50,7 @@ export interface BeachScore {
       status?: 'insufficient' | 'consensus' | 'conflicting' | 'capped';
       recentRedAt?: string | null;
       counts: Record<string, number>;
-      history: Array<{ flag: string; time: string; confidence: number }>;
+      history: Array<{ reportId?: string; flag: string; time: string; confidence: number }>;
     } | null;
   };
   forecast?: Record<string, MetricPoint[]>;

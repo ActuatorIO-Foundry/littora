@@ -53,4 +53,5 @@ sur cinq formats, sans changement de palette ni de mise en page generale.
 
 La connexion d'une source de drapeaux officiels reste a realiser. Les tests
 garantissent l'etat officiel inconnu en son absence, pas une ingestion officielle
-qui n'existe pas encore. La moderation operationnelle est suivie dans #27.
+qui n'existe pas encore. La [modération privée](CONTRIBUTIONS.md) assure la
+publication, le retrait et le réexamen des signalements (#27).

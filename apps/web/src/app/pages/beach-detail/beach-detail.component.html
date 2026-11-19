@@ -283,9 +283,9 @@
               <p class="eyebrow">Les yeux sur le terrain</p>
               <h2>La communauté sur place</h2>
             </div>
-            <span class="badge">{{ reports.length }} observations</span>
+            <span class="badge">{{ loadingReports ? 'Chargement…' : reportsUnavailable ? 'Indisponible' : reports.length === 1 ? '1 observation' : reports.length + ' observations' }}</span>
           </div>
-          <div class="community-flags" *ngIf="score?.safety?.communityFlag as community">
+          <div class="community-flags" *ngIf="!reportsUnavailable && score?.safety?.communityFlag as community">
             <div class="notice"><div>
               <strong>{{ community.flag ? 'Observation majoritaire : ' + flagLabel(community.flag) : 'Pas de majorité suffisamment étayée' }}</strong><br />
               {{ community.participants ?? 0 }} contributions distinctes sur les 3 dernières heures.
@@ -301,6 +301,7 @@
               <div class="report-row" *ngFor="let observation of community.history">
                 <strong>{{ flagLabel(observation.flag) }}</strong>
                 <time>{{ dateLabel(observation.time) }}</time>
+                <button class="btn" *ngIf="observation.reportId as id" [disabled]="sending" (click)="contest(id)">Contester</button>
               </div>
             </details>
           </div>
@@ -354,20 +355,20 @@
               </button>
             </div>
           </details>
-          <p *ngIf="reportMessage" class="notice" role="status">
-            {{ reportMessage }}
+          <p *ngIf="sending || reportMessage" class="notice" role="status">
+            {{ sending ? 'Envoi en cours…' : reportMessage }}
           </p>
           <p *ngIf="reportError" class="notice error" role="alert">
             {{ reportError }}
           </p>
-          <p class="empty-reports" *ngIf="!reports.length">
+          <p class="empty-reports" *ngIf="!reports.length && !loadingReports">
             {{
               reportsUnavailable
                 ? "Observations indisponibles pour le moment."
                 : "Aucune observation récente. Le littoral a besoin de regards attentifs."
             }}
           </p>
-          <div class="report-row" *ngFor="let report of reports">
+          <div class="report-row" *ngFor="let report of feedReports">
             <app-icon
               [name]="report.type === 'flag' ? 'flag' : 'message'"
               [size]="18"
@@ -378,7 +379,8 @@
                 <span *ngIf="report.value?.flag"
                   >· {{ flagLabel(report.value?.flag) }}</span
                 ></strong
-              ><span>Observation communautaire, non officielle</span>
+              ><span>Observation communautaire modérée, non officielle</span>
+              <button class="btn" [disabled]="sending" (click)="contest(report.id)">Contester</button>
             </div>
             <time>{{ dateLabel(report.observed_at ?? report.created_at) }}</time>
           </div>

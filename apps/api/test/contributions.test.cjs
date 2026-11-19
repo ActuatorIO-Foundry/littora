@@ -8,6 +8,13 @@ const {presentReport}=require('../dist/http/presenters');
 
 const now=Date.parse('2026-11-17T12:00:00Z');
 const dto={beachId:'10000000-0000-4000-8000-000000000001',type:'flag',value:{flag:'vert',source:'official'},confidence:1};
+test('contestation: only a private other report can refer to a published observation',()=>{
+  const value={contests:dto.beachId};
+  assert.deepEqual(normalizeReport({...dto,type:'other',value},now).value,value);
+  for(const input of [{...dto,type:'crowd',value},{...dto,type:'other',value:{contests:'unknown'}}]){
+    assert.throws(()=>normalizeReport(input,now),e=>e.getStatus()===400);
+  }
+});
 test('contributions: server strips client provenance and confidence, normalizes one unambiguous flag',()=>{
   assert.deepEqual(normalizeReport(dto,now),{beachId:dto.beachId,type:'flag',value:{flag:'green'},observedAt:'2026-11-17T12:00:00.000Z'});
   for(const value of [{flag:'blue'},{flag:'green',drapeau:'rouge'},{}]) assert.throws(()=>normalizeReport({...dto,value},now),e=>e.getStatus()===400);

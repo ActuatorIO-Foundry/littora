@@ -4,6 +4,7 @@ const { after, before, test } = require('node:test');
 const { randomBytes } = require('node:crypto');
 const { Test } = require('@nestjs/testing');
 const { AdminModule } = require('../dist/modules/admin/admin.module');
+const { DatabaseModule, PG } = require('../dist/database/database.module');
 const { IngestionController } = require('../dist/modules/ingestion/ingestion.controller');
 const { IngestionService } = require('../dist/modules/ingestion/ingestion.service');
 const { BeachesController } = require('../dist/modules/beaches/beaches.controller');
@@ -18,7 +19,7 @@ const originalToken = process.env.ADMIN_API_TOKEN;
 
 before(async () => {
   const module = await Test.createTestingModule({
-    imports: [AdminModule],
+    imports: [AdminModule, DatabaseModule],
     controllers: [IngestionController, BeachesController],
     providers: [
       { provide: IngestionService, useValue: { waterQuality: async () => {
@@ -27,7 +28,10 @@ before(async () => {
       } } },
       { provide: BeachesService, useValue: { list: async () => [{ ...beach, waterType: 'sea' }] } },
     ],
-  }).compile();
+  }).overrideProvider(PG).useValue({query:async sql=>{
+    assert.match(sql,/exists\(select 1 from moderation.queue\)/);
+    return {rows:[{pending:false}]};
+  }}).compile();
   app = module.createNestApplication({ logger: false });
   app.setGlobalPrefix('api');
   configureHttpBoundary(app);
@@ -80,5 +84,5 @@ test('HTTP: valid internal token permits the operation and is not returned', asy
   assert.equal(calls, 1);
   const health = await fetch(`${url}/api/admin/health`, { headers });
   assert.equal(health.status, 200);
-  assert.ok(!(await health.text()).includes(token));
+  assert.deepEqual(await health.json(),{status:'ok',moderationQueue:false});
 });

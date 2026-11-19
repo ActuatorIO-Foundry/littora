@@ -8,7 +8,7 @@ import { WeatherService } from '../weather/weather.service';
 import { finiteMetric } from '../../shared/forecast-data';
 import { measured } from './comfort-model';
 import { CacheService } from '../../cache/cache.service';
-import { conditionKey, conditionSnapshot, searchConditions } from '../search/search-conditions';
+import { conditionKey, conditionSnapshot, estimatedFlag as estimateFlag, searchConditions } from '../search/search-conditions';
 
 @Injectable()
 export class ScoreService {
@@ -39,7 +39,7 @@ export class ScoreService {
     const current = { weather: wc, marine: mc, tides, waterQuality, community };
     const closed = waterQuality.status === 'closed';
     const projection = conditionSnapshot({ beach, current, dataStatus });
-    const { scores, explanations, conditions } = searchConditions(beach, projection, Date.now(), closed);
+    const { scores, explanations, conditions } = searchConditions(beach, projection, Date.now(), closed, community);
     const { bathing } = scores;
     const metric = (group: 'weather' | 'marine', key: string) => conditions[group]
       ? measured(key,current[group][key],dataStatus[group].units[key]) : null;
@@ -79,14 +79,13 @@ export class ScoreService {
       },
       disclaimer: 'Scores indicatifs. Ne remplacent jamais les consignes officielles, drapeaux, postes de secours, BMS ou autorités locales.',
     };
-    const published = await this.cache.setJson(conditionKey(id), { ...projection, estimatedFlag:result.safety.estimatedFlag }, 900);
+    const published = await this.cache.setJson(conditionKey(id), projection, 900);
     if (requireProjection && !published) throw new Error('Search cache unavailable');
     return result;
   }
 
   safety(bathing: number | null, wave: number | null, current: number | null, uv: number | null, wind: number | null, quality?: string, communityAlerts: string[] = [], communityFlag?: any) {
-    const estimatedFlag = quality === 'closed' ? 'unknown' : bathing === null || wave === null || current === null ? 'unknown'
-      : bathing >= 78 && wave < 0.8 && current < 0.18 ? 'green' : bathing >= 55 && wave < 1.3 && current < 0.32 ? 'yellow' : 'red';
+    const estimatedFlag = estimateFlag(bathing,wave,current,quality==='closed');
     return {
       flag: estimatedFlag,
       estimatedFlag,

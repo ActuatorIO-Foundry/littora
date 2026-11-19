@@ -679,7 +679,7 @@ export class LittoraService extends BaseService {
   static readonly GetAdminHealthPath = '/admin/health';
 
   /**
-   * Internal scaffold health; moderationQueue is not a live queue measurement.
+   * Protected status. moderationQueue is true only when an actionable report is waiting.
    *
    * This method provides access to the full `HttpResponse`, allowing access to response headers.
    * To access only the response body, use `getAdminHealth()` instead.
@@ -692,7 +692,7 @@ export class LittoraService extends BaseService {
   }
 
   /**
-   * Internal scaffold health; moderationQueue is not a live queue measurement.
+   * Protected status. moderationQueue is true only when an actionable report is waiting.
    *
    * This method provides access only to the response body.
    * To access the full response (for headers, for example), `getAdminHealth$Response()` instead.

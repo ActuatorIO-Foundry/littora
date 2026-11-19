@@ -33,6 +33,14 @@ const beaches = [
     distanceKm: 5,
   },
 ];
+const fetchedAt = '2026-07-15T11:45:00Z';
+function forecastPoint(validAt: string, value: number | null, provider = 'open-meteo', unit = '°C') {
+  return {validAt, value, fetchedAt, source:{provider,product:null}, unit, kind:'forecast',
+    status:value === null ? 'unknown' : 'available',isDemo:false,producedAt:null,validUntil:null,
+    resolution:{spatialMeters:null,temporalSeconds:null}};
+}
+const airStatus = {status:'available',provider:'open-meteo',kind:'forecast',fetchedAt,
+  validAt:'2026-07-15T12:00:00Z',collectionIntervalSeconds:21600};
 const score = {
   beach: beaches[0],
   scores: { bathing: 64, family: 58, paddle: 70, boat: 65 },
@@ -46,6 +54,11 @@ const score = {
     marine: { sea_surface_temperature: 21, wave_height: 0.4 },
   },
   providers: { weather: "open-meteo", marine: "open-meteo-marine" },
+  dataStatus:{weather:airStatus,marine:{...airStatus,provider:'open-meteo-marine'}},
+  measurements:{forecast:{air:[
+    forecastPoint('2026-07-15T12:00:00Z',24),forecastPoint('2026-07-15T13:00:00Z',26),
+    forecastPoint('2026-07-15T14:00:00Z',23),
+  ]}},
   safety: { flag: "red", official: false, alerts: ["Vent soutenu"] },
   forecast: {
     air: [
@@ -205,7 +218,11 @@ test('vigilance officielle : source et échéance indépendantes du score', asyn
 
 test('prévisions : courant en m/s et interruption de courbe pour une mesure absente', async ({ page }) => {
   await page.route('**/api/score/beach/*', route => route.fulfill({ json: {
-    ...score, forecast: { current: [
+    ...score, measurements:{forecast:{current:[
+      forecastPoint('2026-07-15T12:00:00Z',1,'open-meteo-marine','m/s'),
+      forecastPoint('2026-07-15T13:00:00Z',null,'open-meteo-marine','m/s'),
+      forecastPoint('2026-07-15T14:00:00Z',0,'open-meteo-marine','m/s'),
+    ]}}, forecast: { current: [
       { time: '2026-07-15T12:00:00Z', value: 1 },
       { time: '2026-07-15T13:00:00Z', value: null },
       { time: '2026-07-15T14:00:00Z', value: 0 },
@@ -223,11 +240,59 @@ test('prévisions : courant en m/s et interruption de courbe pour une mesure abs
   await noOverflow(page);
 });
 
+test('prévisions : source unique par mesure, aucune interpolation ni reprise des points non attribués', async ({page})=>{
+  await page.route('**/api/score/**',route=>route.fulfill({json:{...score,
+    forecast:{...score.forecast,water:[{time:'2026-07-15T12:00:00Z',value:99}]},
+    measurements:{forecast:{air:[
+    forecastPoint('2026-07-15T12:00:00Z',0),forecastPoint('2026-07-15T14:00:00Z',17),
+    forecastPoint('2026-07-15T15:00:00Z',99,'open-meteo-marine'),
+    {...forecastPoint('2026-07-15T16:00:00Z',88),isDemo:true},
+    forecastPoint('2026-07-15T17:00:00Z',77,'open-meteo','°F'),
+    {...forecastPoint('2026-07-15T18:00:00Z',66),fetchedAt:'2026-07-14T11:45:00Z'},
+  ]}}}}));
+  await page.goto('/plages/test-sea');
+  const chart=page.locator('#previsions');
+  await expect(chart.locator('.chart-heading')).toContainText('Source unique : Open-Meteo');
+  await expect(chart.locator('.forecast-chart circle')).toHaveCount(2);
+  await expect(chart.locator('.forecast-chart svg path')).toHaveAttribute('d',/^M[^L]*M[^L]*$/);
+  await chart.getByText('Valeurs détaillées').click();
+  await expect(chart.locator('tbody tr').first()).toContainText('0 °C');
+  await chart.getByRole('button',{name:'Eau',exact:true}).click();
+  await expect(chart.locator('.forecast-chart svg')).toHaveCount(0);
+  await expect(chart.getByRole('heading',{name:'Prévisions non disponibles'})).toBeVisible();
+});
+
+test('prévisions : une mesure marine reçue pour une rivière ne devient pas sa température',async({page})=>{
+  await page.route('**/api/beaches/test-river',route=>route.fulfill({json:beaches[1]}));
+  await page.route('**/api/score/**',route=>route.fulfill({json:{...score,beach:beaches[1],
+    measurements:{forecast:{water:[forecastPoint('2026-07-15T12:00:00Z',19,'open-meteo-marine')]}}}}));
+  await page.goto('/plages/test-river');
+  const chart=page.locator('#previsions');
+  await chart.getByRole('button',{name:'Eau',exact:true}).click();
+  await expect(chart.getByText('Aucune source marine applicable à ce site.')).toBeVisible();
+  await expect(chart.locator('.forecast-chart svg')).toHaveCount(0);
+});
+
+test('prévisions : actualisation automatique à expiration même si le prochain contrôle est repoussé',async({page})=>{
+  await page.clock.install({time:new Date('2026-07-15T17:44:50Z')});
+  let requests=0;
+  await page.route('**/api/score/**',route=>{
+    requests++;
+    return route.fulfill({json:{...score,dataStatus:{weather:{...airStatus,
+      status:requests===1?'available':'stale',validAt:'2026-07-15T18:00:00Z',nextCheckAt:'2026-07-15T20:00:00Z'}}}});
+  });
+  await page.goto('/plages/test-sea');
+  await expect(page.locator('.chart-heading')).toContainText('Open-Meteo');
+  await page.clock.fastForward(11000);
+  await expect.poll(()=>requests).toBe(2);
+  await expect(page.locator('.chart-heading')).toContainText('périmée');
+});
+
 test('conditions : panne fournisseur sans faux score ni courbe', async ({ page }) => {
   await page.route('**/api/score/beach/*', route => route.fulfill({ json: {
     ...score, scores: { bathing: null, family: null, paddle: null, boat: null },
     current: { weather: { temperature_2m: null, uv_index: null }, marine: {} },
-    forecast: { air: [], water: [], uv: [], wave: [] },
+    forecast: { air: [], water: [], uv: [], wave: [] }, measurements:{forecast:{}},
     dataStatus: { weather: { status: 'unknown' }, marine: { status: 'unknown' } },
   } }));
   await page.goto('/plages/test-sea');
@@ -242,7 +307,7 @@ test('conditions : dernier relevé sourcé explicitement ancien, zéro réel aff
   await page.route('**/api/score/beach/*', route => route.fulfill({ json: {
     ...score, scores: { bathing: null, family: null, paddle: null, boat: null },
     current: { ...score.current, weather: { ...score.current.weather, temperature_2m: 0 } },
-    dataStatus: { weather: { status: 'stale', ageSeconds: 1800, fetchedAt: '2026-07-15T12:00:00Z', validAt: '2026-07-15T13:00:00Z' }, marine: { status: 'partial', ageSeconds: 60 } },
+    dataStatus: { weather: { ...airStatus,status: 'stale', ageSeconds: 1800, validAt: '2026-07-15T13:00:00Z' }, marine: { status: 'partial', ageSeconds: 60 } },
   } }));
   await page.goto('/plages/test-sea');
   await expect(page.getByText(/Prévisions périmées.*collecte :.*échéance :/)).toBeVisible();

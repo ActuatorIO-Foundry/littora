@@ -31,6 +31,25 @@ Redis produites même en l'absence de visiteurs. Le cache est reconstructible.
   admissible. Une pause globale ou la file peuvent repousser la prochaine
   vérification au-delà de `nextCheckAt`.
 
+## Source des courbes de la fiche (#25)
+
+La sélection automatique se fait **par mesure** : température de l’air et UV
+proviennent d’Open-Meteo Forecast ; température de surface de la mer, hauteur
+des vagues et courant d’Open-Meteo Marine, uniquement sur les sites classés
+mer. Une seule source compatible est raccordée pour chacune. Pas de sélecteur
+manuel, de moyenne, ni de repli d’un modèle marin sur un lac. Les alertes
+officielles et les drapeaux restent indépendants des prévisions.
+
+La fiche lit `measurements.forecast` dans la réponse de `GET /api/score/beach/{id}`.
+Chaque point doit correspondre au fournisseur et à la collecte du groupe, avec
+la bonne unité et sa propre échéance. Un zéro reste une valeur ; une valeur absente
+ou une heure sautée interrompt la courbe. Seules les huit prochaines échéances
+horaires UTC peuvent figurer dans la réponse ; un doublon contradictoire vaut
+« inconnu », une heure absente n’est pas remplacée par la neuvième. L’ancienne série `forecast` sans
+provenance par point ne sert pas de repli. La fiche distingue l’heure de collecte
+des échéances et renouvelle ses conditions quand elles vieillissent, sans appeler
+directement le fournisseur. La date de production du modèle n’est pas déduite.
+
 ## Recette après un cycle réel (#43)
 
 Un heartbeat sain ou six heures écoulées ne prouvent pas que toutes les zones

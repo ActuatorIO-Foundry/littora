@@ -21,6 +21,8 @@ import {
   metricClass,
   providerLabel,
   dataStatusLabel,
+  forecastIsStale,
+  freshnessDeadline,
 } from "../../shared/presentation";
 type UsageKey = "bathing" | "family" | "paddle" | "boat";
 interface Report {
@@ -103,11 +105,11 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     },
   ];
   readonly charts = [
-    { key: "air", label: "Air", unit: "°C", icon: "sun" },
-    { key: "water", label: "Eau", unit: "°C", icon: "waves" },
-    { key: "uv", label: "UV", unit: "", icon: "sun" },
-    { key: "wave", label: "Vagues", unit: "m", icon: "waves" },
-    { key: "current", label: "Courant", unit: "m/s", icon: "water" },
+    { key: "air", group: "weather", label: "Air", unit: "°C", icon: "sun" },
+    { key: "water", group: "marine", label: "Eau", unit: "°C", icon: "waves" },
+    { key: "uv", group: "weather", label: "UV", unit: "", icon: "sun" },
+    { key: "wave", group: "marine", label: "Vagues", unit: "m", icon: "waves" },
+    { key: "current", group: "marine", label: "Courant", unit: "m/s", icon: "water" },
   ];
   readonly groups: Array<{
     category: BeachAmenity["category"];
@@ -238,6 +240,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     clearTimeout(this.scoreTimer);
     if (!background) { this.score = null; this.loadingScore = true; }
     this.scoreError = "";
+    this.cdr.markForCheck();
     this.scoreRequest?.unsubscribe();
     this.scoreRequest = this.api
       .getScore(id)
@@ -250,9 +253,12 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
           const times = Object.values(r.dataStatus ?? {}).flatMap(s => [
             s.nextCheckAt ? Date.parse(s.nextCheckAt) - now : Infinity,
             s.validAt ? Date.parse(s.validAt) + 1800001 - now : Infinity,
+            freshnessDeadline(s) - now,
           ]).filter(n => Number.isFinite(n) && n > 0);
+          const retry = Object.values(r.dataStatus ?? {}).some(s =>
+            s.status === 'stale' || (s.nextCheckAt && Date.parse(s.nextCheckAt) <= now));
           this.scoreTimer = setTimeout(() => this.loadScore(id, true),
-            Math.max(60000, Math.min(times.length ? 3600000 : 300000, ...times)));
+            Math.min(times.length && !retry ? 3600000 : 300000, ...times));
           this.loadingScore = false;
           this.cdr.markForCheck();
         },
@@ -296,10 +302,32 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
   get chart() {
     return this.charts.find((c) => c.key === this.selectedChart)!;
   }
+  get chartStatus() {
+    return this.score?.dataStatus?.[this.chart.group];
+  }
+  get chartCaption(): string {
+    const status = this.chartStatus;
+    if (!status) return '';
+    return 'Source unique : ' + providerLabel(status.provider) +
+      ' · Collecte : ' + this.dateLabel(status.fetchedAt) +
+      (forecastIsStale(status) ? ' · Prévision périmée' : '');
+  }
   get points(): MetricPoint[] {
-    return (this.score?.forecast?.[this.selectedChart] ?? []).filter(
-      (p) => Number.isFinite(Date.parse(p.time)),
-    );
+    const status = this.chartStatus;
+    const marine = this.chart.group === 'marine';
+    if (!status || status.kind !== 'forecast' || status.status === 'unknown' ||
+        (marine && this.score?.beach.waterType !== 'sea') ||
+        status.provider !== (marine ? 'open-meteo-marine' : 'open-meteo')) return [];
+    const fetched = Date.parse(status.fetchedAt ?? '');
+    if (!Number.isFinite(fetched)) return [];
+    const points = this.score?.measurements?.forecast[this.selectedChart] ?? [];
+    return points.flatMap(p => {
+      if (!p.validAt || !Number.isFinite(Date.parse(p.validAt))) return [];
+      const compatible = p.kind === 'forecast' && p.isDemo === false && p.source.provider === status.provider &&
+        p.unit === this.chart.unit && Date.parse(p.fetchedAt ?? '') === fetched &&
+        (p.status === 'stale' || p.status === 'available') && Number.isFinite(p.value);
+      return [{time:p.validAt, value:compatible ? p.value : null}];
+    });
   }
   get bounds() {
     const values = this.points.map((p) => p.value).filter((v): v is number => v !== null && Number.isFinite(v));
@@ -324,9 +352,10 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
   }
   chartPath(): string {
     let connected = false;
-    return this.points.map((p, i) => {
+    return this.points.map((p, i, points) => {
       if (p.value === null || !Number.isFinite(p.value)) { connected = false; return ''; }
-      const command = connected ? 'L' : 'M';
+      const consecutive = i > 0 && Date.parse(p.time) - Date.parse(points[i-1].time) === 3600000;
+      const command = connected && consecutive ? 'L' : 'M';
       connected = true;
       return `${command}${this.chartX(i)},${this.chartY(p.value)}`;
     }).join(' ');

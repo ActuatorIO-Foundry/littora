@@ -54,6 +54,7 @@ export interface BeachScore {
     } | null;
   };
   forecast?: Record<string, MetricPoint[]>;
+  measurements?: Pick<import('@littora/api-client/models').BeachScore['measurements'], 'forecast'>;
   providers?: Record<string, string>;
   reliability?: Record<string, string>;
   dataStatus?: Record<string, DataStatus>;

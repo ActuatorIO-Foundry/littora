@@ -201,7 +201,7 @@
             <div class="chart-heading">
               <span
                 >{{ chart.label }} <small>{{ chart.unit }}</small></span
-              ><span class="caption">Prévisions du fournisseur</span>
+              ><span class="caption">{{ chartCaption }}</span>
             </div>
             <svg
               viewBox="0 0 740 225"
@@ -271,7 +271,9 @@
             ><div class="empty-state">
               <app-icon name="wind" [size]="30" />
               <h3>Prévisions non disponibles</h3>
-              <p>Aucune série renseignée pour cette mesure.</p>
+              <p>{{ chart.group === 'marine' && beach?.waterType !== 'sea'
+                ? 'Aucune source marine applicable à ce site.'
+                : 'Aucune prévision sourcée disponible pour cette mesure.' }}</p>
             </div></ng-template
           >
         </section>
@@ -450,7 +452,7 @@
       <div>
         <p class="eyebrow">Derrière les données</p>
         <h2>Sources & disponibilité</h2>
-        <p>Une donnée absente ne signifie pas une absence de risque.</p>
+        <p>Une seule source de prévision par mesure : pas de comparaison ni de moyenne. Une donnée absente ne signifie pas une absence de risque.</p>
       </div>
       <dl>
         <div>

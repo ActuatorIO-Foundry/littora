@@ -64,6 +64,40 @@ de la recherche. Une reprise après veille ne démontre pas que le cycle a duré
 Conserver les seuls agrégats dans le ticket, jamais le journal ni le cache.
 Un passage réussi n’établit pas une disponibilité continue ou de production.
 
+### Après une mise en veille
+
+Docker ne collecte rien pendant la suspension de son hôte. Au réveil, un tour
+qui a bien traité toutes les zones peut encore contenir des prévisions trop
+anciennes : la recherche évalue leur âge à l’instant de consultation.
+Pour la recette locale sur macOS, brancher le poste, laisser le capot ouvert
+et lancer le suivi avec une prévention temporaire de la veille sur secteur :
+
+```sh
+caffeinate -s npm run check:v1-cycle -- watch HORODATAGE EMPREINTE
+```
+
+La protection prend fin avec la commande. Pour la reprise d’un ancien tour,
+remplacer `watch` par `resume`. Pour vérifier un **nouveau** tour sans veille,
+prendre une nouvelle référence avec `start`. Laisser le worker rattraper le
+retard : ne pas vider Redis, changer les seuils ni lancer un deuxième collecteur.
+En exploitation, utiliser un hôte qui reste disponible sans dépendre d’une session locale.
+
+Avant d’attribuer un déficit à la recherche, comparer les zones déjà périmées
+en base aux projections encore dans leur durée de vie. Ces compteurs de diagnostic
+ne remplacent pas la mesure publique de la température sur chaque site :
+
+```sql
+SELECT t.source, count(*) AS zones,
+       count(*) FILTER (WHERE z.last_success_at IS NULL OR
+         z.last_success_at <= now() - interval '6 hours') AS sans_succes_frais,
+       count(*) FILTER (WHERE z.error_code IS NOT NULL) AS en_erreur
+FROM forecast_targets t LEFT JOIN forecast_zones z USING (source, y, x)
+GROUP BY t.source;
+SELECT count(*) AS sites, count(*) FILTER (
+  WHERE p.updated_at > now() - interval '15 minutes') AS projections_recalculees
+FROM beach_catalogue b LEFT JOIN forecast_projections p ON p.beach_id = b.id;
+```
+
 ## Exploitation
 
 `docker compose -f docker-compose.local.yml ps worker` contrôle l'activité

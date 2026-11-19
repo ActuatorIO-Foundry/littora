@@ -21,7 +21,7 @@ Les 6 mesures essentielles (baignade/famille) ou 4 (paddle/bateau) doivent toute
 
 Une interdiction officielle active neutralise baignade et famille (0, statut `closed`), quel que soit le milieu, sans fabriquer de drapeau. Après levée, une projection datant de la fermeture est écartée. Surveillance sur place, dangers localisés, vigilance, compétences et embarcation ne sont pas validés par le modèle.
 
-La liste, les recommandations et la fiche utilisent les mêmes contributions ; une liste est datée et figée pendant la pagination (2 min), la fiche relit les dernières données. Les entrées projetées expirent après 15 min et sont revérifiées à la lecture. Un rafraîchissement ou un nouveau signalement peut légitimement changer le résultat. Aucun calcul ne déclenche d'appel météo par résultat de recherche.
+La liste, les recommandations et la fiche relisent les contributions actives en base, indépendamment des projections météo (15 min). Une liste est datée et figée pendant au plus deux minutes ; si une fermeture ou l’état communautaire change entre deux pages, son curseur est refusé (409). Une contribution retirée ou expirée ne peut donc pas continuer à pénaliser une nouvelle recherche. Aucun calcul ne déclenche d’appel météo par résultat.
 
 Les recommandations excluent les indices inconnus, non applicables, nuls et les usages interdits. La recherche sans filtre conserve ces plages pour consultation.
 

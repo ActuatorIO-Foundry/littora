@@ -2,7 +2,7 @@ import { CommonModule } from "@angular/common";
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from "@angular/core";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { Subscription, timeout } from "rxjs";
-import type { Alerts, ArsMeasurement } from "@littora/api-client/models";
+import type { Alerts, ArsMeasurement, Report } from "@littora/api-client/models";
 import {
   Beach,
   BeachAmenity,
@@ -25,11 +25,6 @@ import {
   freshnessDeadline,
 } from "../../shared/presentation";
 type UsageKey = "bathing" | "family" | "paddle" | "boat";
-interface Report {
-  type: string;
-  created_at: string;
-  value?: { flag?: string };
-}
 @Component({
   selector: "app-beach-detail",
   standalone: true,
@@ -52,6 +47,9 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
   private vigilanceTimer?: ReturnType<typeof setTimeout>;
   amenities: BeachAmenitiesResponse | null = null;
   reports: Report[] = [];
+  loadingReports = true;
+  private reportTimer?: ReturnType<typeof setTimeout>;
+  private reportRequest?: Subscription;
   loading = true;
   loadingScore = true;
   loadingAmenities = true;
@@ -156,6 +154,9 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     this.subscriptions.add(this.route.paramMap.subscribe(params => this.loadBeach(params.get("id"))));
   }
   private loadBeach(id: string | null): void {
+    clearTimeout(this.reportTimer);
+    this.reportRequest?.unsubscribe();
+    this.loadingReports = true;
     clearTimeout(this.shomExpiry);
     clearTimeout(this.vigilanceTimer);
     this.vigilance = null;
@@ -273,22 +274,39 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
       });
   }
   private loadReports(id: string): void {
-    this.beachRequests.add(
-      this.api
+    clearTimeout(this.reportTimer);
+    this.reportRequest?.unsubscribe();
+    const previous = this.reports;
+    this.reports = previous.filter(r => Date.parse(r.expires_at ?? '') > Date.now());
+    this.cdr.markForCheck();
+    this.reportRequest = this.api
         .getReports(id)
         .pipe(timeout(12000))
         .subscribe({
           next: (r) => {
-            this.reports = r as Report[];
+            const now = Date.now();
+            this.reports = r.filter(item => item.status === 'verified' && item.provenance?.verified &&
+              !item.provenance.isDemo && Date.parse(item.expires_at ?? '') > now);
+            const changed = previous.length !== this.reports.length || previous.some((p,i) => this.reports[i]?.id !== p.id);
+            if (!this.loadingReports && (changed || this.score?.safety?.communityFlag)) this.loadScore(id,true);
+            this.loadingReports = false;
             this.reportsUnavailable = false;
+            this.reportTimer = setTimeout(() => this.loadReports(id), Math.min(60000,
+              ...this.reports.map(item => Date.parse(item.expires_at!) - now)));
             this.cdr.markForCheck();
           },
           error: () => {
+            this.loadingReports = false;
+            this.reports = [];
             this.reportsUnavailable = true;
+            this.reportTimer = setTimeout(() => this.loadReports(id),60000);
             this.cdr.markForCheck();
           },
-        }),
-    );
+        });
+  }
+  get feedReports() {
+    const history = new Set(this.score?.safety?.communityFlag?.history.map(entry => entry.reportId));
+    return this.reports.filter(report => !history.has(report.id));
   }
   get backQuery() {
     return this.route.snapshot.queryParams;
@@ -396,6 +414,13 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     } else {
       payload = { beachId: this.beach.id, type, value: {}, observedAt: new Date().toISOString() };
     }
+    this.submitReport(payload);
+  }
+  contest(reportId: string): void {
+    if (!this.beach || this.sending) return;
+    this.submitReport({beachId:this.beach.id,type:'other',value:{contests:reportId}});
+  }
+  private submitReport(payload: ReportPayload): void {
     this.sending = true;
     this.reportMessage = "";
     this.reportError = "";
@@ -407,7 +432,8 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
           next: () => {
             this.sending = false;
             this.reportMessage =
-              "Observation reçue, en attente de modération. Merci.";
+              payload.type === 'other' ? "Contestation reçue. L’observation sera réexaminée." :
+                "Observation reçue, en attente de modération. Merci.";
             this.loadReports(this.beach!.id);
             this.cdr.markForCheck();
           },
@@ -458,6 +484,8 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
         }).format(d);
   }
   ngOnDestroy(): void {
+    clearTimeout(this.reportTimer);
+    this.reportRequest?.unsubscribe();
     clearTimeout(this.shomExpiry);
     clearTimeout(this.vigilanceTimer);
     clearTimeout(this.scoreTimer);

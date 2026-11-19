@@ -116,7 +116,7 @@ export class LittoraApiService {
         }));
     }
 
-    getReports(beachId: string): Observable<unknown[]> {
+    getReports(beachId: string) {
         return this.client.getReports({ beachId });
     }
 }

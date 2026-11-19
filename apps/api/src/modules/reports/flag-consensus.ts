@@ -38,6 +38,6 @@ export function flagConsensus(rows: Observation[], now = Date.now()) {
     status:capped?'capped':participants<3?'insufficient':consensus?'consensus':'conflicting',
     windowHours:3,historyHours:12,
     recentRedAt:recentRed?new Date(recentRed.time).toISOString():null,
-    history:selected.map(item=>({flag:item.flag,time:new Date(item.time).toISOString(),confidence:0})),
+    history:selected.map(item=>({reportId:item.row.id,flag:item.flag,time:new Date(item.time).toISOString(),confidence:0})),
   };
 }

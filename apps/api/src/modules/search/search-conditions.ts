@@ -18,7 +18,7 @@ export function freshSource(data: Row | undefined, now: number): boolean {
 
 // Store only dated model inputs, never an entire beach record or sanitary archive.
 export function conditionSnapshot(score: Row) {
-  const { weather, marine, waterQuality, community } = score.current;
+  const { weather, marine, waterQuality } = score.current;
   return {
     lat: score.beach.lat,
     lon: score.beach.lon,
@@ -28,12 +28,16 @@ export function conditionSnapshot(score: Row) {
     marine,
     dataStatus: score.dataStatus,
     quality: waterQuality.status,
-    community,
-    estimatedFlag: score.safety?.estimatedFlag,
   };
 }
 
-export function searchConditions(beach: Row, snapshot: Row | null, now: number, closed = false) {
+export function estimatedFlag(bathing:number|null,wave:number|null,current:number|null,closed:boolean) {
+  return closed || bathing === null || wave === null || current === null ? 'unknown'
+    : bathing >= 78 && wave < 0.8 && current < 0.18 ? 'green' : bathing >= 55 && wave < 1.3 && current < 0.32 ? 'yellow' : 'red';
+}
+
+export function searchConditions(beach: Row, snapshot: Row | null, now: number, closed = false,
+  community: Parameters<typeof explainAll>[4] = []) {
   const valid =
     snapshot &&
     snapshot.lat === beach.lat &&
@@ -61,11 +65,12 @@ export function searchConditions(beach: Row, snapshot: Row | null, now: number, 
     values,
     !!valid && snapshot.quality === 'poor',
     closed,
-    valid ? (snapshot.community ?? []) : [],
+    community,
   );
   const { bathing, family, paddle, boat } = explanations;
   return {
     explanations,
+    estimatedFlag: estimatedFlag(bathing.score,values.wave_height,values.ocean_current_velocity,closed),
     scores: { bathing: bathing.score, family: family.score, paddle: paddle.score, boat: boat.score },
     waterTemp: values.sea_surface_temperature,
     airTemp: read('weather', 'temperature_2m'),

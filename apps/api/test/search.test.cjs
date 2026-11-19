@@ -14,10 +14,23 @@ function fixture() {
   const cache={getJson:async k=>structuredClone(stored.get(k)??null),
     getManyJson:async keys=>keys.map(k=>stored.get(k)??null),
     setJson:async(k,v)=>{stored.set(k,structuredClone(v));return true;}};
+  const community={key:'initial',byBeach:new Map()};
   const service=new SearchService({closedForBathing:async()=>new Set(),searchCandidates:async()=>{reads++;return rows;}},
-    {get:async()=>{throw Error('Unexpected geographic request');}}, {flagConsensuses:async()=>new Map()},cache);
-  return {service,cache,stored,reads:()=>reads};
+    {get:async()=>{throw Error('Unexpected geographic request');}},
+    {flagConsensuses:async()=>new Map(),activeCommunity:async()=>community},cache);
+  return {service,cache,stored,community,reads:()=>reads};
 }
+test('search: retired reports stop penalising immediately, including with a warm forecast cache',async()=>{
+  const {service,stored,community}=fixture(), id=rows[0].id;
+  const pollution=[{type:'pollution',count:1,confidence:1}];
+  stored.set(conditionKey(id),{...snapshot(),community:pollution});
+  community.byBeach.set(id,pollution);
+  const old=await service.search({limit:1});
+  community.key='withdrawn';community.byBeach.clear();
+  await assert.rejects(service.search({limit:1,cursor:old.pageInfo.nextCursor}),e=>e.getStatus()===409);
+  const fresh=await service.search({limit:1});
+  assert.equal(fresh.items[0].scores.bathing-old.items[0].scores.bathing,22);
+});
 test('search: dynamic criteria apply beyond candidate 30, including real zero and inclusive bounds',async()=>{
   const {service,stored}=fixture();stored.set(conditionKey(rows[64].id),snapshot(0));
   const result=await service.search({minWaterTemp:0,maxWaterTemp:0,minAirTemp:0,maxAirTemp:0,usage:'family',minScore:20});

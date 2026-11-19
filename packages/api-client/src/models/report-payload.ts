@@ -22,6 +22,11 @@ export type ReportPayload = ({
 'drapeau'?: 'green' | 'yellow' | 'red' | 'vert' | 'verte' | 'jaune' | 'orange' | 'rouge';
 'value'?: string;
 'note'?: string;
+
+/**
+ * Private review request for an active report on the same beach. Only for type other.
+ */
+'contests'?: string;
 'severity'?: string;
 
 /**

@@ -28,6 +28,11 @@ export type CommunityFlag = {
 [key: string]: number;
 };
 'history': Array<{
+
+/**
+ * Public report identifier for deduplication and review requests.
+ */
+'reportId'?: string;
 'flag': 'green' | 'yellow' | 'red';
 'time': string;
 'confidence': number;

@@ -3,6 +3,7 @@ import { PG } from '../../database/database.module';
 import { ContributionsService, ContributionIdentity } from './contributions.service';
 import { normalizeReport, ReportInput } from './report-input';
 import { flagConsensus } from './flag-consensus';
+import { createHash } from 'node:crypto';
 
 @Injectable()
 export class ReportsService {
@@ -16,29 +17,43 @@ export class ReportsService {
 
   async list(beachId: string) {
     const { rows } = await this.db.query(
-      `select r.*,c.observed_at,c.expires_at from reports r left join report_contributions c on c.report_id=r.id
+      `select r.*,coalesce(c.observed_at,r.created_at) as observed_at,
+       coalesce(c.expires_at,r.created_at+interval '24 hours') as expires_at from reports r left join report_contributions c on c.report_id=r.id
        where beach_id=$1 and status='verified' and coalesce(r.value->>'demo','false')<>'true'
        and exists(select 1 from beach_catalogue b where b.id=r.beach_id)
        and coalesce(c.expires_at,r.created_at+interval '24 hours')>now()
-       order by created_at desc limit 50`,
+       and coalesce(c.observed_at,r.created_at)<=now()
+       order by observed_at desc,r.id limit 50`,
       [beachId],
     );
     return rows;
   }
 
   async aggregate(beachId: string) {
-    const { rows } = await this.db.query(
-      `select type,count(*)::int as count,avg(confidence)::float as confidence
-       from reports
-       where beach_id=$1
-       and exists(select 1 from beach_catalogue b where b.id=reports.beach_id)
-       and status='verified' and coalesce(value->>'demo','false')<>'true'
-       and coalesce((select expires_at from report_contributions where report_id=reports.id),created_at+interval '24 hours')>now()
-       and created_at > now() - interval '24 hours'
-       group by type`,
-      [beachId],
-    );
-    return rows;
+    return (await this.activeCommunity([beachId])).byBeach.get(beachId.toLowerCase()) ?? [];
+  }
+
+  async activeCommunity(beachIds?: string[]) {
+    const {rows}=await this.db.query(`select r.beach_id,r.type,count(*)::int as count,
+      avg(r.confidence)::float as confidence,md5(string_agg(r.id::text || case
+        when r.type <> 'flag' then ''
+        when coalesce(c.observed_at,r.created_at)>now()-interval '3 hours' and c.contributor_id is not null
+          and c.network_hash is not null then 'vote'
+        when coalesce(c.observed_at,r.created_at)>now()-interval '12 hours' then 'history'
+        else 'inactive' end,',' order by r.id)) as stamp
+      from reports r left join report_contributions c on c.report_id=r.id
+      where r.status='verified' and r.created_at>now()-interval '24 hours' and coalesce(r.value->>'demo','false')<>'true'
+        and coalesce(c.observed_at,r.created_at)<=now() and coalesce(c.expires_at,r.created_at+interval '24 hours')>now()
+        and ($1::uuid[] is null or r.beach_id=any($1)) and exists(select 1 from beach_catalogue b where b.id=r.beach_id)
+      group by r.beach_id,r.type order by r.beach_id,r.type`,[beachIds ?? null]);
+    const byBeach=new Map<string,Array<{type:string;count:number;confidence:number}>>();
+    const digest=createHash('sha256');
+    for(const {beach_id,type,count,confidence,stamp} of rows){
+      digest.update(JSON.stringify([beach_id,type,count,confidence,stamp]));
+      const group=byBeach.get(beach_id) ?? [];
+      group.push({type,count,confidence});byBeach.set(beach_id,group);
+    }
+    return {key:digest.digest('hex'),byBeach};
   }
 
   async flagConsensus(beachId: string) {

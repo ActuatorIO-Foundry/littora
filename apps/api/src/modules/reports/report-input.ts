@@ -21,6 +21,10 @@ export function normalizeReport(dto: ReportInput, now = Date.now()) {
     value.flag=flags[0];
   } else if (value.flag!==undefined || value.drapeau!==undefined) throw new BadRequestException();
   if (value.severity && !['low','medium','high'].includes(value.severity)) throw new BadRequestException();
-  if (dto.type==='other' && !value.note?.trim()) throw new BadRequestException();
+  if (value.contests !== undefined) {
+    if (dto.type !== 'other' || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(value.contests)) throw new BadRequestException();
+    value.contests = value.contests.toLowerCase();
+  }
+  if (dto.type==='other' && !value.note?.trim() && !value.contests) throw new BadRequestException();
   return { beachId:dto.beachId,type:dto.type,value,observedAt:new Date(Math.min(now,observed)).toISOString() };
 }

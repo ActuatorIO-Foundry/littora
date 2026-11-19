@@ -7,7 +7,7 @@ import { ReportsService } from '../reports/reports.service';
 import { conditionKey, searchConditions } from './search-conditions';
 import { SearchInput, validateSearch } from './search-input';
 
-type Snapshot = { closedKey: string; hash: string; asOf: string; expiresAt: string; items: any[];
+type Snapshot = { closedKey: string; communityKey:string; hash: string; asOf: string; expiresAt: string; items: any[];
   commune: any; coverage: { candidates: number; waterTemperature: number; airTemperature: number; scores: number; flags: number } };
 
 @Injectable()
@@ -20,7 +20,7 @@ export class SearchService {
     const { cursor, ...criteria } = input;
     const limit = input.limit ?? 200;
     const hash = createHash('sha256').update(JSON.stringify(Object.entries(criteria).sort(([a],[b]) => a.localeCompare(b)))).digest('hex');
-    const closed=await this.beaches.closedForBathing();
+    const [closed,live]=await Promise.all([this.beaches.closedForBathing(),this.reports.activeCommunity()]);
     const closedKey=createHash('sha256').update([...closed].join(',')).digest('hex');
     let snapshot: Snapshot, id = randomUUID(), offset = 0;
     if (cursor) {
@@ -28,7 +28,7 @@ export class SearchService {
       if (!match) throw new BadRequestException('Invalid search cursor');
       id = match[1] as typeof id; offset = Number(match[2]);
       const saved = await this.cache.getJson<Snapshot>(`search:page:v4:${id}`);
-      if (!saved || saved.closedKey!==closedKey || Date.parse(saved.expiresAt) <= Date.now()) throw new ConflictException('Search expired; restart from first page');
+      if (!saved || saved.closedKey!==closedKey || saved.communityKey!==live.key || Date.parse(saved.expiresAt) <= Date.now()) throw new ConflictException('Search expired; restart from first page');
       if (saved.hash !== hash || !Number.isSafeInteger(offset) || offset >= saved.items.length || offset % limit) {
         throw new BadRequestException('Cursor does not match search');
       }
@@ -40,7 +40,7 @@ export class SearchService {
       const flags = await this.reports.flagConsensuses(candidates.map(b => b.id));
       const now = Date.now(), usage = input.usage ?? 'bathing';
       const enriched = candidates.map((beach, i) => {
-        const {explanations,...conditions} = searchConditions(beach, cached[i], now, closed.has(beach.id));
+        const {explanations,estimatedFlag,...conditions} = searchConditions(beach, cached[i], now, closed.has(beach.id),live.byBeach.get(beach.id));
         const community = flags.get(beach.id);
         return { ...beach, ...conditions, scoreExplanation:explanations[usage], bathingRestriction:closed.has(beach.id)?'closed':'unknown', selectedScore: conditions.scores[usage],
           flag: community?.flag ?? null, flagSource: community?.flag ? 'community' : null,
@@ -55,7 +55,7 @@ export class SearchService {
       items.sort((a,b) => (input.sort === 'score' ? (b.selectedScore ?? -1) - (a.selectedScore ?? -1)
         : input.sort === 'distance' ? (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity)
         : names.compare(a.name,b.name)) || a.id.localeCompare(b.id));
-      snapshot = { closedKey, hash, asOf: new Date(now).toISOString(), expiresAt: new Date(now + 120_000).toISOString(), items, commune,
+      snapshot = { closedKey, communityKey:live.key, hash, asOf: new Date(now).toISOString(), expiresAt: new Date(now + 120_000).toISOString(), items, commune,
         coverage: { candidates: candidates.length, waterTemperature: enriched.filter(b => b.waterTemp !== null).length,
           airTemperature: enriched.filter(b => b.airTemp !== null).length,
           scores: enriched.filter(b => b.selectedScore !== null).length, flags: enriched.filter(b => b.flag !== null).length } };

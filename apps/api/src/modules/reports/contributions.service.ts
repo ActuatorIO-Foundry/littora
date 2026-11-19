@@ -83,6 +83,11 @@ export class ContributionsService {
       if (!actor) throw new UnauthorizedException();
       if (!(await client.query(`select id from beaches where id=$1
         and exists(select 1 from beach_catalogue c where c.id=beaches.id) for key share`, [dto.beachId])).rows.length) throw new NotFoundException();
+      if (dto.value.contests && !(await client.query(`select r.id from reports r
+        left join report_contributions c on c.report_id=r.id
+        where r.id=$1 and r.beach_id=$2 and r.status='verified' and coalesce(r.value->>'demo','false')<>'true'
+        and coalesce(c.observed_at,r.created_at)<=now() and coalesce(c.expires_at,r.created_at+interval '24 hours')>now()
+        for share of r`, [dto.value.contests,dto.beachId])).rowCount) throw new NotFoundException();
       // Serialise both network and actor, including submissions from different API instances.
       for (const key of [network, actor.id].sort()) await client.query('select pg_advisory_xact_lock(hashtextextended($1,23))', [key]);
       const duplicate = await client.query(`select r.id from reports r join report_contributions c on c.report_id=r.id

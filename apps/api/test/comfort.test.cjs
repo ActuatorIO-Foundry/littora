@@ -8,7 +8,7 @@ const { calmProjection }=require('./fixtures.cjs');
 test('recommendations exclude unscored and officially closed bathing sites rather than ranking them last',async()=>{
   const sites=['ok','closed','lake','missing'].map(id=>({id,lat:43,lon:6,waterType:id==='lake'?'lake':'sea'}));
   const svc=new RecommendationsService({list:async()=>sites,closedForBathing:async()=>new Set(['closed'])},
-    {getManyJson:async()=>[calmProjection(),calmProjection(),null,null]});
+    {getManyJson:async()=>[calmProjection(),calmProjection(),null,null]}, {activeCommunity:async()=>({byBeach:new Map()})});
   const rows=await svc.best(43,6,'family');
   assert.deepEqual(rows.map(r=>r.id),['ok']);
   assert.equal(rows[0].scoreExplanation.score,rows[0].selectedScore);

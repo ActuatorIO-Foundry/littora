@@ -43,7 +43,7 @@ test('migrations: fresh install, readonly startup guard and idempotent reference
   try {
     await assert.rejects(factory(), /Database migrations required/);
     assert.equal((await pool.query("select to_regclass('public.schema_migrations') as name")).rows[0].name, null);
-    assert.equal((await migrate(pool)).length, 9);
+    assert.equal((await migrate(pool)).length, manifest().length);
     assert.deepEqual(await migrate(pool), []);
     const ready = await factory();
     await ready.end();
@@ -84,7 +84,7 @@ test('migrations: preserve historical UUIDs, duplicates, reports, samples and OS
   assert.equal((await pool.query('select count(*)::int as count from beaches where seed_key is not null')).rows[0].count, 5);
   assert.equal((await pool.query('select count(*)::int as count from water_quality where is_demo')).rows[0].count, 10);
   assert.deepEqual((await pool.query("select extversion from pg_extension where extname='postgis'")).rows, extension);
-  assert.equal((await status(pool)).filter(m => m.applied).length, 9);
+  assert.equal((await status(pool)).filter(m => m.applied).length, manifest().length);
   await assert.rejects(pool.query(`insert into beaches(name,lat,lon,osm_id) select name,lat,lon,osm_id from beaches limit 1`), e => e.code === '23505');
   await assert.rejects(pool.query(`insert into reports(beach_id,type) values($1,'flag')`, [randomUUID()]), e => e.code === '23503');
   await pool.query('set enable_seqscan = off');
@@ -99,6 +99,33 @@ test('migrations: backfill only missing geometries', async t => {
   await pool.query('update beaches set geom=null where id=$1', [first]);
   await migrate(pool);
   assert.equal((await pool.query('select ST_X(geom::geometry)=lon and ST_Y(geom::geometry)=lat as valid from beaches where id=$1', [first])).rows[0].valid, true);
+});
+
+test('search presence migration: complete facility facts match counts for fresh, empty, moved and expired inventories', async t => {
+  const { pool } = await isolated(t);
+  await migrate(pool, manifest().slice(0, 9));
+  await pool.query(`insert into beaches(name,lat,lon)
+    select n,43,6 from unnest(array['near','far','empty','expired','moved','absent']) n`);
+  await pool.query(`insert into beach_amenity_collections(beach_id,lat,lon,attempted_at,fetched_at,source_url)
+    select id,43,case when name='moved' then 5 else 6 end,now(),
+      case when name='expired' then now()-interval '8 days' else now() end,'https://example.test'
+    from beaches where name<>'absent'`);
+  await pool.query(`insert into beach_amenities(beach_id,osm_id,name,category,lat,lon)
+    select id,'node/'||i,'POI',case i when 1 then 'toilets' when 2 then 'rescue' else 'parking' end,
+      case when name='far' or i=1 then 44 else 43 end,6
+    from beaches cross join generate_series(1,5) i where name<>'empty'`);
+  const read = async () => (await pool.query('select id,name,facility_facts from beach_catalogue order by id')).rows;
+  const before = await read();
+  assert.equal(before.length, 6);
+  const near = before.find(b => b.name === 'near').facility_facts;
+  assert.equal(near.parking.value, true);
+  assert.equal(near.rescueStation.value, true);
+  assert.equal(near.toilets.value, null);
+  assert.equal(near.lifeguard.value, null);
+  assert.ok(before.filter(b => b.name !== 'near').every(b => b.facility_facts.parking.value === null));
+  await migrate(pool);
+  assert.deepEqual(await read(), before);
+  assert.ok((await pool.query("select to_regclass('beach_amenities_site_category_idx') as idx")).rows[0].idx);
 });
 
 test('migrations: conflict refuses silently destructive deduplication', async t => {

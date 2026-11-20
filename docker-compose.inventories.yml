@@ -1,0 +1,27 @@
+services:
+  inventories:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: inventories
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL required}
+      INVENTORY_REGIONS: ${INVENTORY_REGIONS:-all}
+      INVENTORY_MAX_MIB: ${INVENTORY_MAX_MIB:-4096}
+      INVENTORY_RATE: ${INVENTORY_RATE:-8M}
+    volumes:
+      - ${INVENTORY_CACHE:-inventory_cache}:/cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "sh", "-c", "test ! -f /cache/cycle.failed && test -n \"$$(find /cache/cycle.ok -mmin -1620 -print 2>/dev/null)\""]
+      interval: 5m
+      start_period: 1h
+      timeout: 5s
+volumes:
+  inventory_cache:

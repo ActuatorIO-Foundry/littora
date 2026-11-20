@@ -36,6 +36,9 @@ jobs:
       - name: Build runtime images
         run: |
           docker build -f apps/api/Dockerfile -t littora-api:ci .
+          docker build --target inventories -f apps/api/Dockerfile -t littora-inventories:ci .
+          docker run --rm littora-inventories:ci node -e "require('./apps/api/scripts/amenities.cjs')"
+          docker run --rm -v "$PWD/scripts/test:/app/scripts/test:ro" littora-inventories:ci python3 scripts/test/test_territory_inventories.py
           docker build -f apps/web/Dockerfile.prod -t littora-web:ci .
           docker build --platform linux/amd64 -t littora-postgres:16.16-3.7.0-r1 infra/postgres
           docker build -t littora-redis:7.4.12-r1 infra/redis
@@ -57,7 +60,7 @@ jobs:
         run: |
           mkdir -p image-reports
           status=0
-          for image in api web; do
+          for image in api web inventories; do
             /tmp/trivy image --image-src docker --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --format json --output "image-reports/$image.json" "littora-$image:ci" || status=1
           done
           for entry in postgres:16.16-3.7.0-r1 redis:7.4.12-r1 caddy:2.11.9-r1; do

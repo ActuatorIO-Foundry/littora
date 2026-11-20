@@ -220,6 +220,18 @@ test('Confort partiel : plafond nul visible et vent/UV périmés distincts des v
   await noOverflow(page);
 });
 
+test('Barème : accès depuis une fiche, coefficients et retour à la plage',async({page})=>{
+  await page.goto('/plages/test-sea');
+  await page.getByRole('link',{name:'Comprendre le barème'}).click();
+  await expect(page).toHaveURL(/\/bareme$/);
+  await expect(page.getByRole('heading',{name:'Comprendre le barème'})).toBeVisible();
+  await expect(page.getByRole('row',{name:/Catamaran/})).toContainText('35');
+  await expect(page.getByText(/chaque km\/h au-dessus/)).toBeVisible();
+  await noOverflow(page);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/plages\/test-sea$/);
+});
+
 test('Direction du vent : nord, calme et valeur inconnue restent distincts',async({page})=>{
   let degrees:number|null=0,speed=12;
   await page.route('**/api/score/beach/*',r=>r.fulfill({json:{...score,

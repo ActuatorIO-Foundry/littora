@@ -85,9 +85,9 @@ export async function collectOne(db: Pool, request = fetch) {
 
 export async function projectDue(db: Pool, score: ScoreService) {
   const { rows } = await db.query(`select b.id from beach_catalogue b left join forecast_projections p on p.beach_id=b.id
-    where (p.updated_at is null or p.updated_at < now()-interval '8 minutes')
-    and exists(select 1 from forecast_zones z where z.y=floor(b.lat*100+0.5)::int and z.x=floor(b.lon*100+0.5)::int
-      and z.last_success_at>now()-interval '24 hours' and (z.source='open-meteo' or b.water_type='sea'))
+    where exists(select 1 from forecast_zones z where z.y=floor(b.lat*100+0.5)::int and z.x=floor(b.lon*100+0.5)::int
+      and z.last_success_at>now()-interval '24 hours' and (z.source='open-meteo' or b.water_type='sea')
+      and (p.updated_at is null or p.updated_at < now()-interval '8 minutes' or z.last_success_at > p.updated_at))
     order by p.updated_at nulls first,b.id limit 100`);
   let failed = 0;
   for (const { id } of rows) {

@@ -43,3 +43,37 @@ de fraîcheur ne changent pas. Ces bandes sont des préférences de loisir, pas
 des limites de sécurité validées pour une personne, un gréement ou un site.
 La direction est la provenance météorologique, pas une estimation de vent de
 terre ou de mer : elle ne modifie pas la note.
+
+## Suivi opérationnel (#69)
+
+Toutes les 15 minutes, le worker lit le catalogue public, les derniers passages
+des zones météo et les projections présentes dans Redis. Il appelle le même
+modèle que la recherche pour les six activités. Il ne visite aucune fiche,
+ne contacte pas les fournisseurs, ne conserve ni notes individuelles ni
+signalements. Un succès de collecte rend les plages de la zone éligibles dès
+le prochain travail de projection (chaque minute, lot borné à 100). Le
+renouvellement ordinaire et les recherches déjà paginées restent inchangés.
+
+```sh
+docker compose -f docker-compose.local.yml exec -T worker node scripts/score-coverage.cjs sample
+docker compose -f docker-compose.local.yml exec -T worker node scripts/score-coverage.cjs history 24
+```
+
+`sample` observe sans écrire. `history 24` lit les six dernières heures ;
+un créneau sans observation vaut `null`, jamais zéro. Le premier relevé de
+chaque quart d'heure est conservé sept jours dans le cache et peut disparaître
+en cas d'éviction ou de perte de Redis. Comparer les séries de même `scope`
+(identifiants, positions et milieux). Il ne s'agit pas d'un historique garanti
+ni d'un nouvel objectif de disponibilité.
+
+Les statuts de chaque activité sont exclusifs. Les motifs d'une note incomplète
+peuvent se recouper : projection inutilisable, prévision périmée, mesure absente
+ou invalide. Sans projection utilisable, ne pas attribuer les valeurs manquantes
+au fournisseur. `awaitingProjection` compte les sites dont la base connaît un
+succès météo postérieur à la projection encore utilisable. Les deux lectures
+(base puis cache) sont rapprochées, pas une transaction distribuée.
+`sources` fournit aussi les erreurs, dates des dernières tentatives et zones
+en attente. `dispatch` distingue une temporisation du fournisseur, un retard
+avec des tentatives récentes, ou sans tentative récente sur les deux sources.
+Un trou d'observation ou une absence de tentative ne prouve pas à lui seul
+une panne du fournisseur ou une mise en veille de l'hôte.

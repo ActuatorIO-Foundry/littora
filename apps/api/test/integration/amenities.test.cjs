@@ -6,6 +6,7 @@ const {Pool}=require('pg');
 const {migrate}=require('../../scripts/database.cjs');
 const {AmenitiesService}=require('../../dist/modules/beaches/amenities.service');
 const {BeachesService}=require('../../dist/modules/beaches/beaches.service');
+const {coverage}=require('../../scripts/amenities.cjs');
 
 test('amenities: persistence, radius, same-name parking, freshness and catalogue consistency',async t=>{
   const url=new URL(process.env.TEST_DATABASE_URL);assert.equal(url.pathname,'/littora_ci_test');
@@ -38,9 +39,20 @@ test('amenities: persistence, radius, same-name parking, freshness and catalogue
   assert.equal((await service.get(beach.id)).status,'unknown');assert.equal((await catalogue.get(beach.id)).has_parking,null);
   await service.persist(beach,[],'https://overpass-api.de/api/interpreter');
   assert.equal((await service.get(beach.id)).total,0);assert.equal((await catalogue.get(beach.id)).has_parking,null);
+  assert.equal((await coverage(pool)).empty,1);
+  const source='https://download.openstreetmap.fr/extracts/europe/france/paca/var-latest.osm.pbf';
+  const date=new Date(Date.now()-30*3600_000).toISOString();
+  assert.equal(await service.persist(beach,points,source,date),false); // Newer live inventory wins.
+  await pool.query("update beach_amenity_collections set fetched_at=now()-interval '8 days'");
+  assert.equal(await service.persist(beach,points,source,date),true);
+  assert.equal(await service.persist(beach,points,source,date),false);
+  result=await service.get(beach.id);
+  assert.equal(result.provider,'openstreetmap-extract');assert.equal(result.status,'available');assert.equal(result.fetchedAt,date);
+  assert.deepEqual(await coverage(pool),{sites:1,populated:1,empty:0,unknown:0,associations:9});
   await service.persist(beach,points,'https://overpass-api.de/api/interpreter');
   await pool.query('update beaches set lat=44 where id=$1',[beach.id]);
   assert.equal((await service.read(beach.id)).total,0);assert.equal((await catalogue.get(beach.id)).has_parking,null);
+  assert.equal((await coverage(pool)).unknown,1);
   await assert.rejects(service.persist(beach,[],'https://overpass-api.de/api/interpreter'),/position changed/);
   assert.equal((await pool.query('select count(*)::int n from beaches')).rows[0].n,1);
 });

@@ -1,6 +1,7 @@
 const assert=require('node:assert/strict');
 const {test}=require('node:test');
-const {parseAmenities,amenityCategory,fetchAmenities}=require('../dist/modules/beaches/amenities');
+const {parseAmenities,amenityCategory,fetchAmenities,failureReason}=require('../dist/modules/beaches/amenities');
+const {validate,covers,importCity}=require('../scripts/amenities.cjs');
 const {AmenitiesService}=require('../dist/modules/beaches/amenities.service');
 const {BeachesService}=require('../dist/modules/beaches/beaches.service');
 const position={lat:43,lon:6};
@@ -54,11 +55,35 @@ test('amenities: failed source and legacy flags never produce a geolocated fallb
 test('amenities: unavailable provider is bounded and simultaneous requests share a collection',async()=>{
   const original=global.fetch;let calls=0;
   global.fetch=async(_url,init)=>{calls++;assert.ok(init.signal);return {ok:false,status:429};};
-  try{await assert.rejects(fetchAmenities(position,'https://overpass-api.de/api/interpreter'),/unavailable/);}
+  try{await assert.rejects(fetchAmenities(position,'https://overpass-api.de/api/interpreter'),/rate-limit/);}
   finally{global.fetch=original;}
   assert.equal(calls,1);
   const service=new AmenitiesService({});let loads=0;
   service.load=async()=>{loads++;await new Promise(r=>setTimeout(r,10));return {amenities:[]};};
   const first=service.get('id'),second=service.get('id');
   assert.deepEqual(await first,await second);assert.equal(loads,1);
+});
+
+test('amenities: provider diagnostics do not expose exception details',()=>{
+  assert.equal(failureReason(new DOMException('private request data','TimeoutError')),'timeout');
+  assert.equal(failureReason(new Error('unfiltered internal details')),'transport');
+  assert.equal(failureReason(new SyntaxError('raw provider body')),'invalid-response');
+  assert.equal(failureReason(new Error('upstream')),'upstream');
+});
+
+test('amenities: offline preview rejects stale, malformed or out-of-scope data without any writes',async()=>{
+  const asOf=new Date(Date.now()-3600000).toISOString();
+  const doc={version:1,asOf,source:'https://download.openstreetmap.fr/extracts/europe/france/paca/var-latest.osm.pbf',
+    bounds:[42.9,5.9,43.1,6.1],elements:[{...node(1),timestamp:asOf}]};
+  assert.equal(validate(doc),doc);
+  for(const invalid of [{asOf:new Date(Date.now()-49*3600000).toISOString()},{asOf:'2999-01-01'},
+    {source:'https://example.com/var-latest.osm.pbf'},{bounds:[42,5,44,7]},
+    {elements:[...doc.elements,...doc.elements]},{elements:[{...doc.elements[0],lat:45}]}])
+    assert.throws(()=>validate({...doc,...invalid}));
+  assert.ok(covers(doc.bounds,position));assert.equal(covers(doc.bounds,{lat:43.099,lon:6}),false);
+  const db={query:async(sql)=>{assert.match(sql,/^select id,lat,lon from beach_catalogue/);
+    return {rows:[{id:'a',...position},{id:'b',lat:43.099,lon:6},{id:'c',lat:43.06,lon:6}]};}};
+  const report=await importCity(db,'Commune',doc,false);
+  assert.deepEqual(report,{sites:3,edge:1,withoutPoints:1,withPoints:1,associations:1,updated:0,preserved:0,asOf});
+  assert.equal((await importCity(db,'Commune',{...doc,elements:[]},true)).updated,0);
 });

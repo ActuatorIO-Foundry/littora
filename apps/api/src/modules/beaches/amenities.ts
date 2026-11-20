@@ -38,22 +38,32 @@ export function parseAmenities(raw: any, beach: {lat: number; lon: number}): Ame
 
 let queue: Promise<unknown> = Promise.resolve();
 let pending=0, nextStart=0;
+export function failureReason(error: unknown): string {
+  if (!(error instanceof Error)) return 'transport';
+  if (error.name === 'TimeoutError' || error.name === 'AbortError') return 'timeout';
+  if (error instanceof SyntaxError) return 'invalid-response';
+  return ['rate-limit','upstream','http-error','queue-full','invalid-response','configuration'].includes(error.message)
+    ? error.message : 'transport';
+}
 export async function fetchAmenities(beach: {lat: number; lon: number}, endpoint: string): Promise<AmenityPoint[]> {
-  const url=new URL(endpoint);
+  let url: URL;
+  try { url = new URL(endpoint); } catch { throw new Error('configuration'); }
   if (url.protocol!=='https:' || url.username || url.password || url.hostname==='overpass.osm.ch') throw new Error('configuration');
-  if (pending>=4) throw new Error('unavailable');
+  if (pending>=4) throw new Error('queue-full');
   pending++;
   const task=queue.then(async()=>{
     const pause=nextStart-Date.now();
     if(pause>0)await new Promise(resolve=>setTimeout(resolve,pause));
     nextStart=Date.now()+2000;
-    const around=`around:2500,${beach.lat},${beach.lon}`;
-    const query=`[out:json][timeout:18];(nwr(${around})[amenity~"^(parking|parking_space|toilets|restaurant|cafe|ice_cream|fast_food|boat_rental)$"];nwr(${around})[shop~"^(rental|ice_cream)$"];nwr(${around})[rental];nwr(${around})[emergency~"^(lifeguard|lifeguard_tower)$"];nwr(${around})[lifeguard];);out center meta;`;
+    // One spatial index window for every category; the parser and PostGIS still enforce the radius.
+    const dy=2.5/110, dx=dy/Math.cos((Math.abs(beach.lat)+dy)*Math.PI/180);
+    const bounds=[beach.lat-dy,beach.lon-dx,beach.lat+dy,beach.lon+dx].join(',');
+    const query=`[out:json][timeout:18][bbox:${bounds}];(nwr[amenity~"^(parking|parking_space|toilets|restaurant|cafe|ice_cream|fast_food|boat_rental)$"];nwr[shop~"^(rental|ice_cream)$"];nwr[rental];nwr[emergency~"^(lifeguard|lifeguard_tower)$"];nwr[lifeguard];);out meta center;`;
     const response=await fetch(url,{method:'POST',signal:AbortSignal.timeout(20000),headers:{
       'content-type':'application/x-www-form-urlencoded',accept:'application/json',
       'user-agent':'Littora/0.1 (+https://github.com/ActuatorIO-Foundry/littora)',
     },body:new URLSearchParams({data:query})});
-    if(!response.ok)throw new Error('unavailable');
+    if(!response.ok)throw new Error(response.status === 429 ? 'rate-limit' : response.status >= 500 ? 'upstream' : 'http-error');
     let body='',bytes=0;const decoder=new TextDecoder();
     for await(const chunk of response.body as any){
       bytes+=chunk.byteLength;if(bytes>8*1024*1024)throw new Error('invalid-response');

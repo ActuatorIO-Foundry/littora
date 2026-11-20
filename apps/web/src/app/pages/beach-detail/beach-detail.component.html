@@ -18,13 +18,13 @@
       <div>
         <p class="eyebrow">
           {{ beach.waterType === 'lake' ? 'Lac' : beach.waterType === 'river' ? 'Rivière' : beach.coastline || 'Site de baignade' }}
-          <span *ngIf="beach.region">· {{ beach.region }}</span>
+          <span *ngIf="beach.region && !freshwater">· {{ beach.region }}</span>
         </p>
         <h1>{{ beach.name }}</h1>
         <p>
-          <app-icon name="pin" [size]="16" />{{ beach.city
-          }}<span *ngIf="beach.city && beach.department"> · </span
-          >{{ beach.department }}
+          <app-icon name="pin" [size]="16" />{{ beach.city }}<ng-container *ngIf="!freshwater">
+            <span *ngIf="beach.city && beach.department"> · </span>{{ beach.department }}
+          </ng-container>
         </p>
       </div>
       <span class="official-status"

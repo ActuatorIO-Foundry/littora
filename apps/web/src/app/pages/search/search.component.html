@@ -168,7 +168,7 @@
       <app-icon name="reset" [size]="15" />Réinitialiser
     </button>
   </section>
-  <div class="usage-row">
+  <div class="usage-row" [class.inland-note]="inland">
     <div *ngIf="!inland" class="usage-tabs" role="group" aria-label="Usage recherché">
       <button
         *ngFor="let usage of usages"
@@ -280,9 +280,9 @@
               {{ beach.name }}
             </button>
             <p>
-              {{ beach.city
-              }}<span *ngIf="beach.city && beach.department"> · </span
-              >{{ beach.department }}
+              {{ beach.city }}<ng-container *ngIf="beach.waterType !== 'lake' && beach.waterType !== 'river'">
+                <span *ngIf="beach.city && beach.department"> · </span>{{ beach.department }}
+              </ng-container>
             </p>
             <div class="beach-tags">
               <span *ngIf="beach.scoreExplanation?.status === 'calculated'">Confort : {{ beach.selectedScore }}/100</span>

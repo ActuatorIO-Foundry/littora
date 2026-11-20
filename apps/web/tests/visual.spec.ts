@@ -543,7 +543,7 @@ test('recherche : mer, lac, riviere et inconnu restent distincts', async ({ page
   const catalogue = [
     { ...beaches[0], name: 'Plage de La Baule', city: 'La Baule', department: 'Loire-Atlantique', region: 'Pays de la Loire' },
     { ...beaches[1], name: 'Berge de test' },
-    { ...beaches[0], id: 'test-lake', name: 'Plage du lac sale', waterType: 'lake', coastline: 'Atlantique' },
+    { ...beaches[0], id: 'test-lake', name: 'Plage du lac sale', waterType: 'lake', coastline: 'Atlantique',department:'Atlantique' },
     { ...beaches[0], id: 'test-unknown', name: 'Site non classe', waterType: 'unknown' },
   ];
   await page.route('**/api/search/beaches', route => route.fulfill({ json: searchResult(route.request().postDataJSON(),catalogue) }));
@@ -558,6 +558,7 @@ test('recherche : mer, lac, riviere et inconnu restent distincts', async ({ page
     await expect(page.locator('.beach-result')).toHaveCount(1);
     await expect(page.locator('.beach-name').getByRole('button', { name, exact: true })).toBeVisible();
     if(type!=='sea'){
+      await expect(page.locator('.beach-name p')).not.toContainText('Atlantique');
       await expect(page.getByLabel('Façade géographique')).toHaveCount(0);
       await expect(page.locator('.zone-marker')).toHaveCount(0);
       await expect(page.locator('.shoreline-tiles')).toHaveCount(0);

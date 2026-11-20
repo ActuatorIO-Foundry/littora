@@ -109,7 +109,8 @@
               >{{ metricValue(score.current?.weather, "wind_speed_10m")
               }}<small> km/h</small></strong
             >
-            <small *ngIf="oldReading('weather','wind_speed_10m')">Prévision périmée</small>
+            <small class="wind-origin">{{ windOrigin }}</small>
+            <small *ngIf="oldReading('weather','wind_speed_10m') || oldReading('weather','wind_direction_10m')">Prévision périmée</small>
           </div>
           <div
             [ngClass]="metricClass('uv', score.current?.weather?.['uv_index'])"
@@ -169,21 +170,29 @@
             >
               <app-icon [name]="usage.icon" /><span>{{ usage.label }}</span
               >
-              @if (score.explanations?.[usage.key]?.status === 'partial') {
-                <strong>≤ {{ score.explanations?.[usage.key]?.partialScore }}<small>/100</small></strong>
-                <small>Partiel · {{ score.explanations?.[usage.key]?.available }}/{{ score.explanations?.[usage.key]?.required }} mesures</small>
+              @let e = explanation(usage.key);
+              @if (e?.status === 'partial') {
+                <strong>{{ e?.partialScore ? '≤ ' : '' }}{{ e?.partialScore }}<small>/100</small></strong>
+                <small>Partiel · {{ e?.available }}/{{ e?.required }} mesures</small>
               } @else {
-                <strong>{{ score.scores[usage.key] ?? '—' }}<small *ngIf="score.scores[usage.key] != null">/100</small></strong>
+                <strong>{{ completeScore(usage.key) ?? '—' }}<small *ngIf="completeScore(usage.key) != null">/100</small></strong>
               }
+              <small *ngIf="usage.key === 'paddle'">{{ sport.label }}</small>
             </button>
           </div>
           <div class="score-explanation">
             <app-icon name="info" [size]="19" />
             <div>
-              <h3>{{ selectedUsageInfo.label }}</h3>
-              <p *ngIf="!['closed','not-applicable'].includes(score.explanations?.[selectedUsage]?.status ?? '')">{{ selectedUsageInfo.text }}</p>
-              <app-comfort-explanation [value]="score.explanations?.[selectedUsage]" />
-              <p *ngIf="!score.explanations && score.scores[selectedUsage] == null" class="caption">Score indisponible : données récentes insuffisantes.</p>
+              @if (selectedUsage === 'paddle') {
+                <label class="sport-choice">Discipline nautique
+                  <select #discipline [value]="sport.key" (change)="chooseSport(discipline.value)">
+                    <option *ngFor="let s of sports" [value]="s.key">{{ s.label }}</option>
+                  </select>
+                </label>
+              } @else { <h3>{{ selectedUsageInfo.label }}</h3> }
+              <p *ngIf="!['closed','not-applicable'].includes(explanation(selectedUsage)?.status ?? '')">{{ selectedUsage === 'paddle' ? sport.description : selectedUsageInfo.text }}</p>
+              <app-comfort-explanation [value]="explanation(selectedUsage)" />
+              <p *ngIf="!explanation(selectedUsage) && completeScore(selectedUsage) == null" class="caption">Score indisponible : données récentes insuffisantes.</p>
               <small
                 >Indice expérimental, pas une autorisation de baignade ni de
                 navigation.</small
@@ -438,19 +447,21 @@
           <p class="caption" *ngIf="realAmenities.length">
             Points référencés à moins de 2,5 km. Ouverture et surveillance en service non confirmées.
           </p>
-          <div class="amenity-group" *ngFor="let group of groups">
-            <h4>
-              <app-icon [name]="group.icon" [size]="17" />{{ group.name }}
-            </h4>
-            <p *ngFor="let item of amenitiesBy(group.category)">
-              {{ item.name
-              }}<span>{{ item.distanceKm | number: "1.0-1" }} km · {{ item.source === 'openstreetmap' ? 'OSM' : item.source }}</span>
+          <details class="amenity-group" name="nearby-places" *ngFor="let group of groups">
+            @let places = amenitiesBy(group.category);
+            <summary><app-icon [name]="group.icon" [size]="17" />{{ group.name }}
+              <span class="place-count">{{ places.length || '—' }}</span><app-icon name="down" [size]="15" />
+            </summary>
+            <p *ngFor="let item of places">
+              <a [href]="directionsTo(item)" target="_blank" rel="noopener noreferrer"
+                 [attr.aria-label]="'Itinéraire vers '+item.name+' dans Google Maps (nouvel onglet)'">{{ item.name }} <app-icon name="external" [size]="13" /></a>
+              <span>{{ item.distanceKm < 1 ? ((item.distanceKm * 1000 | number: '1.0-0') + ' m') : ((item.distanceKm | number: '1.0-1') + ' km') }}
+                · GPS {{ item.lat.toFixed(5) }}, {{ item.lon.toFixed(5) }}
+                <ng-container *ngIf="(item.referenceCount ?? 1) > 1"> · {{ item.referenceCount }} références OSM</ng-container>
+              </span>
             </p>
-            <small
-              *ngIf="!amenitiesBy(group.category).length && !loadingAmenities"
-              >Non renseigné</small
-            >
-          </div>
+            <small *ngIf="!places.length && !loadingAmenities">Non renseigné</small>
+          </details>
         </div>
         <div class="on-site-note">
           <app-icon name="flag" [size]="22" />

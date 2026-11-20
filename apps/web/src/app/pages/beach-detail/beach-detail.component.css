@@ -220,6 +220,24 @@
   font-size: 13px;
   margin-bottom: 5px;
 }
+.sport-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.sport-choice select {
+  max-width: 100%;
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: white;
+  color: var(--sea-dark);
+  font: inherit;
+}
 .score-explanation p {
   color: var(--muted);
   font-size: 12px;
@@ -397,18 +415,26 @@
 }
 .amenity-group {
   border-bottom: 1px solid var(--line);
-  padding: 15px 0;
 }
-.amenity-group h4 {
+.amenity-group summary {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
   font-weight: 550;
 }
-.amenity-group h4 app-icon {
+.amenity-group summary::-webkit-details-marker { display: none; }
+.amenity-group[open] summary app-icon:last-child { transform: rotate(180deg); }
+.amenity-group summary app-icon, .amenity-group a {
   color: var(--sea);
 }
+.amenity-group .place-count { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--muted); }
+.amenity-group a { display: inline-flex; align-items: center; gap: 6px; min-height: 26px; overflow-wrap: anywhere; }
+.amenity-group a:hover { text-decoration: underline; }
+.amenity-group[open] { padding-bottom: 10px; }
 .amenity-group p {
   font-size: 12px;
   margin-top: 9px;

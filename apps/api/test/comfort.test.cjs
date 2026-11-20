@@ -4,6 +4,22 @@ const { scoreFixture, beach } = require('./fixtures.cjs');
 const { searchConditions, conditionSnapshot } = require('../dist/modules/search/search-conditions');
 const { RecommendationsService }=require('../dist/modules/recommendations/recommendations.service');
 const { calmProjection }=require('./fixtures.cjs');
+const { explainAll }=require('../dist/modules/score/comfort-model');
+
+test('sailing profiles distinguish lack of wind, steady wind, gusts and missing wind from paddle',()=>{
+  const run=(wind,gust=wind,type='sea')=>explainAll(type,{wind_speed_10m:wind,wind_gusts_10m:gust,
+    wave_height:0.2,ocean_current_velocity:0.1},false,false,[]);
+  const calm=run(0),moderate=run(18),strong=run(38),gusty=run(18,42);
+  for(const key of ['catamaran','windsurf']){
+    assert.ok(moderate[key].score>calm[key].score && moderate[key].score>strong[key].score);
+    assert.ok(moderate[key].score>gusty[key].score);
+    assert.equal(run('stale',null)[key].status,'partial');
+    assert.deepEqual(run('stale',null)[key].stale,['Vent']);
+    assert.equal(run(18,20,'lake')[key].status,'not-applicable');
+  }
+  assert.ok(calm.paddle.score>moderate.paddle.score);
+  assert.notEqual(run(12).catamaran.score,run(12).windsurf.score);
+});
 
 test('recommendations exclude unscored and officially closed bathing sites rather than ranking them last',async()=>{
   const sites=['ok','closed','lake','missing'].map(id=>({id,lat:43,lon:6,waterType:id==='lake'?'lake':'sea'}));

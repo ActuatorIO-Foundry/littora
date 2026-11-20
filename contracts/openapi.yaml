@@ -816,6 +816,8 @@ components:
         bathing: {$ref: '#/components/schemas/ScoreExplanation'}
         family: {$ref: '#/components/schemas/ScoreExplanation'}
         paddle: {$ref: '#/components/schemas/ScoreExplanation'}
+        catamaran: {$ref: '#/components/schemas/ScoreExplanation'}
+        windsurf: {$ref: '#/components/schemas/ScoreExplanation'}
         boat: {$ref: '#/components/schemas/ScoreExplanation'}
     BeachScore:
       type: object

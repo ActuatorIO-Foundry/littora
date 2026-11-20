@@ -5,6 +5,8 @@ import { ScoreExplanation } from '../models/score-explanation';
 export interface UsageExplanations {
   bathing: ScoreExplanation;
   boat: ScoreExplanation;
+  catamaran?: ScoreExplanation;
   family: ScoreExplanation;
   paddle: ScoreExplanation;
+  windsurf?: ScoreExplanation;
 }

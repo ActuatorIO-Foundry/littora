@@ -15,8 +15,8 @@ import type { ScoreExplanation } from '@littora/api-client/models';
       Score indisponible · {{ e.available }}/{{ e.required }} mesures utilisables.
     </p>
     <p *ngSwitchCase="'partial'">
-      Indice partiel : <strong>au plus {{ e.partialScore }}/100</strong> · {{ e.available }}/{{ e.required }} mesures utilisables.
-      Les autres mesures pourraient abaisser cet indice.
+      Indice partiel : <strong>{{ e.partialScore ? 'au plus ' : '' }}{{ e.partialScore }}/100</strong> · {{ e.available }}/{{ e.required }} mesures utilisables.
+      {{ e.partialScore === 0 ? 'Les mesures disponibles suffisent à atteindre le minimum.' : 'Les autres mesures pourraient abaisser cet indice.' }}
     </p>
     <ng-container *ngSwitchCase="'calculated'">
       <p>
@@ -24,7 +24,7 @@ import type { ScoreExplanation } from '@littora/api-client/models';
       </p>
     </ng-container>
     <p class="caption" *ngIf="e.status === 'calculated' || e.status === 'partial'">
-      Base : 100<span *ngFor="let factor of e.factors"> · {{ factor.label }} : {{ factor.points }}</span>.
+      Base : 100 points<span *ngFor="let factor of e.factors"> · {{ factor.label }} : {{ -factor.points }} {{ factor.points < -1 ? 'points retirés' : 'point retiré' }}</span>.
     </p>
     <p class="caption" *ngIf="e.stale?.length">Prévisions périmées, exclues du calcul : {{ e.stale.join(', ') }}.</p>
     <p class="caption" *ngIf="e.invalid?.length">Valeur, unité ou datation non exploitable : {{ e.invalid.join(', ') }}.</p>

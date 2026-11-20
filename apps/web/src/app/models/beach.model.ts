@@ -81,6 +81,7 @@ export interface MetricPoint {
 }
 
 export interface BeachAmenity {
+  referenceCount?: number;
   id: string;
   name: string;
   category: 'parking' | 'toilets' | 'rental' | 'food' | 'rescue' | 'other';

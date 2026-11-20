@@ -30,3 +30,16 @@ Les recommandations excluent les indices inconnus, non applicables, nuls et les 
 ## Scénarios de régression
 
 Vent 8, rafales 10, vagues 0,3, courant 0,05, UV 3, eau 22 : **77 / 72 / 63 / 77** (ordre du tableau). Mêmes entrées avec vagues 4 et courant 1 : **0 / 0 / 0 / 0**. Avec eau manquante seulement : **≤ 77 (5/6) / ≤ 72 (5/6) / 63 / 77**. Avec prélèvement récent défavorable et signalement pollution au plafond : **20 / 15 / 63 / 77**. Le gel des scénarios vérifie le calcul, pas sa capacité prédictive. Ne pas généraliser aux eaux intérieures sans données et calibration propres.
+
+## Disciplines sur la fiche
+
+Les profils expérimentaux `voile-loisir-1` (catamaran et planche à voile)
+complètent le paddle sur la fiche uniquement. Les classements existants et les
+drapeaux ne les utilisent pas. Le vent moyen est exprimé en km/h : le modèle
+retire 4 points par km/h en dehors de la bande éditoriale 12–22 (catamaran)
+ou 15–25 (planche), et 2 points par km/h de rafale au-dessus de la borne haute.
+Les vagues et le courant restent défavorables ; les règles de couverture et
+de fraîcheur ne changent pas. Ces bandes sont des préférences de loisir, pas
+des limites de sécurité validées pour une personne, un gréement ou un site.
+La direction est la provenance météorologique, pas une estimation de vent de
+terre ou de mer : elle ne modifie pas la note.

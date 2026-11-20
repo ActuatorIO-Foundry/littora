@@ -20,13 +20,25 @@ function mappable(p: { lat: number; lon: number }): boolean {
 }
 
 export function listedAmenities(points: BeachAmenity[]) {
-  return points.filter(
-    (p) =>
-      !!p.source &&
-      p.source !== "local-hint" &&
-      p.verification !== "to_verify" &&
-      mappable(p),
-  );
+  const seen = new Set<string>();
+  const places = new Map<string, BeachAmenity>();
+  for (const p of points) {
+    if (!p.id || !p.source || p.source === "local-hint" || p.verification === "to_verify" || !mappable(p)) continue;
+    const identity = JSON.stringify([p.source, p.id]);
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    // Same label alone is not evidence: nearby car parks and shops may be distinct.
+    const key = JSON.stringify([p.source, p.category, p.name.normalize('NFC').trim().toLocaleLowerCase('fr'), p.lat, p.lon]);
+    const place = places.get(key);
+    if (place) place.referenceCount = (place.referenceCount ?? 1) + 1;
+    else places.set(key, {...p, referenceCount: 1});
+  }
+  return [...places.values()];
+}
+
+export function directionsTo(p: BeachAmenity): string {
+  const params = new URLSearchParams({api:'1', destination:p.lat+','+p.lon});
+  return 'https://www.google.com/maps/dir/?'+params;
 }
 
 function label(value: string) {
@@ -109,8 +121,12 @@ export class MapPoints {
       const group = amenityGroups.find((g) => g.category === p.category);
       const source = p.source === "openstreetmap" ? "OpenStreetMap" : p.source;
       const popup = document.createElement("div");
-      const title = document.createElement("strong");
+      const title = document.createElement("a");
       title.textContent = p.name;
+      title.href = directionsTo(p);
+      title.target = '_blank';
+      title.rel = 'noopener noreferrer';
+      title.title = 'Itinéraire dans Google Maps';
       popup.append(
         title,
         document.createElement("br"),

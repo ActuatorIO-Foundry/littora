@@ -32,7 +32,7 @@ import { amenityGroups, MapPoints } from "./map-points";
       [attr.aria-label]="
         detail
           ? 'Carte de la plage et de ses équipements'
-          : 'Carte des façades du littoral français'
+          : inland ? 'Carte des sites de baignade en eau douce' : 'Carte des façades du littoral français'
       "
     ></div>
     <button
@@ -58,7 +58,7 @@ import { amenityGroups, MapPoints } from "./map-points";
     <p class="map-error" *ngIf="failed" role="status">
       Fond de carte indisponible. La liste des plages reste accessible.
     </p>
-    <p class="map-error" *ngIf="!failed && shorelineFailed" role="status">
+    <p class="map-error" *ngIf="!inland && !failed && shorelineFailed" role="status">
       Limite terre-mer indisponible. Le fond OpenStreetMap reste affiché.
     </p>`,
   styles: [
@@ -108,6 +108,7 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input() selected: string | null = null;
   @Input() zoneId: string | null = null;
   @Input() detail = false;
+  @Input() inland = false;
   @Input() amenities: BeachAmenity[] = [];
   @Input() commune: Commune | null = null;
   @Output() beachSelect = new EventEmitter<Beach>();
@@ -203,10 +204,6 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
         })
         .addTo(this.map!);
       if (!this.detail) {
-        this.shoreline = this.createShoreline("shoreline", "shoreline-tiles");
-        this.map!.attributionControl.addAttribution(
-          config.shorelineAttribution,
-        );
         // A low-detail land layer remains underneath the online tiles during an outage.
         const response = await fetch("/data/europe.geojson", {
           signal: this.abort.signal,
@@ -296,13 +293,26 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
       this.map.setView([this.beaches[0].lat, this.beaches[0].lon], 14, {
         animate: false,
       });
-    else if (this.zoneId !== this.lastZone) {
+    else if (this.zoneId !== this.lastZone || changes?.['inland'] ||
+      (this.inland && (!changes || (changes['beaches'] && this.beaches.length)))) {
       this.reset();
       this.lastZone = this.zoneId;
     }
   }
   private drawCoasts(): void {
     if (!this.L || !this.coasts || this.detail || !this.configuration) return;
+    if(this.inland){
+      if(this.shoreline) this.map?.attributionControl.removeAttribution(this.configuration.shorelineAttribution);
+      this.shoreline?.remove(); this.shoreline=undefined;
+      this.selectedShoreline?.remove(); this.selectedShoreline=undefined;
+      this.renderedCoastZone=undefined;
+      this.coasts.clearLayers();
+      return;
+    }
+    if(!this.shoreline){
+      this.shoreline=this.createShoreline("shoreline","shoreline-tiles");
+      this.map?.attributionControl.addAttribution(this.configuration.shorelineAttribution);
+    }
     if (this.renderedCoastZone === this.zoneId) return;
     this.renderedCoastZone = this.zoneId;
     const L = this.L;
@@ -395,6 +405,8 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
       });
     } else if (this.detail && this.beaches[0])
       this.map?.setView([this.beaches[0].lat, this.beaches[0].lon], 14);
+    else if(this.inland && this.beaches.length)
+      this.map?.fitBounds(this.beaches.map(b=>[b.lat,b.lon] as [number,number]),{padding:[30,30],maxZoom:14,animate:false});
     else if (zone && !this.detail) {
       const [s, w, n, e] = zone.bbox.split(",").map(Number);
       this.map?.fitBounds([[s,w],[n,e]], {padding:[35,35], maxZoom:8, animate:false});

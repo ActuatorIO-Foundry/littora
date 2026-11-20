@@ -1,7 +1,7 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
-import { ActivatedRoute, ParamMap, Router, RouterLink } from "@angular/router";
+import { ActivatedRoute, ParamMap, Params, Router, RouterLink } from "@angular/router";
 import { Subscription, timeout } from "rxjs";
 import type { BeachSearch } from '@littora/api-client/models';
 import { Beach, BeachScore } from "../../models/beach.model";
@@ -48,6 +48,21 @@ export class SearchComponent implements OnInit, OnDestroy {
   selectedUsage = "bathing";
   query = "";
   waterType = "all";
+  readonly sections = [{id:'all',label:'Tous'}, {id:'sea',label:'Mer'}, {id:'lake',label:'Lacs'}, {id:'river',label:'Rivières'}];
+  private sectionQueries = new Map<string,Params>();
+  get inland() { return this.waterType === 'lake' || this.waterType === 'river'; }
+  rememberSection() {
+    // A private geolocation is specific to its history entry, not to a saved section.
+    const {near, ...params}=this.route.snapshot.queryParams;
+    this.sectionQueries.set(this.waterType,params);
+  }
+  sectionParams(id:string): Params {
+    if(id===this.waterType) return this.route.snapshot.queryParams;
+    const params:Params = {...(this.sectionQueries.get(id) ?? this.route.snapshot.queryParams), water:id==='all'?null:id};
+    if(id==='lake'||id==='river') return {...params,zone:null,min:null,max:null,usage:null,
+      sort:params['sort']==='score'?null:params['sort']};
+    return params;
+  }
   requiredFlag = "all";
   requireParking = false;
   requireToilets = false;
@@ -121,6 +136,12 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.waterType = ["sea", "river", "lake"].includes(p.get("water") ?? "")
       ? p.get("water")!
       : "all";
+    if(this.inland && (['zone','min','max','usage'].some(k=>p.has(k)) || p.get('sort')==='score')){
+      void this.router.navigate([], {relativeTo:this.route,queryParamsHandling:'merge',
+        queryParams:{zone:null,min:null,max:null,usage:null,sort:p.get('sort')==='score'?null:p.get('sort')},
+        state:this.router.getCurrentNavigation()?.extras.state ?? history.state,replaceUrl:true});
+      return;
+    }
     this.requireParking = p.get("parking") === "1";
     this.requireToilets = p.get("toilets") === "1";
     this.requireLifeguard = p.get("rescue") === "1";
@@ -135,7 +156,7 @@ export class SearchComponent implements OnInit, OnDestroy {
       p.has("max") && Number.isFinite(Number(p.get("max")))
         ? Number(p.get("max"))
         : null;
-    const zone = this.coastalZones.find((z) => z.id === p.get("zone"));
+    const zone = !this.inland && this.coastalZones.find((z) => z.id === p.get("zone"));
     const commune = p.get("commune");
     if (commune) this.chooseCommune(commune);
     else if (p.get("near") === "1") {
@@ -477,7 +498,6 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.selectedCommune = null;
     this.communeCode = null;
     this.query = "";
-    this.waterType = "all";
     this.requiredFlag = "all";
     this.requireParking = false;
     this.requireToilets = false;
@@ -494,7 +514,6 @@ export class SearchComponent implements OnInit, OnDestroy {
   }
   filterCount(): number {
     return (
-      Number(this.waterType !== "all") +
       Number(this.requiredFlag !== "all") +
       Number(this.requireParking) +
       Number(this.requireToilets) +
@@ -507,7 +526,7 @@ export class SearchComponent implements OnInit, OnDestroy {
         q: this.query || null,
         commune: this.communeCode,
         zone: this.selectedZone?.id ?? null,
-        usage: this.selectedUsage,
+        usage: this.inland ? null : this.selectedUsage,
         water: this.waterType === "all" ? null : this.waterType,
         parking: this.requireParking ? "1" : null,
         toilets: this.requireToilets ? "1" : null,

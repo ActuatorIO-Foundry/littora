@@ -133,10 +133,12 @@ sur l'ancienne image, pas un downgrade des extensions mises a niveau.
 La CI reconstruit les images, teste catalogue et relations, restaure les tables
 avec des fixtures sanitaires et geometriques non vides, puis restaure un RDB avec
 des jobs BullMQ en pause/differes et execute un job apres reprise.
-Le test des migrations lance aussi Caddy, Nginx/Angular et Nest sur un reseau
-interne, sans ports publies. Il verifie la redirection HTTP, le certificat de
+Le test des migrations lance aussi Caddy, Nginx/Angular et Nest sur des reseaux
+jetables, sans ports publies. Il verifie la redirection HTTP, le certificat de
 recette, l'acces direct aux pages, le prefixe API, les parametres, les origines
-autorisees et le redemarrage du proxy. La racine de confiance reste dans la
+autorisees et le redemarrage du proxy. Deux visiteurs sur des adresses distinctes
+peuvent ensuite contribuer sur la meme plage, tandis qu'un deuxieme envoi du
+meme reseau est refuse. La racine de confiance reste dans la
 recette jetable ; rien n'est installe sur l'hote.
 
 ## Preparation HTTPS (#29)
@@ -151,7 +153,8 @@ Le domaine fixe aussi l'unique origine navigateur de l'API ; seuls 80/443 sont
 publies. L'API et le worker partagent le Redis des jobs, distinct du cache.
 
 Avant ouverture : lever les exceptions de securite, verifier le retour arriere
-sur l'hebergement cible et la gestion des quotas derriere le proxy, puis verifier
+sur l'hebergement cible et confirmer la separation des quotas depuis deux
+connexions Internet distinctes ([principe et limites](CONTRIBUTIONS.md)), puis verifier
 DNS A/AAAA, acces aux ports 80/443 et certificat public depuis l'exterieur.
 La recette locale ne prouve pas l'emission ni le renouvellement d'un certificat
 public. Voir [HTTPS automatique de Caddy](https://caddyserver.com/docs/automatic-https).

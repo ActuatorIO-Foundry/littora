@@ -1,4 +1,4 @@
-// Runs inside the isolated API container with the disposable Caddy root as its only extra CA.
+// Runs from the visitor network with the disposable Caddy root as its only extra CA.
 import assert from 'node:assert/strict';
 
 const base = 'https://littora.internal';

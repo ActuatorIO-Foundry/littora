@@ -11,9 +11,9 @@ officielle, ni une preuve de presence sur place. Aucun compte n'est requis.
 - `REPORT_IP_HASH_KEY` est une cle serveur separee, d'au moins 32 caracteres.
   Une valeur absente ou invalide desactive les contributions (503).
   La cle et les jetons ne doivent jamais figurer dans des journaux.
-- L'adresse du socket est transformee par HMAC-SHA-256 ; aucune adresse brute
-  ni empreinte du navigateur n'est conservee. Les en-tetes IP fournis par le
-  client ne sont pas utilises.
+- L'adresse observee a l'entree est transformee par HMAC-SHA-256 ; les tables
+  de contribution ne conservent ni adresse brute ni empreinte du navigateur.
+  En local, sans `REPORT_PROXY_IPV4`, seule l'adresse du socket compte.
 - Une session n'est pas une personne unique. Un reseau partage peut reunir
   plusieurs personnes ; une personne peut changer de reseau. Aucune probabilite
   de securite ne peut etre deduite de ces identifiants.
@@ -60,10 +60,19 @@ generique. Aucun fichier de trace n'est versionne.
 Les codes 400, 401, 404, 409, 429 et 503 sont normalises sans erreur SQL ni secret.
 L'UI annonce explicitement l'attente de moderation, les doublons et les quotas.
 
-Avant un deploiement derriere proxy (#29), definir les seuls proxies de confiance
-et tester les adresses transmises. En l'etat, les visiteurs d'un meme proxy
-partagent le quota de son socket : comportement conservateur, pas une protection
-multi-utilisateur de production validee. L'acces direct a l'API doit etre ferme.
+Dans le Compose de production (#29), Caddy est l'unique entree. Il remplace
+`X-Forwarded-For` par l'adresse de son correspondant. L'API n'accepte cette
+valeur que si le socket provient de l'IPv4 exacte de Caddy sur le reseau prive
+`proxy_api`. Adresse absente, multiple ou invalide, ou autre emetteur : les
+deux routes de contribution repondent 503 sans creer de session ni de rapport.
+Le port de l'API n'est pas publie. Ce mode ne prend pas en charge un CDN ou
+un repartiteur en amont : ne pas l'activer dans cette topologie sans revoir
+la chaine de confiance. Voir la [gestion des en-tetes de Caddy](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#headers).
+
+Le quota correspond a une adresse visible, pas a un utilisateur : meme sortie
+Wi-Fi ou NAT operateur, meme quota ; deux adresses IPv6 distinctes ont des
+quotas distincts. Avant ouverture, verifier depuis deux acces Internet
+independants que l'hebergeur preserve ces adresses jusqu'a Caddy.
 Les attaques distribuees et la rotation de reseaux ne sont pas eliminees par les
 quotas ; moderation et protections de perimetre restent requises avant V1.
 

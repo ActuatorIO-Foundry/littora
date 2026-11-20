@@ -31,6 +31,20 @@ test('production model: private services, shared job queue, one HTTPS origin and
   }
   assert.deepEqual(services.caddy.ports.map(p => Number(p.published)).sort((a,b) => a-b), [80,443]);
   assert.equal(services.api.environment.CORS_ORIGIN, 'https://plages.exemple.fr');
+  assert.equal(model.networks.proxy_api.internal, true);
+  assert.deepEqual(Object.keys(services.caddy.networks).sort(), ['edge','proxy_api']);
+  assert.deepEqual(Object.keys(services.api.networks).sort(), ['default','proxy_api']);
+  assert.deepEqual(Object.keys(services.web.networks), ['edge']);
+  assert.deepEqual(Object.keys(services).filter(s => Object.hasOwn(services[s].networks ?? {}, 'proxy_api')).sort(), ['api','caddy']);
+  const invalidPeer = structuredClone(model);
+  invalidPeer.services.api.environment.REPORT_PROXY_IPV4 = '10.0.0.0/8';
+  assert.throws(() => validateProduction(invalidPeer), /REPORT_PROXY_IPV4/);
+  const exposed = structuredClone(model);
+  exposed.services.api.ports = [{published: '3000', target: 3000}];
+  assert.throws(() => validateProduction(exposed), /proxy_api/);
+  delete exposed.services.api.ports;
+  exposed.services.worker.networks.proxy_api = null;
+  assert.throws(() => validateProduction(exposed), /proxy_api/);
   assert.equal(services.api.environment.JOBS_REDIS_URL, services.worker.environment.JOBS_REDIS_URL);
   assert.notEqual(services.api.environment.JOBS_REDIS_URL, services.api.environment.REDIS_URL);
   for (const service of ['api','worker']) {

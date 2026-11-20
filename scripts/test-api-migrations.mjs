@@ -6,11 +6,17 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
-const docker = args => execFileSync('docker', args, {
-  encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 45000,
+const docker = (args, timeout = 45000) => execFileSync('docker', args, {
+  encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout,
 }).trim();
 const name = `littora-migration-test-${randomUUID().slice(0, 8)}`;
+// Small private subnets also work on development hosts with exhausted default pools.
+const suffix = name.slice(-8);
+const subnet = index => `10.${parseInt(suffix.slice(0, 2), 16)}.${parseInt(suffix.slice(2, 4), 16)}.${index * 16}/28`;
 const containers = [];
+const networks = [];
+const edge = name + '-edge';
+const ingress = name + '-ingress';
 const image = process.env.TEST_API_IMAGE || 'littora-api:ci';
 const postgres = `${name}-postgres`;
 const redis = `${name}-redis`;
@@ -19,7 +25,7 @@ const environment = ['-e', `DATABASE_URL=postgresql://littora:test-only-password
   '-e', `REDIS_URL=redis://${redis}:6379/15`, '-e', 'API_PORT=3000', '-e', 'NODE_ENV=production',
   '-e', `CORS_ORIGIN=https://${domain}`];
 const sql = query => docker(['exec', postgres, 'psql', '-XAt', '-v', 'ON_ERROR_STOP=1', '-U', 'littora', '-d', 'littora_ci_test', '-c', query]);
-const command = action => docker(['run', '--rm', '--network', name, ...environment, image, 'node', 'scripts/database.cjs', action]);
+const command = action => docker(['run', '--rm', '--network', name, ...environment, image, 'node', 'scripts/database.cjs', action], 180000);
 
 // Exercise the real Compose profile/env_file path without application credentials.
 const fixture = mkdtempSync(join(tmpdir(), 'littora-compose-migrations-'));
@@ -29,12 +35,16 @@ try {
   const envFile = join(fixture, '.env');
   writeFileSync(envFile, `DATABASE_URL=${fakeUrl}\nPOSTGRES_VOLUME=${name}-pg\nREDIS_VOLUME=${name}-redis\nSTORAGE_VOLUMES_EXTERNAL=false\n`);
   const override = join(fixture, 'override.json');
-  writeFileSync(override, JSON.stringify({ services: { migrate: { image, network_mode: 'none' } } }));
-  const output = docker(['compose', '--project-directory', fixture, '--env-file', envFile,
+  writeFileSync(override, JSON.stringify({ services: { migrate: { image, network_mode: 'none' } },
+    networks: { default: { internal: true, ipam: { config: [{ subnet: subnet(0) }] } } } }));
+  const compose = ['compose', '--project-directory', fixture, '--env-file', envFile,
     '--project-name', name, '-f', resolve('docker-compose.local.yml'), '-f', override,
-    '--profile', 'tools', 'run', '--rm', '--no-deps', '--entrypoint', 'node', 'migrate', '-e',
-    `require('node:assert/strict').equal(process.env.DATABASE_URL,${JSON.stringify(fakeUrl)});console.log('Migration environment verified');`]);
-  assert.equal(output, 'Migration environment verified');
+    '--profile', 'tools'];
+  try {
+    const output = docker([...compose, 'run', '--rm', '--no-deps', '--entrypoint', 'node', 'migrate', '-e',
+      `require('node:assert/strict').equal(process.env.DATABASE_URL,${JSON.stringify(fakeUrl)});console.log('Migration environment verified');`]);
+    assert.equal(output, 'Migration environment verified');
+  } finally { docker([...compose, 'down']); }
 } finally { rmSync(fixture, { recursive: true, force: true }); }
 async function until(check, description) {
   for (let attempt = 0; attempt < 80; attempt++) {
@@ -43,14 +53,13 @@ async function until(check, description) {
   }
   throw new Error(`Timed out: ${description}`);
 }
-function start(service, imageName = image) {
+function start(service, imageName = image, extra = []) {
   const container = `${name}-${service}`;
   containers.push(container);
   // Deterministic provider outage: avoid external DNS timeouts starving database lookups.
   docker(['run', '-d', '--name', container, '--network', name,
-    ...(service === 'ready' ? ['--network-alias', 'api'] : []),
     '--add-host', 'api.open-meteo.com:127.0.0.1', '--add-host', 'marine-api.open-meteo.com:127.0.0.1',
-    ...environment, imageName]);
+    ...environment, ...extra, imageName]);
   return container;
 }
 function request(container, path) {
@@ -60,8 +69,11 @@ function request(container, path) {
   return JSON.parse(docker(['exec', container, 'node', '-e', script]));
 }
 
-docker(['network', 'create', '--internal', name]);
 try {
+  for (const network of [name, edge, ingress]) {
+    docker(['network', 'create', '--internal', '--subnet', subnet(networks.length + 1), network]);
+    networks.push(network);
+  }
   containers.push(postgres);
   docker(['run', '-d', '--name', postgres, '--network', name, '--platform', 'linux/amd64',
     '--tmpfs', '/var/lib/postgresql/data', '-e', 'POSTGRES_USER=littora',
@@ -91,7 +103,19 @@ try {
   assert.equal(sql('select count(*) from water_quality'), '0');
   assert.equal(sql('select count(*) from beaches where has_parking is null and has_toilets is null and has_lifeguard is null'), '5');
 
-  const api = start('ready');
+  const web = `${name}-web`;
+  const proxy = `${name}-proxy`;
+  docker(['run', '-d', '--name', web, '--network', edge, '--network-alias', 'web',
+    process.env.TEST_WEB_IMAGE || 'littora-web:ci']);
+  containers.push(web);
+  docker(['run', '-d', '--name', proxy, '--network', edge, '--network-alias', domain,
+    '-e', `DOMAIN=${domain}`, '-v', `${resolve('infra/caddy/Caddyfile')}:/etc/caddy/Caddyfile:ro`,
+    'littora-caddy:2.11.9-r1']);
+  containers.push(proxy);
+  docker(['network', 'connect', ingress, proxy]);
+  const peer = docker(['inspect', '--format', `{{(index .NetworkSettings.Networks "${ingress}").IPAddress}}`, proxy]);
+  const api = start('ready', image, ['-e', 'REPORT_PROXY_IPV4=' + peer, '-e', 'REPORT_IP_HASH_KEY=' + randomUUID()]);
+  docker(['network', 'connect', '--alias', 'api', ingress, api]);
   await until(() => request(api, '/api/beaches?limit=1').status === 200, 'HTTP after migration');
   assert.notEqual(docker(['exec', api, 'id', '-u']), '0');
   const response = request(api, '/api/beaches/catalogue');
@@ -99,15 +123,6 @@ try {
   assert.equal(response.body.beaches.length, 5);
   assert.equal(response.body.nextCursor, null);
   const id = response.body.beaches[0].id;
-  const web = `${name}-web`;
-  const proxy = `${name}-proxy`;
-  docker(['run', '-d', '--name', web, '--network', name, '--network-alias', 'web',
-    process.env.TEST_WEB_IMAGE || 'littora-web:ci']);
-  containers.push(web);
-  docker(['run', '-d', '--name', proxy, '--network', name, '--network-alias', domain,
-    '-e', `DOMAIN=${domain}`, '-v', `${resolve('infra/caddy/Caddyfile')}:/etc/caddy/Caddyfile:ro`,
-    'littora-caddy:2.11.9-r1']);
-  containers.push(proxy);
   const fixtureDir = mkdtempSync(join(tmpdir(), 'littora-proxy-ca-'));
   try {
     const ca = join(fixtureDir, 'root.crt');
@@ -116,17 +131,28 @@ try {
       return true;
     }, 'disposable TLS root');
     chmodSync(ca, 0o644);
-    docker(['cp', ca, api + ':/tmp/test-root.crt']);
-    docker(['cp', resolve('scripts/test-caddy.mjs'), api + ':/tmp/test-caddy.mjs']);
-    const probe = () => docker(['exec', '-e', 'NODE_EXTRA_CA_CERTS=/tmp/test-root.crt', '-e', 'TEST_BEACH_ID=' + id,
-      api, 'node', '/tmp/test-caddy.mjs']);
-    const proxyReady = () => docker(['exec', '-e', 'NODE_EXTRA_CA_CERTS=/tmp/test-root.crt', api, 'node', '-e',
+    const visitors = [name + '-visitor-a', name + '-visitor-b'];
+    for (const visitor of visitors) {
+      docker(['run', '-d', '--name', visitor, '--network', edge, '--no-healthcheck',
+        '-e', 'NODE_EXTRA_CA_CERTS=/tmp/test-root.crt', '-e', 'TEST_BEACH_ID=' + id,
+        image, 'node', '-e', 'setInterval(()=>{},60000)']);
+      containers.push(visitor);
+      docker(['cp', ca, visitor + ':/tmp/test-root.crt']);
+      docker(['cp', resolve('scripts/test-caddy.mjs'), visitor + ':/tmp/test-caddy.mjs']);
+      docker(['cp', resolve('scripts/test-proxy-contribution.mjs'), visitor + ':/tmp/test-contribution.mjs']);
+    }
+    const probe = () => docker(['exec', visitors[0], 'node', '/tmp/test-caddy.mjs']);
+    const proxyReady = () => docker(['exec', visitors[0], 'node', '-e',
       `fetch('https://${domain}',{signal:AbortSignal.timeout(1500)}).then(r=>process.exit(r.ok?0:1))`]) === '';
     await until(proxyReady, 'trusted HTTPS');
     probe();
+    docker(['exec', visitors[0], 'node', '/tmp/test-contribution.mjs']);
     docker(['restart', proxy]);
     await until(proxyReady, 'trusted HTTPS after restart');
     probe();
+    docker(['exec', visitors[1], 'node', '/tmp/test-contribution.mjs']);
+    assert.equal(sql('select count(distinct network_hash) from report_contributions'), '2');
+    assert.equal(sql("select count(distinct split_part(key,':',2)) from report_rate_limits where key like 'session-hour:%'"), '2');
   } finally { rmSync(fixtureDir, { recursive: true, force: true }); }
   assert.equal(request(api, `/api/beaches/${id}`).body.id, id);
   assert.deepEqual(request(api, `/api/reports?beachId=${id}`).body, []);
@@ -155,6 +181,8 @@ try {
   for (const container of containers.reverse()) {
     try { docker(['rm', '-f', '-v', container]); } catch { failures.push(container); }
   }
-  try { docker(['network', 'rm', name]); } catch { failures.push(name); }
+  for (const network of networks.reverse()) {
+    try { docker(['network', 'rm', network]); } catch { failures.push(network); }
+  }
   if (failures.length) throw new Error(`Test cleanup incomplete: ${failures.join(', ')}`);
 }

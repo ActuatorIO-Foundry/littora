@@ -65,7 +65,12 @@ class Downloads:
                 links = DatedLinks(path)
                 links.feed(index.stdout)
                 if index.returncode == 0 and links.links:
-                    result = subprocess.run([*cmd,max(links.links)], capture_output=True, text=True)
+                    edition = max(links.links)
+                    if target.is_file():
+                        stamp = osm["open_extract"](target).header.get("osmosis_replication_timestamp")
+                        if stamp and edition.endswith(datetime.fromisoformat(stamp.replace("Z","+00:00")).strftime("-%y%m%d.osm.pbf")):
+                            return target
+                    result = subprocess.run([*cmd,edition], capture_output=True, text=True)
             self.remaining -= os.stat(tmp.name).st_size
             if result.returncode:
                 raise ValueError(f"Download failed: {name} (curl {result.returncode})")

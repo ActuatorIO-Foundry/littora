@@ -79,11 +79,14 @@ export class BeachesService {
         bounds[0] >= bounds[2] || bounds[1] >= bounds[3]) {
       throw new BadRequestException('Invalid catalogue bounds');
     }
-    // A UUID cursor keeps subsequent pages stable when another beach is deleted.
+    // Keep the correlated lookup inside the page: flattening it aggregates amenities nationwide.
     const { rows } = await this.db.query(
-      `select ${catalogueColumns} from beach_catalogue where ($1::uuid is null or id > $1::uuid)
-       and lat between $3 and $5 and lon between $4 and $6
-       order by id limit $2`,
+      `select detail.* from (
+         select id from beach_catalogue where ($1::uuid is null or id > $1::uuid)
+         and lat between $3 and $5 and lon between $4 and $6 order by id limit $2
+       ) page cross join lateral (
+         select ${catalogueColumns} from beach_catalogue where id=page.id offset 0
+       ) detail order by page.id`,
       [after || null, limit + 1, ...bounds],
     );
     const page = rows.slice(0, limit);

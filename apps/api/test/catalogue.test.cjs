@@ -84,6 +84,8 @@ test('catalogue: cursor pages are bounded, stable and parameterized', async () =
   const rows = Array.from({ length: 201 }, (_, i) => ({ ...beach, id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}` }));
   const service = new BeachesService({ query: async (sql, values) => {
     assert.match(sql, /order by id limit \$2/);
+    assert.match(sql, /select id from beach_catalogue[\s\S]+limit \$2[\s\S]+lateral[\s\S]+where id=page\.id/i,
+      'Select the public page before computing its facility facts');
     assert.deepEqual(values, [null, 201, -90, -180, 90, 180]);
     return { rows };
   } }, {});

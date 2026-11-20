@@ -44,6 +44,32 @@ const local = [
   { ...beaches[0], id: "outside", name: "Autre plage", city: "Autre commune" },
 ];
 
+test('milieux : commune conservée, filtres propres à chaque section et historique',async({page})=>{
+  const inputs:any[]=[];
+  await page.route('**/api/search/beaches',r=>{
+    const input=r.request().postDataJSON();inputs.push(input);
+    return r.fulfill({json:searchResult(input,beaches,bandol)});
+  });
+  await page.goto('/recherche?water=sea&commune=83009&parking=1&min=19&sort=score');
+  await expect(page.locator('.commune-selection')).toContainText('Bandol');
+  const nav=page.getByRole('navigation',{name:'Milieu de baignade'});
+  await nav.getByRole('link',{name:'Lacs'}).click();
+  await expect.poll(()=>inputs.at(-1)?.waterType).toBe('lake');
+  expect(inputs.at(-1)).toMatchObject({communeCode:'83009',parking:true,sort:'name'});
+  expect(inputs.at(-1).minWaterTemp).toBeUndefined();
+  await expect(page).not.toHaveURL(/min=|sort=score|zone=/);
+  await page.getByRole('button',{name:/Filtres/}).click();
+  await page.getByLabel('Toilettes',{exact:true}).check();
+  await expect(page).toHaveURL(/toilets=1/);
+  await nav.getByRole('link',{name:'Mer',exact:true}).click();
+  await expect.poll(()=>inputs.at(-1)?.waterType).toBe('sea');
+  expect(inputs.at(-1)).toMatchObject({minWaterTemp:19,communeCode:'83009',sort:'score'});
+  expect(inputs.at(-1).toilets).toBeUndefined();
+  await page.goBack();
+  await expect(nav.getByRole('link',{name:'Lacs'})).toHaveAttribute('aria-current','page');
+  await expect(page).toHaveURL(/toilets=1/);
+});
+
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/search/beaches", route => {
     const input=route.request().postDataJSON();

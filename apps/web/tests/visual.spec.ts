@@ -331,9 +331,25 @@ test('prévisions : une mesure marine reçue pour une rivière ne devient pas sa
     measurements:{forecast:{water:[forecastPoint('2026-07-15T12:00:00Z',19,'open-meteo-marine')]}}}}));
   await page.goto('/plages/test-river');
   const chart=page.locator('#previsions');
-  await chart.getByRole('button',{name:'Eau',exact:true}).click();
-  await expect(chart.getByText('Aucune source marine applicable à ce site.')).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Baignade en eau douce'})).toBeVisible();
+  await expect(page.getByText('Autorisation de baignade non confirmée.',{exact:true})).toBeVisible();
+  await expect(chart.getByRole('button',{name:'Eau',exact:true})).toHaveCount(0);
+  await expect(page.locator('dt').filter({hasText:'Marées'})).toHaveCount(0);
+  await expect(page.getByText('Hauteur des vagues',{exact:true})).toHaveCount(0);
+  await expect(page.locator('.usage-scores')).toHaveCount(0);
   await expect(chart.locator('.forecast-chart svg')).toHaveCount(0);
+});
+
+test('lac : une fermeture officielle reste visible en l’absence de modèle marin',async({page})=>{
+  const lake={...beaches[1],id:'test-lake',waterType:'lake'};
+  await page.route('**/api/beaches/test-lake',r=>r.fulfill({json:lake}));
+  await page.route('**/api/score/**',r=>r.fulfill({json:{...score,beach:lake,current:{...score.current,
+    waterQuality:{status:'closed',restriction:{status:'closed',decisions:[]}}}}}));
+  await page.goto('/plages/test-lake');
+  await expect(page.locator('.usage-section')).toContainText('Baignade interdite par décision officielle.');
+  await expect(page.locator('.usage-section')).not.toContainText('Autorisation de baignade non confirmée');
+  await expect(page.locator('dt').filter({hasText:'Marées'})).toHaveCount(0);
+  await noOverflow(page);
 });
 
 test('prévisions : actualisation automatique à expiration même si le prochain contrôle est repoussé',async({page})=>{
@@ -527,19 +543,28 @@ test('recherche : mer, lac, riviere et inconnu restent distincts', async ({ page
   const catalogue = [
     { ...beaches[0], name: 'Plage de La Baule', city: 'La Baule', department: 'Loire-Atlantique', region: 'Pays de la Loire' },
     { ...beaches[1], name: 'Berge de test' },
-    { ...beaches[0], id: 'test-lake', name: 'Plage du lac sale', waterType: 'lake', coastline: 'Atlantique' },
+    { ...beaches[0], id: 'test-lake', name: 'Plage du lac sale', waterType: 'lake', coastline: 'Atlantique',department:'Atlantique' },
     { ...beaches[0], id: 'test-unknown', name: 'Site non classe', waterType: 'unknown' },
   ];
   await page.route('**/api/search/beaches', route => route.fulfill({ json: searchResult(route.request().postDataJSON(),catalogue) }));
   await page.goto('/recherche');
   await expect(page.locator('.beach-result')).toHaveCount(4);
   await page.getByRole('button', { name: 'Filtres', exact: true }).click();
-  for (const [type, name] of [['sea', 'Plage de La Baule'], ['lake', 'Plage du lac sale'], ['river', 'Berge de test']]) {
-    await page.getByLabel('Type d’eau').selectOption(type);
+  const sections=page.getByRole('navigation',{name:'Milieu de baignade'});
+  for (const [section, type, name] of [['Mer','sea', 'Plage de La Baule'], ['Lacs','lake', 'Plage du lac sale'], ['Rivières','river', 'Berge de test']]) {
+    await sections.getByRole('link',{name:section,exact:true}).click();
+    await expect(page).toHaveURL(new RegExp('water='+type));
+    await expect(sections.getByRole('link',{name:section,exact:true})).toHaveAttribute('aria-current','page');
     await expect(page.locator('.beach-result')).toHaveCount(1);
     await expect(page.locator('.beach-name').getByRole('button', { name, exact: true })).toBeVisible();
+    if(type!=='sea'){
+      await expect(page.locator('.beach-name p')).not.toContainText('Atlantique');
+      await expect(page.getByLabel('Façade géographique')).toHaveCount(0);
+      await expect(page.locator('.zone-marker')).toHaveCount(0);
+      await expect(page.locator('.shoreline-tiles')).toHaveCount(0);
+    }
   }
-  await page.getByLabel('Type d’eau').selectOption('all');
+  await sections.getByRole('link',{name:'Tous',exact:true}).click();
   await expect(page.locator('.beach-result')).toHaveCount(4);
   await noOverflow(page);
 });
@@ -550,10 +575,10 @@ test("recherche : filtres, apercu distinct et retour", async ({
   await page.goto("/recherche");
   await expect(page.locator(".beach-result")).toHaveCount(2);
   await page.getByRole("button", { name: "Filtres", exact: true }).click();
-  await page.getByLabel("Type d’eau").selectOption("river");
+  await page.getByRole('navigation',{name:'Milieu de baignade'}).getByRole('link',{name:'Rivières'}).click();
   await expect(page.locator(".beach-result")).toHaveCount(1);
   await expect(page.locator(".beach-name")).toContainText("Berge des Saules");
-  await page.getByLabel("Type d’eau").selectOption("all");
+  await page.getByRole('navigation',{name:'Milieu de baignade'}).getByRole('link',{name:'Tous'}).click();
   await page.getByLabel("Parking", { exact: true }).check();
   await expect(page.locator(".beach-result")).toHaveCount(1);
   await page

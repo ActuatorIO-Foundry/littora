@@ -91,6 +91,8 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     return 'Provenance : '+compass[Math.round(degrees/45)%8]+' · '+Math.round(degrees)%360+'°';
   }
   selectedChart = "air";
+  get freshwater() { return this.beach?.waterType === 'lake' || this.beach?.waterType === 'river'; }
+  get applicableCharts() { return this.beach?.waterType === 'sea' ? this.charts : this.charts.filter(c=>c.group==='weather'); }
   sanitaryReading(m?: ArsMeasurement): string {
     if (m?.value == null || m.qualifier === 'missing') return 'non renseigné';
     const value = m.value.toLocaleString('fr-FR') + ' / 100 ml';
@@ -187,6 +189,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     this.beachRequests = new Subscription();
     this.scoreRequest?.unsubscribe();
     this.beach = null;
+    this.selectedChart = "air";
     this.score = null;
     this.amenities = null;
     this.realAmenities = [];

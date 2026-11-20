@@ -95,3 +95,24 @@ l'ancien code et le manifeste complet incluant 0003 ; ne pas effacer une migrati
 appliquee. Autre retour possible : restaurer la sauvegarde dans un volume distinct
 et utiliser l'image correspondante. Ne jamais remplacer le volume actif sans verifier
 les ecritures intervenues depuis la sauvegarde.
+## Parcours par milieu (#35)
+
+La recherche conserve la vue d'ensemble et propose trois sections partageables :
+`/recherche?water=sea`, `/recherche?water=lake`, `/recherche?water=river`.
+Seuls les sites publics deja classes figurent dans une section. Une classification
+inconnue reste consultable dans la vue d'ensemble. Les rubriques ne constituent
+pas un inventaire exhaustif ni un recensement de sites autorises a la baignade.
+
+En eau douce, la carte OpenStreetMap cadre les sites du resultat ou le contour
+de la commune choisie. Pas de trait de cote, de selecteur de facade, de tri
+par confort marin ni de filtre de temperature marine. Dans la recherche et la
+fiche, la meteo atmospherique reste attribuee a son fournisseur. Une mesure
+de mer ne remplace jamais une temperature de lac ou de riviere.
+
+Pour les sources, le rapprochement au site, les droits et la fraicheur, voir
+[qualite sanitaire et restrictions](QUALITE-BAIGNADE.md) et
+[equipements locaux](EQUIPEMENTS.md). Les archives saisonnieres ne prouvent
+pas une autorisation actuelle. Les restrictions officielles actives restent
+visibles sans note marine. Un poste de secours reference n'atteste pas la
+surveillance en service. Aucun flux local valide de temperature d'eau douce,
+de debit, de vitesse de courant ni de cyanobacteries n'est connecte en pre-V1.

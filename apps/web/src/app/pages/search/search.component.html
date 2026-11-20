@@ -11,7 +11,12 @@
       }}
     </button>
   </div>
-  <div class="search-tools">
+  <nav class="water-sections" aria-label="Milieu de baignade">
+    <a *ngFor="let section of sections" routerLink="/recherche" [queryParams]="sectionParams(section.id)"
+       [state]="navigationState" (click)="rememberSection()"
+       [attr.aria-current]="section.id === waterType ? 'page' : null">{{ section.label }}</a>
+  </nav>
+  <div class="search-tools" [class.inland-tools]="inland">
     <div class="place-search">
       <label class="search-field"
         ><app-icon name="search" /><input
@@ -55,7 +60,7 @@
         </li>
       </ul>
     </div>
-    <label class="zone-select"
+    <label class="zone-select" *ngIf="!inland"
       ><span class="sr-only">Façade géographique</span
       ><select
         [ngModel]="selectedZone?.id || ''"
@@ -101,17 +106,6 @@
     [hidden]="!filtersOpen"
     aria-label="Critères de recherche"
   >
-    <label class="field"
-      >Type d’eau<select
-        [(ngModel)]="waterType"
-        (ngModelChange)="syncFilters()"
-      >
-        <option value="all">Tous les milieux</option>
-        <option value="sea">Mer</option>
-        <option value="river">Rivière</option>
-        <option value="lake">Lac</option>
-      </select></label
-    >
     <fieldset>
       <legend>Équipements référencés</legend>
       <label class="check-field"
@@ -145,7 +139,7 @@
         <option value="red">Rouge</option>
       </select></label
     >
-    <fieldset>
+    <fieldset *ngIf="!inland">
       <legend>Température de l’eau</legend>
       <div class="temperature-inputs">
         <label
@@ -174,8 +168,8 @@
       <app-icon name="reset" [size]="15" />Réinitialiser
     </button>
   </section>
-  <div class="usage-row">
-    <div class="usage-tabs" role="group" aria-label="Usage recherché">
+  <div class="usage-row" [class.inland-note]="inland">
+    <div *ngIf="!inland" class="usage-tabs" role="group" aria-label="Usage recherché">
       <button
         *ngFor="let usage of usages"
         [class.active]="selectedUsage === usage.id"
@@ -215,6 +209,7 @@
   <div class="explorer-grid" [class.map-view]="mobileView === 'map'">
     <section class="map-column">
       <app-coast-map
+        [inland]="inland"
         [commune]="selectedCommune"
         [beaches]="loading ? [] : displayedBeaches()"
         [selected]="selectedBeach?.id || null"
@@ -239,13 +234,13 @@
               ? (initialLoad ? "Recherche en cours" : "Mise à jour des résultats")
               : displayedBeaches().length +
                 (displayedBeaches().length === 1 ? " plage" : " plages")
-          }}<span>{{ selectedCommune?.name || selectedZone?.name || "Le littoral français" }}</span>
+          }}<span>{{ selectedCommune?.name || selectedZone?.name || (inland ? 'Eaux intérieures' : 'France métropolitaine') }}</span>
         </h2>
         <label
           ><span class="sr-only">Trier les plages</span
           ><select [(ngModel)]="sort" (ngModelChange)="syncFilters()">
             <option value="name">Nom A–Z</option>
-            <option value="score">Score indicatif</option>
+            <option *ngIf="!inland" value="score">Score indicatif</option>
             <option value="distance">Distance</option>
           </select></label
         >
@@ -285,9 +280,9 @@
               {{ beach.name }}
             </button>
             <p>
-              {{ beach.city
-              }}<span *ngIf="beach.city && beach.department"> · </span
-              >{{ beach.department }}
+              {{ beach.city }}<ng-container *ngIf="beach.waterType !== 'lake' && beach.waterType !== 'river'">
+                <span *ngIf="beach.city && beach.department"> · </span>{{ beach.department }}
+              </ng-container>
             </p>
             <div class="beach-tags">
               <span *ngIf="beach.scoreExplanation?.status === 'calculated'">Confort : {{ beach.selectedScore }}/100</span>
@@ -324,7 +319,7 @@
                   }}<small> °C</small></strong
                 >
               </div>
-              <div>
+              <div *ngIf="beach.waterType === 'sea'">
                 <app-icon name="waves" /><span>Eau</span
                 ><strong
                   >{{
@@ -344,10 +339,9 @@
               </div>
             </div>
             <p class="overview-source">
-              {{ providerLabel(score.providers?.["weather"]) }} ·
-              {{ providerLabel(score.providers?.["marine"]) }}
+              {{ providerLabel(score.providers?.["weather"]) }}<ng-container *ngIf="beach.waterType === 'sea'"> · {{ providerLabel(score.providers?.["marine"]) }}</ng-container>
             </p>
-            <p class="caption" *ngFor="let source of ['weather', 'marine']">
+            <p class="caption" *ngFor="let source of beach.waterType === 'sea' ? ['weather', 'marine'] : ['weather']">
               <ng-container *ngIf="score.dataStatus?.[source]">
                 {{ providerLabel(score.providers?.[source]) }} : {{ dataStatusLabel(score.dataStatus?.[source]) }}
               </ng-container>

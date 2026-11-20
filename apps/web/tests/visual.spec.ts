@@ -598,6 +598,49 @@ test('equipements : le filtre poste de secours ne pretend pas confirmer la surve
   await noOverflow(page);
 });
 
+test('carte : équipements superposés, filtres indépendants et provenance au clavier', async ({page}) => {
+  const point = {lat:43.0805,lon:6.152,distanceKm:0.2,source:'openstreetmap',verification:'listed'};
+  const amenities = [
+    {...point,id:'p1',category:'parking',name:'Parking du port'},
+    {...point,id:'p2',category:'parking',name:'Parking du port'},
+    {...point,id:'t1',category:'toilets',name:'Sanitaires du port'},
+    {...point,id:'x',category:'parking',name:'Point non confirmé',verification:'to_verify'},
+  ];
+  await page.route('**/api/beaches/test-sea/amenities',r=>r.fulfill({json:{amenities,provider:'openstreetmap',status:'available'}}));
+  await page.route('https://tile.openstreetmap.org/**',r=>r.abort());
+  await page.goto('/plages/test-sea');
+  const map=page.locator('app-coast-map'), layers=map.locator('summary');
+  await expect(map.getByRole('status')).toContainText('Fond de carte indisponible');
+  await expect(map.getByRole('button',{name:'3 équipements'})).toBeVisible();
+  await layers.press('Enter');
+  const parking=map.getByRole('checkbox',{name:'Stationnement (2)'});
+  await parking.uncheck();
+  await expect(map.locator('.map-point-cluster')).toHaveCount(0);
+  await expect(page.locator('.amenity-group p')).toHaveCount(3);
+  await layers.press('Enter');
+  const toilet=map.getByRole('button',{name:'Équipement : Sanitaires du port'});
+  await toilet.press('Enter');
+  await expect(map.locator('.leaflet-popup-content')).toContainText('Toilettes · OpenStreetMap');
+  await map.locator('.leaflet-popup-close-button').click();
+  await layers.press('Enter');await parking.check();await layers.press('Enter');
+  await map.getByRole('button',{name:'3 équipements'}).press('Enter');
+  await expect(map.getByRole('button',{name:'Équipement : Parking du port'})).toHaveCount(2);
+  await expect(page.getByText('Point non confirmé')).toHaveCount(0);
+  await noOverflow(page);
+});
+
+test('carte : plages au même emplacement sélectionnables sans ouvrir la fiche', async ({page})=>{
+  const twins=[beaches[0],{...beaches[0],id:'test-twin',name:'Crique des Pins'}];
+  await page.route('**/api/search/beaches',r=>r.fulfill({json:searchResult(r.request().postDataJSON(),twins)}));
+  await page.goto('/recherche?zone=azur');
+  if ((page.viewportSize()?.width ?? 1440)<761) await page.getByRole('button',{name:'Carte',exact:true}).click();
+  const map=page.locator('app-coast-map');
+  await map.getByRole('button',{name:'2 plages'}).press('Enter');
+  await map.getByRole('button',{name:'Plage : Crique des Pins'}).press('Enter');
+  await expect(page.locator('.beach-result.selected .beach-name button[aria-expanded=true]')).toHaveText('Crique des Pins');
+  await expect(page).toHaveURL(/recherche/);
+});
+
 test("contact : pas de faux succes et champs accessibles", async ({
   page,
 }, info) => {

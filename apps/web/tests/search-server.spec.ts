@@ -20,7 +20,7 @@ test('recherche serveur: criteres combines, usage, total et carte partagent la m
   expect(requests[0].bbox).toBeTruthy();expect(requests[0].lat).toBeUndefined();
   await expect(page.getByRole('status')).toContainText('non officiels');
   if((page.viewportSize()?.width??1440)<761)await page.getByRole('button',{name:'Carte',exact:true}).click();
-  await page.locator('.leaflet-overlay-pane path[fill="#007e88"]').click();
+  await page.getByRole('button',{name:'Plage : '+beach.name,exact:true}).click();
   await expect(page.locator('.beach-result.selected')).toContainText(beach.name);
 });
 

@@ -9,6 +9,7 @@ import {
   OnChanges,
   OnDestroy,
   Output,
+  SimpleChanges,
   ViewChild,
 } from "@angular/core";
 import { CommonModule } from "@angular/common";
@@ -18,6 +19,7 @@ import { Beach, BeachAmenity } from "../models/beach.model";
 import { Commune } from "../models/commune.model";
 import { COASTAL_ZONES, CoastalZone } from "./coastal-zones";
 import { IconComponent } from "./icon.component";
+import { amenityGroups, MapPoints } from "./map-points";
 
 @Component({
   selector: "app-coast-map",
@@ -41,6 +43,18 @@ import { IconComponent } from "./icon.component";
     >
       <app-icon name="locate" [size]="18" />
     </button>
+    <details class="map-layers" *ngIf="detail && layers.length">
+      <summary class="icon-button" aria-label="Équipements sur la carte" title="Équipements sur la carte">
+        <app-icon name="filters" [size]="18" />
+      </summary>
+      <fieldset>
+        <legend>Équipements sur la carte</legend>
+        <label *ngFor="let layer of layers">
+          <input type="checkbox" [checked]="!hidden.has(layer.category)" (change)="toggleLayer(layer.category)" />
+          {{ layer.name }} ({{ layer.count }})
+        </label>
+      </fieldset>
+    </details>
     <p class="map-error" *ngIf="failed" role="status">
       Fond de carte indisponible. La liste des plages reste accessible.
     </p>
@@ -79,6 +93,12 @@ import { IconComponent } from "./icon.component";
         font-size: 12px;
         z-index: 500;
       }
+      .map-layers { position:absolute; right:12px; top:56px; z-index:501; max-width:calc(100% - 24px); }
+      .map-layers summary { width:36px; height:36px; list-style:none; margin-left:auto; cursor:pointer; }
+      .map-layers summary::-webkit-details-marker { display:none; }
+      .map-layers fieldset { background:white; margin:4px 0 0; padding:8px 12px; border:1px solid #c4d6d4; border-radius:6px; max-height:160px; overflow:auto; }
+      .map-layers legend { float:left; width:100%; font-size:13px; font-weight:700; }
+      .map-layers label { display:flex; align-items:center; gap:8px; min-height:30px; font-size:13px; }
     `,
   ],
 })
@@ -96,7 +116,10 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
   shorelineFailed = false;
   private L?: typeof Leaflet;
   private map?: Leaflet.Map;
-  private markers?: Leaflet.LayerGroup;
+  private points?: MapPoints;
+  layers: {category: BeachAmenity['category']; name: string; count: number}[] = [];
+  readonly hidden = new Set<BeachAmenity['category']>();
+  private detailBeachId?: string;
   private coasts?: Leaflet.LayerGroup;
   private shoreline?: Leaflet.TileLayer.WMS;
   private selectedShoreline?: Leaflet.TileLayer.WMS;
@@ -123,6 +146,7 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
       const module = await import("leaflet");
       const L =
         (module as unknown as { default?: typeof Leaflet }).default ?? module;
+      await import("leaflet.markercluster");
       if (this.destroyed) return;
       this.L = L;
       this.ngZone.runOutsideAngular(() => {
@@ -138,17 +162,20 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
         this.map.getPane("shoreline")!.style.pointerEvents = "none";
         this.map.getPane("shoreline-selected")!.style.pointerEvents = "none";
         this.map.on("move zoom resize", () => this.clipSelectedShoreline());
-        this.markers = L.layerGroup().addTo(this.map);
         this.coasts = L.layerGroup().addTo(this.map);
         this.reset();
+        let visible = this.el.nativeElement.clientWidth > 0 && this.el.nativeElement.clientHeight > 0;
         this.observer = new ResizeObserver(() => {
           if (
             !this.el.nativeElement.clientWidth ||
             !this.el.nativeElement.clientHeight
-          )
+          ) {
+            visible = false;
             return;
+          }
           this.map?.invalidateSize({ pan: false });
-          this.fitCurrent();
+          if (!visible) this.reset();
+          visible = true;
         });
         this.observer.observe(this.el.nativeElement);
       });
@@ -203,54 +230,41 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
           '<a href="https://www.naturalearthdata.com/">Natural Earth</a>',
         );
       }
-      this.ngOnChanges();
     } catch (error) {
       if (!this.destroyed) {
         console.warn("[Littora] Map unavailable", error);
         this.failed = true;
         this.cdr.markForCheck();
       }
+    } finally {
+      if (!this.destroyed && this.L && this.map) {
+        this.points = new MapPoints(this.L, this.map, this.detail);
+        this.ngOnChanges();
+      }
     }
   }
-  ngOnChanges(): void {
-    if (!this.map || !this.L || !this.markers) return;
+  toggleLayer(category: BeachAmenity['category']): void {
+    if (this.hidden.has(category)) this.hidden.delete(category);
+    else this.hidden.add(category);
+    this.drawPoints();
+  }
+  private drawPoints(): void {
+    this.points?.draw(this.beaches, this.amenities.filter(p => !this.hidden.has(p.category)), this.detail,
+      beach => this.ngZone.run(() => this.beachSelect.emit(beach)));
+    this.points?.highlight(this.selected, false);
+  }
+  ngOnChanges(changes?: SimpleChanges): void {
+    const detailId = this.detail ? this.beaches[0]?.id : undefined;
+    const detailChanged = detailId !== this.detailBeachId;
+    if (detailChanged) this.hidden.clear();
+    if (!changes || changes['amenities']) {
+      this.layers = amenityGroups.map(g => ({...g, count:this.amenities.filter(p => p.category === g.category).length}))
+        .filter(g => g.count > 0);
+    }
+    if (!this.map || !this.L || !this.points) return;
     const L = this.L;
-    this.markers.clearLayers();
-    for (const beach of this.beaches) {
-      if (
-        !Number.isFinite(Number(beach.lat)) ||
-        !Number.isFinite(Number(beach.lon))
-      )
-        continue;
-      const active = beach.id === this.selected;
-      const label = document.createElement("span");
-      label.textContent = beach.name;
-      L.circleMarker([Number(beach.lat), Number(beach.lon)], {
-        radius: active ? 8 : 5,
-        color: "white",
-        weight: 2,
-        fillColor: active ? "#d94d3b" : "#007e88",
-        fillOpacity: 1,
-      })
-        .bindTooltip(label)
-        .on("click", () => this.ngZone.run(() => this.beachSelect.emit(beach)))
-        .addTo(this.markers);
-    }
-    for (const poi of this.amenities.filter(
-      (p) => p.source !== "local-hint" && p.verification !== "to_verify",
-    )) {
-      const label = document.createElement("span");
-      label.textContent = poi.name;
-      L.circleMarker([poi.lat, poi.lon], {
-        radius: 5,
-        color: "white",
-        weight: 2,
-        fillColor: "#98620a",
-        fillOpacity: 1,
-      })
-        .bindTooltip(label)
-        .addTo(this.markers);
-    }
+    if (!changes || changes['beaches'] || changes['amenities']) this.drawPoints();
+    if (changes?.['selected']) this.points.highlight(this.selected, !this.detail);
     this.drawCoasts();
     const communeCode = this.commune?.code ?? null;
     if (communeCode !== this.lastCommune) {
@@ -274,29 +288,16 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
         this.boundary.bringToBack();
       }
       this.lastCommune = communeCode;
-      this.fitCurrent();
+      this.reset();
     }
     if (this.commune) return;
-    if (this.detail && this.beaches[0])
+    this.detailBeachId = detailId;
+    if (detailChanged && this.beaches[0])
       this.map.setView([this.beaches[0].lat, this.beaches[0].lon], 14, {
         animate: false,
       });
     else if (this.zoneId !== this.lastZone) {
-      const zone = COASTAL_ZONES.find((z) => z.id === this.zoneId);
-      if (zone) {
-        const [s, w, n, e] = zone.bbox.split(",").map(Number);
-        this.map.fitBounds(
-          [
-            [s, w],
-            [n, e],
-          ],
-          {
-            padding: [35, 35],
-            maxZoom: 8,
-            animate: !matchMedia("(prefers-reduced-motion: reduce)").matches,
-          },
-        );
-      } else this.reset();
+      this.reset();
       this.lastZone = this.zoneId;
     }
   }
@@ -385,6 +386,7 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
       `polygon(${topLeft.x}px ${topLeft.y}px, ${bottomRight.x}px ${topLeft.y}px, ${bottomRight.x}px ${bottomRight.y}px, ${topLeft.x}px ${bottomRight.y}px)`;
   }
   reset(): void {
+    const zone = COASTAL_ZONES.find((z) => z.id === this.zoneId);
     if (this.commune && this.boundary) {
       this.map?.fitBounds(this.boundary.getBounds(), {
         padding: [25, 25],
@@ -393,7 +395,10 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
       });
     } else if (this.detail && this.beaches[0])
       this.map?.setView([this.beaches[0].lat, this.beaches[0].lon], 14);
-    else
+    else if (zone && !this.detail) {
+      const [s, w, n, e] = zone.bbox.split(",").map(Number);
+      this.map?.fitBounds([[s,w],[n,e]], {padding:[35,35], maxZoom:8, animate:false});
+    } else
       this.map?.fitBounds(
         [
           [41.1, -5.5],
@@ -401,23 +406,6 @@ export class CoastMapComponent implements AfterViewInit, OnChanges, OnDestroy {
         ],
         { padding: [20, 20], animate: false },
       );
-  }
-  private fitCurrent(): void {
-    if (this.commune && this.boundary) {
-      this.reset();
-      return;
-    }
-    const zone = COASTAL_ZONES.find((z) => z.id === this.zoneId);
-    if (!this.detail && zone) {
-      const [s, w, n, e] = zone.bbox.split(",").map(Number);
-      this.map?.fitBounds(
-        [
-          [s, w],
-          [n, e],
-        ],
-        { padding: [35, 35], maxZoom: 8, animate: false },
-      );
-    } else this.reset();
   }
   ngOnDestroy(): void {
     this.destroyed = true;

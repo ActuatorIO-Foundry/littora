@@ -45,7 +45,9 @@ services:
       NODE_ENV: production
       API_PORT: 3000
       CORS_ORIGIN: https://${DOMAIN:?DOMAIN required}
+      REPORT_PROXY_IPV4: &proxy-ip "172.30.29.2"
       JOBS_REDIS_URL: redis://redis-jobs:6379
+    networks: [default, proxy_api]
     restart: unless-stopped
     depends_on:
       postgres: {condition: service_healthy}
@@ -78,6 +80,7 @@ services:
       timeout: 5s
       start_period: 30s
   web:
+    networks: [edge]
     build:
       context: .
       dockerfile: apps/web/Dockerfile.prod
@@ -94,6 +97,9 @@ services:
     build: ./infra/caddy
     environment:
       DOMAIN: ${DOMAIN:?DOMAIN required}
+    networks:
+      edge: {}
+      proxy_api: {ipv4_address: *proxy-ip}
     ports:
       - "80:80"
       - "443:443"
@@ -105,6 +111,14 @@ services:
       web: {condition: service_healthy}
       api: {condition: service_healthy}
     restart: unless-stopped
+networks:
+  default: {}
+  edge: {}
+  proxy_api:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.29.0/29
 volumes:
   jobsdata:
   pgdata:

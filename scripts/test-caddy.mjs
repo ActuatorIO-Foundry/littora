@@ -1,38 +1,27 @@
+// Runs inside the isolated API container with the disposable Caddy root as its only extra CA.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
-import { resolve } from 'node:path';
 
-const docker = (args) => execFileSync('docker', args, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
-const name = `littora-proxy-test-${randomUUID().slice(0, 8)}`;
-const containers = [];
-const runtime = process.env.TEST_API_IMAGE || 'littora-api:ci';
-docker(['network', 'create', '--internal', name]);
-try {
-  for (const [service, port] of [['api', 3000], ['web', 80]]) {
-    const container = `${name}-${service}`;
-    docker(['run', '-d', '--name', container, '--network', name, '--network-alias', service,
-      runtime, 'node', '-e', `require('http').createServer((q,s)=>{s.setHeader('content-type','application/json');s.end(JSON.stringify({service:'${service}',path:q.url}))}).listen(${port},'0.0.0.0')`]);
-    containers.push(container);
-  }
-  const caddy = `${name}-caddy`;
-  docker(['run', '-d', '--name', caddy, '--network', name,
-    '-v', `${resolve('infra/caddy/Caddyfile')}:/etc/caddy/Caddyfile:ro`, 'littora-caddy:2.11.9-r1']);
-  containers.push(caddy);
-  docker(['exec', caddy, 'caddy', 'validate', '--config', '/etc/caddy/Caddyfile']);
-  const request = (path) => JSON.parse(docker(['exec', `${name}-api`, 'node', '-e',
-    `fetch(${JSON.stringify(`http://${caddy}`)}+${JSON.stringify(path)},{signal:AbortSignal.timeout(5000)}).then(async r=>console.log(JSON.stringify({status:r.status,body:await r.json()})))`]));
-  for (let i = 0; i < 40; i++) {
-    try { if (request('/').status === 200) break; } catch {}
-    await new Promise(r => setTimeout(r, 250));
-  }
-  for (const [path, service] of [['/', 'web'], ['/recherche', 'web'], ['/plages/test', 'web'], ['/api', 'api'], ['/api/beaches?limit=1', 'api']]) {
-    const response = request(path);
-    assert.equal(response.status, 200);
-    assert.deepEqual(response.body, { service, path });
-  }
-  console.log('Caddy validated: API prefix, query parameters and frontend routes preserved.');
-} finally {
-  for (const container of containers.reverse()) docker(['rm', '-f', container]);
-  docker(['network', 'rm', name]);
+const base = 'https://littora.internal';
+const id = process.env.TEST_BEACH_ID;
+const get = (url, options) => fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(5000), ...options });
+const redirect = await get('http://littora.internal/api/beaches?limit=1');
+assert.equal(redirect.status, 308);
+assert.equal(redirect.headers.get('location'), base + '/api/beaches?limit=1');
+for (const path of ['/', '/recherche', '/plages/' + id]) {
+  const page = await get(base + path);
+  assert.equal(page.status, 200);
+  assert.match(page.headers.get('content-type'), /text\/html/);
+  assert.match(await page.text(), /<app-root\b/);
+}
+const page = await get(base + '/api/beaches?limit=1', { headers: { Origin: base } });
+assert.equal(page.status, 200);
+assert.equal(page.headers.get('access-control-allow-origin'), base);
+assert.equal((await page.json()).length, 1);
+const beach = await get(base + '/api/beaches/' + id, { headers: { Origin: 'https://other.invalid' } });
+assert.equal((await beach.json()).id, id);
+assert.equal(beach.headers.get('access-control-allow-origin'), null);
+for (const path of ['/api', '/api/no-such-route']) {
+  const missing = await get(base + path);
+  assert.equal(missing.status, 404);
+  assert.equal((await missing.json()).code, 'NOT_FOUND');
 }

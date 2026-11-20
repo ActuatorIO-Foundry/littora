@@ -1,7 +1,9 @@
-:80 {
+{$DOMAIN} {
   @api path /api /api/*
   handle @api {
     reverse_proxy api:3000
   }
-  reverse_proxy web:80
+  handle {
+    reverse_proxy web:80
+  }
 }

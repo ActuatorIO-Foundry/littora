@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { chmodSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -14,8 +14,10 @@ const containers = [];
 const image = process.env.TEST_API_IMAGE || 'littora-api:ci';
 const postgres = `${name}-postgres`;
 const redis = `${name}-redis`;
+const domain = 'littora.internal';
 const environment = ['-e', `DATABASE_URL=postgresql://littora:test-only-password@${postgres}:5432/littora_ci_test`,
-  '-e', `REDIS_URL=redis://${redis}:6379/15`, '-e', 'API_PORT=3000', '-e', 'NODE_ENV=production'];
+  '-e', `REDIS_URL=redis://${redis}:6379/15`, '-e', 'API_PORT=3000', '-e', 'NODE_ENV=production',
+  '-e', `CORS_ORIGIN=https://${domain}`];
 const sql = query => docker(['exec', postgres, 'psql', '-XAt', '-v', 'ON_ERROR_STOP=1', '-U', 'littora', '-d', 'littora_ci_test', '-c', query]);
 const command = action => docker(['run', '--rm', '--network', name, ...environment, image, 'node', 'scripts/database.cjs', action]);
 
@@ -46,6 +48,7 @@ function start(service, imageName = image) {
   containers.push(container);
   // Deterministic provider outage: avoid external DNS timeouts starving database lookups.
   docker(['run', '-d', '--name', container, '--network', name,
+    ...(service === 'ready' ? ['--network-alias', 'api'] : []),
     '--add-host', 'api.open-meteo.com:127.0.0.1', '--add-host', 'marine-api.open-meteo.com:127.0.0.1',
     ...environment, imageName]);
   return container;
@@ -95,6 +98,35 @@ try {
   assert.equal(response.body.beaches.length, 5);
   assert.equal(response.body.nextCursor, null);
   const id = response.body.beaches[0].id;
+  const web = `${name}-web`;
+  const proxy = `${name}-proxy`;
+  docker(['run', '-d', '--name', web, '--network', name, '--network-alias', 'web',
+    process.env.TEST_WEB_IMAGE || 'littora-web:ci']);
+  containers.push(web);
+  docker(['run', '-d', '--name', proxy, '--network', name, '--network-alias', domain,
+    '-e', `DOMAIN=${domain}`, '-v', `${resolve('infra/caddy/Caddyfile')}:/etc/caddy/Caddyfile:ro`,
+    'littora-caddy:2.11.9-r1']);
+  containers.push(proxy);
+  const fixtureDir = mkdtempSync(join(tmpdir(), 'littora-proxy-ca-'));
+  try {
+    const ca = join(fixtureDir, 'root.crt');
+    await until(() => {
+      docker(['cp', proxy + ':/data/caddy/pki/authorities/local/root.crt', ca]);
+      return true;
+    }, 'disposable TLS root');
+    chmodSync(ca, 0o644);
+    docker(['cp', ca, api + ':/tmp/test-root.crt']);
+    docker(['cp', resolve('scripts/test-caddy.mjs'), api + ':/tmp/test-caddy.mjs']);
+    const probe = () => docker(['exec', '-e', 'NODE_EXTRA_CA_CERTS=/tmp/test-root.crt', '-e', 'TEST_BEACH_ID=' + id,
+      api, 'node', '/tmp/test-caddy.mjs']);
+    const proxyReady = () => docker(['exec', '-e', 'NODE_EXTRA_CA_CERTS=/tmp/test-root.crt', api, 'node', '-e',
+      `fetch('https://${domain}',{signal:AbortSignal.timeout(1500)}).then(r=>process.exit(r.ok?0:1))`]) === '';
+    await until(proxyReady, 'trusted HTTPS');
+    probe();
+    docker(['restart', proxy]);
+    await until(proxyReady, 'trusted HTTPS after restart');
+    probe();
+  } finally { rmSync(fixtureDir, { recursive: true, force: true }); }
   assert.equal(request(api, `/api/beaches/${id}`).body.id, id);
   assert.deepEqual(request(api, `/api/reports?beachId=${id}`).body, []);
   const score = request(api, `/api/score/beach/${id}`);
@@ -114,7 +146,7 @@ try {
     await until(() => request(previous, '/api/beaches?limit=1').status === 200, 'previous API compatibility');
     assert.equal(request(previous, `/api/beaches/${id}`).body.id, id);
   }
-  console.log(JSON.stringify({ verified: true, readonlyStartup: true, migrations: 7,
+  console.log(JSON.stringify({ verified: true, readonlyStartup: true, migrations: 9, verifiedHttps: true,
     seedIdempotent: true, beaches: 5, sanitarySamples: 0, http: true, offlineScoreContract: true,
     previousImage: Boolean(process.env.PREVIOUS_API_IMAGE) }));
 } finally {

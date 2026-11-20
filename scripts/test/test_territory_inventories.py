@@ -7,6 +7,19 @@ geo = runpy.run_path(str(Path(__file__).resolve().parents[1] / "territory-invent
 
 
 class Planning(unittest.TestCase):
+    def test_input_error_does_not_publish_private_path(self):
+        import subprocess
+        import sys
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as tmp:
+            marker = "missing-private-fixture"
+            result = subprocess.run([sys.executable, geo["__file__"], "--sites", str(Path(tmp, marker)),
+                                     "--cache", tmp, "--manifest", str(Path(tmp, "manifest"))],
+                                    capture_output=True, text=True, timeout=10)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Inventory cycle failed", result.stderr)
+            self.assertFalse(marker in result.stderr or tmp in result.stderr)
+
     def test_shared_region_border_and_unknown_are_distinct(self):
         sites = [dict(id=str(i), lon=lon, lat=44) for i, lon in enumerate((1, 1.1, 2, 8))]
         groups, uncovered = geo["plan"](sites, {"west": box(0, 43, 2, 45), "east": box(2, 43, 3, 45)})

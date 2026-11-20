@@ -21,4 +21,4 @@ async function main([command,...args]){
     throw Error('Use import [DIRECTORY], status, review INSEE, rejects RELEASE or decision close|lift BEACH_UUID CASE_REF YYYY-MM-DD OFFICIAL_URL');
   }finally{await pool.end();}
 }
-main(process.argv.slice(2)).then(result=>console.log(JSON.stringify(result))).catch(e=>{console.error(e.message);process.exitCode=1;});
+main(process.argv.slice(2)).then(result=>console.log(JSON.stringify(result))).catch(()=>{console.error('{"event":"ars_operation_failed"}');process.exitCode=1;});

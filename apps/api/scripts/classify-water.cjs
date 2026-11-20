@@ -181,4 +181,4 @@ async function main() {
   } finally { await pool.end(); }
 }
 module.exports = { collect, apply, review, tile, fetchLayer, validateReport };
-if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });
+if (require.main === module) main().catch(() => { console.error('{"event":"classification_failed"}'); process.exitCode = 1; });

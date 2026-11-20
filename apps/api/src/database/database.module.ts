@@ -5,6 +5,7 @@ export const PG='PG_POOL';
 @Global()
 @Module({providers:[{provide:PG,useFactory:async () => {
   const pool = new Pool({connectionString:process.env.DATABASE_URL, connectionTimeoutMillis:5000});
+  pool.on('error', () => console.error('{"event":"database_connection_lost"}'));
   try {
     await assertCurrent(pool);
     return pool;

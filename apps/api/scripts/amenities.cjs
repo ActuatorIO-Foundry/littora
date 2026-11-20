@@ -111,11 +111,15 @@ async function main() {
   try {
     if(mode==='coverage') return console.log(JSON.stringify(await coverage(db)));
     if(mode==='sites') return console.log(JSON.stringify((await db.query('select id,lat,lon from beach_catalogue order by id')).rows));
-    if(mode.startsWith('region-')) return console.log(JSON.stringify(await importRegion(db,process.stdin,mode==='region-apply')));
+    if(mode.startsWith('region-')) {
+      const {source,asOf,...counts}=await importRegion(db,process.stdin,mode==='region-apply');
+      return console.log(JSON.stringify({...counts,asOf:new Date(asOf).toISOString()}));
+    }
     const chunks=[];let bytes=0;
     for await(const chunk of process.stdin){bytes+=chunk.length;if(bytes>8*1024*1024) throw Error('Extract too large');chunks.push(chunk);}
-    console.log(JSON.stringify(await importCity(db,city,JSON.parse(Buffer.concat(chunks).toString()),mode==='apply')));
+    const report=await importCity(db,city,JSON.parse(Buffer.concat(chunks).toString()),mode==='apply');
+    console.log(JSON.stringify({...report,asOf:new Date(report.asOf).toISOString()}));
   } finally {await db.end();}
 }
 module.exports={validate,covers,importCity,importRegion,coverage};
-if(require.main===module)main().catch(e=>{console.error(e.message);process.exitCode=1;});
+if(require.main===module)main().catch(()=>{console.error('{"event":"amenities_operation_failed"}');process.exitCode=1;});

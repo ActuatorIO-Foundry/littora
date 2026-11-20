@@ -1,5 +1,7 @@
 services:
   postgres:
+    entrypoint: &private-entrypoint ["/bin/sh", "/usr/local/bin/littora-daemon"]
+    command: [postgres]
     image: littora-postgres:16.16-3.7.0-r1
     platform: linux/amd64
     build: ./infra/postgres
@@ -11,16 +13,20 @@ services:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - &private-log-filter ./infra/diagnostics/daemon.sh:/usr/local/bin/littora-daemon:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U littora -d littora"]
       interval: 2s
       timeout: 5s
       retries: 30
   redis:
+    entrypoint: *private-entrypoint
+    command: [redis-server]
     image: littora-redis:7.4.12-r1
     build: ./infra/redis
     volumes:
       - redisdata:/data
+      - *private-log-filter
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     healthcheck:

@@ -1,4 +1,4 @@
-import { ArgumentsHost, BadRequestException, CallHandler, Catch, ExceptionFilter, ExecutionContext, HttpException, INestApplication, InternalServerErrorException, Logger, NestInterceptor } from '@nestjs/common';
+import { ArgumentsHost, BadRequestException, CallHandler, Catch, ExceptionFilter, ExecutionContext, HttpException, INestApplication, InternalServerErrorException, NestInterceptor } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { map } from 'rxjs';
 import { contract, inputValidator, operations, responseValidator, validationDetails } from './contract';
@@ -30,8 +30,7 @@ class ContractInterceptor implements NestInterceptor {
       const payload = JSON.parse(JSON.stringify(present(operation.operationId, data, query)));
       const validate = responseValidator(operation, context.switchToHttp().getResponse().statusCode);
       if (!validate(payload)) {
-        Logger.error({ event: 'response_contract_violation', operation: operation.operationId,
-          requestId: request.requestId, details: validationDetails(validate.errors) }, 'HttpContract');
+        console.error(JSON.stringify({event:'response_contract_violation', operation:operation.operationId, requestId:request.requestId}));
         throw new InternalServerErrorException();
       }
       return payload;
@@ -51,8 +50,10 @@ export class ApiExceptionFilter implements ExceptionFilter {
       404: 'NOT_FOUND', 409: 'CONFLICT', 429: 'RATE_LIMITED', 503: 'UNAVAILABLE' };
     const messages: Record<number, string> = { 400: 'Invalid request', 401: 'Authentication required', 403: 'Access denied',
       404: 'Resource not found', 409: 'Resource conflict', 429: 'Too many requests', 503: 'Service unavailable' };
+    const requestId = request.requestId ?? randomUUID();
+    if (status >= 500) console.error(JSON.stringify({event:'api_request_failed', status, requestId}));
     response.status(status).json({ statusCode: status, code: codes[status] ?? 'INTERNAL_ERROR',
-      message: messages[status] ?? 'Internal server error', requestId: request.requestId ?? randomUUID(), details });
+      message: messages[status] ?? 'Internal server error', requestId, details });
   }
 }
 

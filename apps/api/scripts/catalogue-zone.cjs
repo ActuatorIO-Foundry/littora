@@ -154,5 +154,5 @@ async function main([command,dir,code,...extra]) {
     console.log(JSON.stringify(status(db)));
   }finally{db.close();if(pool)await pool.end();}
 }
-if(require.main===module)main(process.argv.slice(2)).catch(e=>{console.error(e.message);process.exitCode=1;});
+if(require.main===module)main(process.argv.slice(2)).catch(()=>{console.error('{"event":"catalogue_operation_failed"}');process.exitCode=1;});
 module.exports={start,parseTile,collect,status,apply,qualify};

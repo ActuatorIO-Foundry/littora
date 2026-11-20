@@ -1,4 +1,4 @@
-import { ConflictException, HttpException, Inject, Injectable, Logger, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, HttpException, Inject, Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { isIP } from 'node:net';
@@ -14,7 +14,7 @@ export class ContributionsService {
   async purgeExpired() {
     try {
       await this.transaction(client => this.purge(client));
-    } catch { Logger.warn({event:'contribution_retention_unavailable'},'Contributions'); }
+    } catch { console.warn('{"event":"contribution_retention_unavailable"}'); }
   }
 
   private async purge(client: any) {

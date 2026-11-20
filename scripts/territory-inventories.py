@@ -141,7 +141,7 @@ def bundle(region, sites, downloads):
         raise ValueError("Missing, future or expired replication date")
     if age >= 48*3600:
         downloads.aging.append(region)
-        print(f"{region}: warning: replication older than 48 h ({date})", file=sys.stderr)
+        print(f"{region}: replication older than 48 h", file=sys.stderr)
     signature = hashlib.sha256(json.dumps([3, region, date, sites], sort_keys=True).encode()).hexdigest()[:24]
     out = downloads.cache / f"{region}-{signature}.ndjson"
     if out.exists():
@@ -203,11 +203,14 @@ def main():
                     out = bundle(r, groups[r], downloads)
                     print(str(out.resolve()), file=manifest, flush=True)
                     print(f"{r}: {len(groups[r])} inventories prepared", flush=True)
-                except (ValueError, OSError, RuntimeError) as err:
+                except (ValueError, OSError, RuntimeError):
                     failures.append(r)
-                    print(f"{r}: {err}", file=sys.stderr, flush=True)
+                    print(f"{r}: inventory preparation failed", file=sys.stderr, flush=True)
     return 2 if failures or uncovered or downloads.aging else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception:
+        sys.exit("Inventory cycle failed: check inputs, provider and storage.")

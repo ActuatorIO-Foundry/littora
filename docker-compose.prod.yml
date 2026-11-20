@@ -1,5 +1,7 @@
 services:
   postgres:
+    entrypoint: &private-entrypoint ["/bin/sh", "/usr/local/bin/littora-daemon"]
+    command: [postgres]
     image: littora-postgres:16.16-3.7.0-r1
     platform: linux/amd64
     build: ./infra/postgres
@@ -9,6 +11,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - &private-log-filter ./infra/diagnostics/daemon.sh:/usr/local/bin/littora-daemon:ro
     restart: unless-stopped
     healthcheck:
       test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
@@ -16,10 +19,13 @@ services:
       timeout: 5s
       retries: 30
   redis:
+    entrypoint: *private-entrypoint
+    command: [redis-server]
     image: littora-redis:7.4.12-r1
     build: ./infra/redis
     volumes:
       - redisdata:/data
+      - *private-log-filter
     restart: unless-stopped
     healthcheck: &redis-health
       test: [CMD, redis-cli, ping]
@@ -54,6 +60,7 @@ services:
       redis: {condition: service_healthy}
       redis-jobs: {condition: service_healthy}
   redis-jobs:
+    entrypoint: *private-entrypoint
     image: littora-redis:7.4.12-r1
     build: ./infra/redis
     command: [redis-server, --appendonly, "yes", --maxmemory-policy, noeviction]
@@ -61,6 +68,7 @@ services:
     healthcheck: *redis-health
     volumes:
       - jobsdata:/data
+      - *private-log-filter
   worker:
     build:
       context: .
@@ -93,6 +101,8 @@ services:
       timeout: 3s
       retries: 6
   caddy:
+    entrypoint: *private-entrypoint
+    command: [caddy, run, --config, /etc/caddy/Caddyfile, --adapter, caddyfile]
     image: littora-caddy:2.11.9-r1
     build: ./infra/caddy
     environment:
@@ -107,6 +117,7 @@ services:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+      - *private-log-filter
     depends_on:
       web: {condition: service_healthy}
       api: {condition: service_healthy}

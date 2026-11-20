@@ -12,3 +12,6 @@ FROM nginx:1.31.8-alpine@sha256:fed7e14be83cbd2661a75cdc5b872d936cf155d46c327084
 RUN apk add --no-cache --upgrade zlib=1.4-r0 libxslt=1.1.43-r4
 COPY --from=build /app/apps/web/dist/littora-web/browser /usr/share/nginx/html
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY infra/diagnostics/daemon.sh /usr/local/bin/littora-daemon
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/littora-daemon"]
+CMD ["nginx","-g","daemon off;"]

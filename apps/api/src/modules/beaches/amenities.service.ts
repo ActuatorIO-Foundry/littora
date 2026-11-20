@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { PG } from '../../database/database.module';
 import { AmenityPoint, failureReason, fetchAmenities } from './amenities';
 
@@ -32,7 +32,7 @@ export class AmenitiesService {
       try{points=await fetchAmenities(beach,endpoint);}
       catch(error){
         const reason=failureReason(error);
-        Logger.warn('Collecte équipements OSM : '+reason,'AmenitiesService');
+        console.warn(JSON.stringify({event:'amenities_unavailable', reason}));
         const code=['configuration','invalid-response'].includes(reason)?reason:'unavailable';
         await this.db.query(`insert into beach_amenity_collections(beach_id,lat,lon,attempted_at,source_url,error_code)
           values($1,$2,$3,now(),'openstreetmap-overpass',$4) on conflict(beach_id) do update

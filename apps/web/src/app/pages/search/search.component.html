@@ -216,7 +216,7 @@
     <section class="map-column">
       <app-coast-map
         [commune]="selectedCommune"
-        [beaches]="displayedBeaches()"
+        [beaches]="loading ? [] : displayedBeaches()"
         [selected]="selectedBeach?.id || null"
         [zoneId]="selectedZone?.id || null"
         (zoneSelect)="chooseZone($event.id)"
@@ -228,7 +228,7 @@
       </div>
     </section>
     <section
-      class="results-column"
+      class="results-column" [attr.aria-busy]="loading"
       aria-label="Plages proposées"
       [attr.aria-busy]="loading"
     >
@@ -236,7 +236,7 @@
         <h2>
           {{
             loading
-              ? "Recherche en cours"
+              ? (initialLoad ? "Recherche en cours" : "Mise à jour des résultats")
               : displayedBeaches().length +
                 (displayedBeaches().length === 1 ? " plage" : " plages")
           }}<span>{{ selectedCommune?.name || selectedZone?.name || "Le littoral français" }}</span>
@@ -251,10 +251,11 @@
         >
       </div>
       <app-loading
-        *ngIf="loading"
+        *ngIf="loading && initialLoad"
         label="À la recherche de votre prochaine escale…"
       />
-      <div *ngIf="!loading && !displayedBeaches().length" class="empty-state">
+      <p *ngIf="loading && !initialLoad && beaches.length" class="caption" role="status">Résultats précédents, en cours d’actualisation.</p>
+      <div *ngIf="!loading && !error && !displayedBeaches().length" class="empty-state">
         <app-icon name="compass" [size]="35" />
         <h3>Aucune plage pour ces critères</h3>
         <p>Essayez une autre zone ou élargissez votre recherche.</p>
@@ -264,6 +265,7 @@
       </div>
       <article
         *ngFor="let beach of visibleBeaches(); trackBy: trackByBeachId"
+        [attr.inert]="loading ? '' : null"
         class="beach-result"
         [class.selected]="selectedBeach?.id === beach.id"
         [attr.id]="'beach-' + beach.id"
@@ -310,12 +312,9 @@
         </div>
         <div class="beach-overview" *ngIf="selectedBeach?.id === beach.id">
           <app-comfort-explanation [value]="beach.scoreExplanation" />
-          <app-loading
-            *ngIf="loadingScore"
-            label="Chargement des conditions…"
-          />
+          <p *ngIf="loadingScore && !score" role="status" class="caption">Lecture des conditions…</p>
           <p *ngIf="scoreError" class="notice error">{{ scoreError }}</p>
-          <ng-container *ngIf="score && !loadingScore"
+          <ng-container *ngIf="score"
             ><div class="overview-metrics">
               <div>
                 <app-icon name="sun" /><span>Air</span

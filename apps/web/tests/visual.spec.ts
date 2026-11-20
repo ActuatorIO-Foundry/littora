@@ -276,16 +276,93 @@ test('prévisions : une mesure marine reçue pour une rivière ne devient pas sa
 test('prévisions : actualisation automatique à expiration même si le prochain contrôle est repoussé',async({page})=>{
   await page.clock.install({time:new Date('2026-07-15T17:44:50Z')});
   let requests=0;
-  await page.route('**/api/score/**',route=>{
+  let release!:()=>void;
+  const pending=new Promise<void>(resolve=>{release=resolve;});
+  await page.route('**/api/score/**',async route=>{
     requests++;
+    if(requests===2) await pending;
     return route.fulfill({json:{...score,dataStatus:{weather:{...airStatus,
       status:requests===1?'available':'stale',validAt:'2026-07-15T18:00:00Z',nextCheckAt:'2026-07-15T20:00:00Z'}}}});
   });
   await page.goto('/plages/test-sea');
   await expect(page.locator('.chart-heading')).toContainText('Open-Meteo');
-  await page.clock.fastForward(11000);
-  await expect.poll(()=>requests).toBe(2);
+  await page.locator('.beach-heading').evaluate(el=>el.setAttribute('data-original','yes'));
+  try {
+    await page.clock.fastForward(11000);
+    await expect.poll(()=>requests).toBe(2);
+    await expect(page.locator('app-loading')).toHaveCount(0);
+    await expect(page.locator('.conditions-grid')).toBeVisible();
+  } finally {release();}
   await expect(page.locator('.chart-heading')).toContainText('périmée');
+  await expect(page.locator('.beach-heading')).toHaveAttribute('data-original','yes');
+});
+
+test('actualisation discrète : une fiche ouverte ne lance pas de vague pour ses appels secondaires',async({page})=>{
+  let release!:()=>void;
+  const pending=new Promise<void>(resolve=>{release=resolve;});
+  await page.route('**/api/beaches/test-sea/amenities',async route=>{
+    await pending;return route.fulfill({json:{amenities:[],status:'unknown'}});
+  });
+  await page.route('**/api/score/**',async route=>{await pending;return route.fulfill({status:503,json:{}});});
+  await page.goto('/plages/test-sea');
+  try {
+    await expect(page.getByRole('heading',{name:'Plage des Pins',exact:true})).toBeVisible();
+    await expect(page.locator('#conditions')).toContainText('Lecture des conditions');
+    await expect(page.locator('#sur-place')).toContainText('Recherche des équipements');
+    await expect(page.locator('app-loading')).toHaveCount(0);
+  } finally {release();}
+  await expect(page.locator('#conditions')).toContainText('Conditions indisponibles');
+  await expect(page.locator('#communaute')).toBeVisible();
+});
+
+test('actualisation discrète : panne puis reprise sans perdre les prévisions ni conserver les anciens scores', async({page})=>{
+  await page.clock.install({time:new Date('2026-07-15T12:00:00Z')});
+  let attempt=0, release!:()=>void;
+  const gate=new Promise<void>(resolve=>{release=resolve;});
+  await page.route('**/api/score/**',async route=>{
+    attempt++;
+    if(attempt===2)return route.fulfill({status:503,json:{}});
+    if(attempt===3)await gate;
+    return route.fulfill({json:{...score,dataStatus:{weather:{...airStatus,nextCheckAt:'2026-07-15T12:00:10Z'}}}});
+  });
+  await page.goto('/plages/test-sea');
+  await expect(page.locator('.usage-scores strong').first()).toContainText('/100');
+  await page.clock.fastForward(11000);
+  await expect(page.locator('#conditions')).toContainText('Dernières prévisions connues');
+  await expect(page.locator('.conditions-grid strong').first()).toContainText('24');
+  await expect(page.locator('.usage-scores strong')).toHaveText(['—','—','—','—']);
+  await expect(page.locator('.chart-heading')).toContainText('périmée');
+  try {
+    await page.getByRole('button',{name:'Réessayer'}).click();
+    await expect.poll(()=>attempt).toBe(3);
+    await expect(page.locator('app-loading')).toHaveCount(0);
+    await expect(page.locator('.conditions-grid')).toBeVisible();
+  } finally {release();}
+  await expect(page.locator('.usage-scores strong').first()).toContainText('/100');
+  await expect(page.getByRole('button',{name:'Réessayer'})).toHaveCount(0);
+});
+
+test('actualisation discrète : un filtre conserve la liste pendant la requête, sans vague ni ancienne action',async({page})=>{
+  let release!:()=>void;
+  const pending=new Promise<void>(resolve=>{release=resolve;});
+  await page.route('**/api/search/beaches',async route=>{
+    const input=route.request().postDataJSON();
+    if(input.parking) await pending;
+    return route.fulfill({json:searchResult(input,beaches)});
+  });
+  await page.goto('/recherche');
+  await expect(page.locator('.beach-result')).toHaveCount(2);
+  await page.getByRole('button',{name:'Filtres',exact:true}).click();
+  try {
+    await page.getByLabel('Parking',{exact:true}).check();
+    await expect(page.locator('.results-column')).toHaveAttribute('aria-busy','true');
+    await expect(page.locator('.beach-result[inert]')).toHaveCount(2);
+    await expect(page.locator('app-loading')).toHaveCount(0);
+    await expect(page.locator('.results-heading')).toContainText('Mise à jour');
+  } finally {release();}
+  await expect(page.locator('.beach-result')).toHaveCount(1);
+  await expect(page.locator('.beach-result[inert]')).toHaveCount(0);
+  await expect(page.locator('.beach-name')).toContainText('Plage des Pins');
 });
 
 test('conditions : panne fournisseur sans faux score ni courbe', async ({ page }) => {

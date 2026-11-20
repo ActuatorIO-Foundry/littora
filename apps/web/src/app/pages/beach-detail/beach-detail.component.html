@@ -63,7 +63,7 @@
         </ng-container>
         <ng-template #unknownVigilance>information indisponible pour cette plage.</ng-template>
       </p>
-      <app-loading *ngIf="loadingScore" />
+      <p *ngIf="loadingScore" class="caption" role="status">Lecture des conditions…</p>
       <div *ngIf="scoreError" class="notice error">
         <app-icon name="alert" [size]="18" />{{ scoreError
         }}<button class="text-link" (click)="loadScore(beach.id)">
@@ -416,10 +416,7 @@
         /></a>
         <div class="amenities">
           <h3>Accès & équipements</h3>
-          <app-loading
-            *ngIf="loadingAmenities"
-            label="Recherche à proximité…"
-          />
+          <p *ngIf="loadingAmenities" class="caption" role="status">Recherche des équipements à proximité…</p>
           <p class="caption" *ngIf="amenitiesUnavailable">
             Services à proximité indisponibles.
           </p>

@@ -181,6 +181,24 @@ test('Confort : le même profil et les mêmes points dans la liste et la fiche',
   await expect(page.locator('.score-explanation')).toContainText('Température de l’eau');
 });
 
+test('Confort partiel : plafond nul visible et vent/UV périmés distincts des valeurs absentes',async({page})=>{
+  const e={version:'confort-3',status:'partial',score:null,partialScore:0,required:6,available:3,
+    stale:['Vent','Indice UV'],missing:['Rafales'],invalid:[],factors:[{label:'Vagues',points:-88}]};
+  await page.route('**/api/search/beaches',r=>r.fulfill({json:searchResult(r.request().postDataJSON(),
+    [{...beaches[0],selectedScore:null,scoreExplanation:e}])}));
+  await page.route('**/api/score/beach/*',r=>r.fulfill({json:{...score,
+    dataStatus:{...score.dataStatus,weather:{...airStatus,status:'stale'}},scores:{...score.scores,bathing:null},explanations:{bathing:e}}}));
+  await page.goto('/recherche');
+  await expect(page.locator('.beach-tags')).toContainText('Confort partiel : ≤ 0/100 · 3/6 mesures');
+  await page.getByRole('link',{name:/Détails/}).first().click();
+  await expect(page.locator('.usage-scores button').first()).toContainText('Partiel · 3/6 mesures');
+  await expect(page.locator('.score-explanation')).toContainText('au plus 0/100');
+  await expect(page.locator('.score-explanation')).toContainText('Prévisions périmées, exclues du calcul : Vent, Indice UV');
+  await expect(page.locator('.score-explanation')).toContainText('Non renseigné : Rafales');
+  await expect(page.locator('.conditions-grid > div').filter({hasText:'Indice UV'})).toContainText('Prévision périmée');
+  await noOverflow(page);
+});
+
 test('SHOM : références du port distinctes des horaires et retrait à échéance', async ({page})=>{
   await page.clock.install({time:new Date('2026-11-18T22:59:45Z')});
   await page.route('**/api/score/beach/*', route=>route.fulfill({json:{...score,current:{...score.current,tides:{

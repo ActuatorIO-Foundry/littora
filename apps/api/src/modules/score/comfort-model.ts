@@ -1,6 +1,6 @@
 import { forecastUnits, normalizeMetric } from '../../shared/forecast-units';
 
-export const modelVersion = 'confort-2';
+export const modelVersion = 'confort-3';
 const metrics = {
   wind_speed_10m: 'Vent',
   wind_gusts_10m: 'Rafales',
@@ -12,15 +12,18 @@ const metrics = {
 type Metric = keyof typeof metrics;
 type Usage = 'bathing' | 'family' | 'paddle' | 'boat';
 type Factor = { label: string; points: number };
-type Inputs = Partial<Record<Metric, number | null>>;
+type Inputs = Partial<Record<Metric, number | 'stale' | 'invalid' | null>>;
 type Reports = Array<{ type: string; count: number; confidence: number }>;
 export type Explanation = {
   version: string;
-  status: 'calculated' | 'insufficient' | 'not-applicable' | 'closed';
+  status: 'calculated' | 'partial' | 'insufficient' | 'not-applicable' | 'closed';
   score: number | null;
+  partialScore: number | null;
   required: number;
   available: number;
   missing: string[];
+  stale: string[];
+  invalid: string[];
   factors: Factor[];
 };
 
@@ -71,9 +74,12 @@ export function explainUsage(
     version: modelVersion,
     status: 'not-applicable',
     score: null,
+    partialScore: null,
     required: 0,
     available: 0,
     missing: [],
+    stale: [],
+    invalid: [],
     factors: [],
   };
   const bathing = usage === 'bathing' || usage === 'family';
@@ -84,6 +90,10 @@ export function explainUsage(
     e.required++;
     if (value == null) {
       e.missing.push(metrics[key]);
+      continue;
+    }
+    if (value === 'stale' || value === 'invalid') {
+      e[value].push(metrics[key]);
       continue;
     }
     e.available++;
@@ -101,9 +111,11 @@ export function explainUsage(
     const loss = Math.round(weight * Math.min(1, support));
     if (loss) e.factors.push({ label, points: -loss });
   }
-  return e.missing.length
-    ? { ...e, status: 'insufficient' }
-    : { ...e, status: 'calculated', score: Math.max(0, 100 + e.factors.reduce((n, f) => n + f.points, 0)) };
+  if (!e.available) return { ...e, status: 'insufficient' };
+  const result = Math.max(0, 100 + e.factors.reduce((n, f) => n + f.points, 0));
+  // Every factor is a deduction. With incomplete inputs the result is an upper bound, not a rank.
+  return e.available === e.required ? { ...e, status: 'calculated', score: result }
+    : { ...e, status: 'partial', partialScore: result };
 }
 export function explainAll(
   waterType: string,

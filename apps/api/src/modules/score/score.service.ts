@@ -54,6 +54,7 @@ export class ScoreService {
         metric('weather','uv_index'), metric('weather','wind_speed_10m'), waterQuality.status, communityAlerts, flagConsensus),
       summary: Object.fromEntries(Object.entries(explanations).map(([usage,e])=>[usage,
         e.status === 'closed' ? 'Baignade interdite' : e.status === 'not-applicable' ? 'Modèle marin non applicable' :
+        e.status === 'partial' ? `Confort partiel : au plus ${e.partialScore}/100 (${e.available}/${e.required} mesures)` :
         e.score === null ? 'Données insuffisantes' : `Indice de confort : ${e.score}/100`])),
       forecast: {
         uv: this.series(weather.raw?.hourly, 'uv_index', now),

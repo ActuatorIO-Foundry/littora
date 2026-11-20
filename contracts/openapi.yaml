@@ -780,7 +780,7 @@ components:
           required: [level, source]
           properties:
             level: {type: string, enum: [favorable, caution, unfavorable, unknown]}
-            source: {type: string, enum: [littora-score-v1, confort-2]}
+            source: {type: string, enum: [littora-score-v1, confort-2, confort-3]}
         alerts: {type: array, items: {type: string}}
     MetricPoint:
       type: object
@@ -790,14 +790,17 @@ components:
         value: {type: number, nullable: true}
     ScoreExplanation:
       type: object
-      required: [version, status, score, required, available, missing, factors]
+      required: [version, status, score, partialScore, required, available, missing, stale, invalid, factors]
       properties:
         version: {type: string}
-        status: {type: string, enum: [calculated, insufficient, not-applicable, closed]}
+        status: {type: string, enum: [calculated, partial, insufficient, not-applicable, closed]}
         score: {type: integer, minimum: 0, maximum: 100, nullable: true}
+        partialScore: {type: integer, minimum: 0, maximum: 100, nullable: true, description: Upper bound from usable inputs only. Never used for safety estimates or recommendations.}
         required: {type: integer, minimum: 0}
         available: {type: integer, minimum: 0}
         missing: {type: array, items: {type: string}}
+        stale: {type: array, items: {type: string}}
+        invalid: {type: array, items: {type: string}}
         factors:
           type: array
           items:

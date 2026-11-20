@@ -7,9 +7,16 @@ export interface ScoreExplanation {
 'label': string;
 'points': number;
 }>;
+  invalid: Array<string>;
   missing: Array<string>;
+
+  /**
+   * Upper bound from usable inputs only. Never used for safety estimates or recommendations.
+   */
+  partialScore: number | null;
   required: number;
   score: number | null;
-  status: 'calculated' | 'insufficient' | 'not-applicable' | 'closed';
+  stale: Array<string>;
+  status: 'calculated' | 'partial' | 'insufficient' | 'not-applicable' | 'closed';
   version: string;
 }

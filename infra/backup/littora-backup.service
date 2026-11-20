@@ -1,0 +1,18 @@
+[Unit]
+Description=Encrypted Littora PostgreSQL backup
+After=docker.service
+Requires=docker.service
+RequiresMountsFor=/var/backups/littora/postgres
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/littora/backup.env
+Environment=BACKUP_DIR=/var/backups/littora/postgres
+ExecStart=/bin/bash /opt/littora/scripts/backup-postgres.sh
+UMask=0077
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/littora/postgres
+NoNewPrivileges=true
+TimeoutStartSec=2h

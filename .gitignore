@@ -5,6 +5,8 @@ npm/
 *.log.*
 logs/
 *.dump
+*.age
+*.agekey
 .DS_Store
 
 # Local configuration and generated files

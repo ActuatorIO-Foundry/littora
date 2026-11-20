@@ -1,11 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import type { ScoreExplanation } from '@littora/api-client/models';
 
 @Component({
   selector: 'app-comfort-explanation',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink],
   template: `<ng-container *ngIf="value as e" [ngSwitch]="e.status">
     <p *ngSwitchCase="'closed'">
       Baignade interdite par décision officielle. Note : 0/100, indépendamment des prévisions.
@@ -29,7 +30,8 @@ import type { ScoreExplanation } from '@littora/api-client/models';
     <p class="caption" *ngIf="e.stale?.length">Prévisions périmées, exclues du calcul : {{ e.stale.join(', ') }}.</p>
     <p class="caption" *ngIf="e.invalid?.length">Valeur, unité ou datation non exploitable : {{ e.invalid.join(', ') }}.</p>
     <p class="caption" *ngIf="e.missing.length">Non renseigné : {{ e.missing.join(', ') }}.</p>
-  </ng-container>`,
+  </ng-container>
+  <a class="caption" routerLink="/bareme">Comprendre le barème</a>`,
 })
 export class ComfortExplanationComponent {
   @Input() value?: ScoreExplanation;

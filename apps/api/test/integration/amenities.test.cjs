@@ -6,7 +6,8 @@ const {Pool}=require('pg');
 const {migrate}=require('../../scripts/database.cjs');
 const {AmenitiesService}=require('../../dist/modules/beaches/amenities.service');
 const {BeachesService}=require('../../dist/modules/beaches/beaches.service');
-const {coverage,importCity}=require('../../scripts/amenities.cjs');
+const {coverage,importCity,importRegion}=require('../../scripts/amenities.cjs');
+const {Readable}=require('node:stream');
 
 test('amenities: persistence, radius, same-name parking, freshness and catalogue consistency',async t=>{
   const url=new URL(process.env.TEST_DATABASE_URL);assert.equal(url.pathname,'/littora_ci_test');
@@ -64,4 +65,18 @@ test('amenities: persistence, radius, same-name parking, freshness and catalogue
   assert.equal((await coverage(pool)).unknown,1);
   await assert.rejects(service.persist(beach,[],'https://overpass-api.de/api/interpreter'),/position changed/);
   assert.equal((await pool.query('select count(*)::int n from beaches')).rows[0].n,1);
+  await pool.query('update beaches set lat=43 where id=$1',[beach.id]);
+  const region={...doc,site:{...beach,completeWindow:true},source:'https://download.geofabrik.de/europe/france/bretagne/bretagne-latest.osm.pbf',
+    asOf:new Date().toISOString()};
+  const run=(record,apply=true)=>importRegion(pool,Readable.from([JSON.stringify(record)+'\n']),apply);
+  await pool.query("update beach_amenity_collections set fetched_at=now()-interval '3 days'");
+  assert.equal((await run(region,false)).updated,0);
+  assert.equal((await run({...region,site:{...region.site,completeWindow:false},elements:[]})).updated,0);
+  assert.equal((await run(region)).updated,1);
+  assert.equal((await run(region)).preserved,1);
+  assert.equal((await service.read(beach.id)).provider,'openstreetmap-extract');
+  await assert.rejects(run({...region,site:{...region.site,lat:43.001}}),/moved/);
+  await pool.query("update beach_amenity_collections set fetched_at=now()-interval '3 days'");
+  assert.equal((await run({...region,elements:[]})).updated,1);
+  assert.equal((await coverage(pool)).empty,1);
 });

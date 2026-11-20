@@ -2,7 +2,8 @@ import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PG } from '../../database/database.module';
 import { AmenityPoint, failureReason, fetchAmenities } from './amenities';
 
-const isExtract = (url?: string) => !!url?.startsWith('https://download.openstreetmap.fr/extracts/');
+const isExtract = (url?: string) => !!url && (url.startsWith('https://download.openstreetmap.fr/extracts/') ||
+  url.startsWith('https://download.geofabrik.de/europe/france/'));
 const freshnessMs = (url?: string) => (isExtract(url) ? 48 : 6) * 3600_000;
 
 @Injectable()

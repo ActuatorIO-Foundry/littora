@@ -19,6 +19,11 @@ const routes: Routes = [
       ),
   },
   {
+    path: "bareme",
+    title: "Le barème des indices · Littora",
+    loadComponent: () => import("./app/pages/bareme/bareme.component").then(m => m.BaremeComponent),
+  },
+  {
     path: "contact",
     title: "Contact · Littora",
     loadComponent: () =>

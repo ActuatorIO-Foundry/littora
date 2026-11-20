@@ -83,6 +83,47 @@ Ce n'est pas une tache nationale automatique. `coverage` lit uniquement le
 catalogue public : releves exploitables avec points, vides valides et inconnus.
 Les associations comptent un point pour chaque plage voisine, pas des lieux uniques.
 
+## Renouvellement territorial (#73)
+
+Le service optionnel `inventories` part de **tous les sites publics existants**,
+sans condition de commune, de milieu ou de consultation. Il ne cree aucune
+plage. Il associe les coordonnees aux polygones de decoupe des
+[extraits regionaux Geofabrik](https://download.geofabrik.de/europe/france.html)
+(donnees © contributeurs OpenStreetMap, ODbL). Chaque region utile est lue une
+seule fois par version, sans appel bulk a Overpass. Les centres OSM eligibles
+sont ensuite verifies par PostGIS a 2 500 m du site. Les identifiants OSM,
+la date de replication et la source sont conserves.
+
+En bordure de territoire, l'extrait qui couvre le mieux le voisinage du site
+est retenu. Ses points sont des observations positives ; un resultat vide
+n'ecrase jamais un releve si la fenetre n'est pas entierement couverte.
+Meme avec un extrait complet, zero point signifie « aucun point cartographie
+dans ces categories », pas « aucun equipement sur le terrain ».
+
+```sh
+docker compose -f docker-compose.local.yml -f docker-compose.inventories.yml up -d --build inventories
+docker compose -f docker-compose.local.yml exec -T api node scripts/amenities.cjs coverage
+docker compose -f docker-compose.local.yml -f docker-compose.inventories.yml ps inventories
+```
+
+Le cache persiste dans un volume (ou `INVENTORY_CACHE`, repertoire dedie).
+Les coordonnees, fichiers et compteurs de recette ne vont pas dans Git.
+Par defaut : toutes les regions utiles, un seul telechargement a la fois,
+8 Mio/s, 650 Mio par fichier, 4 Gio par cycle. Configurer
+`INVENTORY_REGIONS=bretagne,pays-de-la-loire`, `INVENTORY_RATE` et
+`INVENTORY_MAX_MIB` selon la capacite. Ne pas lancer deux instances sur le
+meme cache. Le service compare les dates de fichier (HTTP 304) et conserve
+la derniere preparation par region. Une relecture de la meme edition est
+idempotente et ne rafraichit pas artificiellement son age.
+
+Une verification horaire lance le premier cycle du jour UTC, y compris apres
+un redemarrage. Une erreur ou une replication de plus de 48 h signale un cycle
+degrade, avec nouvelle tentative apres temporisation ; un extrait de 7 jours
+ou plus est refuse. Les autres regions peuvent progresser. L'etat de sante
+Docker devient negatif en cas d'echec ou en l'absence de succes depuis 27 h.
+Suivre `coverage` apres chaque cycle : avec points / vides valides / inconnus.
+Le service optionnel ne change pas les conditions de deploiement en production.
+
 ## Exploitation
 
 Avant la migration : sauvegarde et restauration isolee. Le remplacement d'une

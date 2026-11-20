@@ -235,8 +235,8 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
   }
   loadScore(id: string, background = false): void {
     clearTimeout(this.scoreTimer);
-    if (!background) { this.score = null; this.loadingScore = true; }
-    this.scoreError = "";
+    if (!background) this.loadingScore = !this.score;
+    if (!this.score) this.scoreError = "";
     this.cdr.markForCheck();
     this.scoreRequest?.unsubscribe();
     this.scoreRequest = this.api
@@ -245,6 +245,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (r) => {
           this.score = r;
+          this.scoreError = "";
           this.updateShomExpiry();
           const now = Date.now();
           const times = Object.values(r.dataStatus ?? {}).flatMap(s => [
@@ -260,11 +261,26 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
           this.cdr.markForCheck();
         },
         error: () => {
-          this.score = null;
+          const previous = this.score;
+          if (previous) {
+            // Only dated forecasts survive a failed refresh, never a safety decision or index.
+            const dataStatus = Object.fromEntries(Object.entries(previous.dataStatus ?? {})
+              .filter(([key, status]) => ['weather','marine'].includes(key) &&
+                status.kind === 'forecast' && status.fetchedAt && status.validAt && status.status !== 'unknown')
+              .map(([key, status]) => [key, {...status,status:'stale' as const}]));
+            this.score = {
+              beach: previous.beach, scores: {bathing:null, family:null, paddle:null, boat:null},
+              current: {weather: dataStatus['weather'] ? previous.current?.weather : undefined,
+                marine: dataStatus['marine'] ? previous.current?.marine : undefined},
+              dataStatus, providers:previous.providers, measurements:previous.measurements,
+            };
+            this.updateShomExpiry();
+          }
           this.scoreTimer = setTimeout(() => this.loadScore(id, true), 300000);
           this.loadingScore = false;
-          this.scoreError =
-            "Conditions indisponibles. Les informations de la plage restent consultables.";
+          this.scoreError = Object.keys(this.score?.dataStatus ?? {}).length
+            ? "Actualisation indisponible. Dernières prévisions connues ; indices et conditions actuelles non confirmés."
+            : "Conditions indisponibles. Les informations de la plage restent consultables.";
           this.cdr.markForCheck();
         },
       });

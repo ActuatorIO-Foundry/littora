@@ -59,6 +59,7 @@ export class SearchComponent implements OnInit, OnDestroy {
   sort = "name";
   resultLimit = 20;
   loading = true;
+  initialLoad = true;
   loadingScore = false;
   locating = false;
   error = "";
@@ -112,7 +113,6 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.communeSuggestions = [];
     this.activeSuggestion = -1;
     this.message = "";
-    this.resultLimit = 20;
     this.query = p.get("q") ?? "";
     this.sort = ["name", "score", "distance"].includes(p.get("sort") ?? "") ? p.get("sort")! : "name";
     this.selectedUsage = this.usages.some((u) => u.id === p.get("usage"))
@@ -167,7 +167,6 @@ export class SearchComponent implements OnInit, OnDestroy {
       this.selectedBeach = null;
       this.score = null;
     }
-    this.resultLimit = 20;
     this.syncFilters();
     if (this.query.trim().length >= 2)
       this.placeTimer = setTimeout(() => this.findCommunes(), 350);
@@ -236,11 +235,9 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.selectedCommune = null;
     this.clearPreview();
     this.communePending = true;
-    this.beaches = [];
     this.loading = true;
     this.error = "";
     this.message = "";
-    this.resultLimit = 20;
     this.syncFilters(false);
     this.runSearch();
   }
@@ -258,14 +255,14 @@ export class SearchComponent implements OnInit, OnDestroy {
   private runSearch(): void {
     this.listRequest?.unsubscribe();
     this.clearPreview();
-    this.beaches = [];
-    this.resultLimit = 20;
     this.loading = true;
     this.error = "";
     if ((this.minWaterTemp !== null && (this.minWaterTemp < 0 || this.minWaterTemp > 45)) ||
       (this.maxWaterTemp !== null && (this.maxWaterTemp < 0 || this.maxWaterTemp > 45)) ||
       (this.minWaterTemp !== null && this.maxWaterTemp !== null && this.minWaterTemp > this.maxWaterTemp)) {
       this.loading = false;
+      this.initialLoad = false;
+      this.beaches = [];
       this.error = "La température minimale doit être inférieure ou égale au maximum, entre 0 et 45 °C.";
       return;
     }
@@ -290,6 +287,7 @@ export class SearchComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (r) => {
           this.beaches = r.items;
+          this.resultLimit = 20;
           this.communePending = false;
           if (r.commune) {
             this.selectedCommune = r.commune;
@@ -303,11 +301,14 @@ export class SearchComponent implements OnInit, OnDestroy {
           if (this.requiredFlag !== 'all') notes.push("Drapeaux issus d'un consensus communautaire, non officiels.");
           if (notes.length) this.message = notes.join(' ');
           this.loading = false;
+          this.initialLoad = false;
           this.cdr.markForCheck();
         },
         error: (error) => {
           this.communePending = false;
           this.loading = false;
+          this.initialLoad = false;
+          this.beaches = [];
           this.error = error.status === 409 ? "La recherche a expiré. Relancez-la pour actualiser les résultats."
             : "Les plages ne sont pas disponibles pour le moment.";
           this.cdr.markForCheck();
@@ -330,7 +331,6 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.message = "";
     this.selectedBeach = null;
     this.score = null;
-    this.beaches = [];
     this.listRequest?.unsubscribe();
     this.scoreRequest?.unsubscribe();
     this.syncFilters(false);
@@ -400,7 +400,6 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.communePending = false;
     this.communeSuggestions = [];
     this.activeSuggestion = -1;
-    this.beaches = [];
     this.clearPreview();
     this.query = "";
     this.placeRequest?.unsubscribe();
@@ -412,8 +411,8 @@ export class SearchComponent implements OnInit, OnDestroy {
   loadScore(beach: Beach): void {
     this.cancelLocation();
     this.scoreRequest?.unsubscribe();
+    if (this.selectedBeach?.id !== beach.id) this.score = null;
     this.selectedBeach = beach;
-    this.score = null;
     this.loadingScore = true;
     this.scoreError = "";
     this.scoreRequest = this.api
@@ -426,6 +425,7 @@ export class SearchComponent implements OnInit, OnDestroy {
           this.cdr.markForCheck();
         },
         error: () => {
+          this.score = null;
           this.loadingScore = false;
           this.scoreError = "Conditions indisponibles pour cette plage.";
           this.cdr.markForCheck();
@@ -523,6 +523,7 @@ export class SearchComponent implements OnInit, OnDestroy {
       relativeTo: this.route,
       queryParams,
       state: this.navigationState,
+      scroll: 'manual',
       replaceUrl: true,
     });
     if (reload) {

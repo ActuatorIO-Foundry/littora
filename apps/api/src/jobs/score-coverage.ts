@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type Redis from 'ioredis';
 import type { Pool } from 'pg';
+import { readDispatch } from './forecast-dispatch';
 import { conditionKey, searchConditions } from '../modules/search/search-conditions';
 
 export const intervalMs = 15 * 60_000;
@@ -63,15 +64,7 @@ export async function measure(db:Pool, redis:Redis) {
       and (a.y,a.x)=(floor(b.lat*100+.5)::int,floor(b.lon*100+.5)::int)
       left join forecast_zones m on b.water_type='sea' and m.source='open-meteo-marine'
       and (m.y,m.x)=(floor(b.lat*100+.5)::int,floor(b.lon*100+.5)::int) order by b.id`)).rows;
-    sources=(await client.query(`select t.source,count(*)::int as zones,
-      count(*) filter(where z.last_success_at is null)::int as "neverCollected",
-      count(*) filter(where z.last_success_at<=now()-interval '6 hours')::int as stale,
-      count(*) filter(where z.error_code is not null)::int as errors,
-      count(*) filter(where z.next_check_at is null or z.next_check_at<=now())::int as due,
-      count(*) filter(where z.next_check_at<now()-interval '5 minutes')::int as overdue,
-      max(z.last_attempt_at) as "lastAttemptAt",max(z.last_success_at) as "lastSuccessAt",
-      (select next_request_at>now() + interval '15 seconds' from forecast_dispatch where singleton) as "dispatchDelayed"
-      from forecast_targets t left join forecast_zones z using(source,y,x) group by t.source order by t.source`)).rows;
+    sources=await readDispatch(client);
     await client.query('commit');
   } catch(e) {await client.query('rollback');throw e;} finally {client.release();}
   const snapshots=[];

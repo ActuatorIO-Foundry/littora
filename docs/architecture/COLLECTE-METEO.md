@@ -141,3 +141,49 @@ désactivée par défaut ; l'énumération de POI avec Nominatim exige une insta
 dédiée. En cas d'indisponibilité, le catalogue local reste consultable.
 [Politique Nominatim](https://operations.osmfoundation.org/policies/nominatim/)
 et [limites Overpass](https://dev.overpass-api.de/overpass-doc/en/preface/commons.html).
+## Alertes de collecte (#30)
+
+Sur une version du worker incluant la sonde, un outil de supervision peut
+exécuter cette commande chaque minute. Elle lit les états internes, sans
+déclencher de requête fournisseur, de tâche ou de modification du catalogue :
+
+```sh
+docker compose -f docker-compose.local.yml exec -T worker node scripts/forecast-check.cjs
+```
+
+| Sortie | Interprétation et action |
+|---|---|
+| `0 / ok` | Aucun des seuils ci-dessous n’est atteint. Ce n’est pas une garantie de couverture pour chaque plage. |
+| `2 / alert` | Examiner les codes et la source ou la file concernée. Répéter le contrôle après intervention. |
+| `1 / unknown` | Le contrôle est incomplet (configuration, cache, base, file ou délai de 12 s). Vérifier ces services ; ne pas conclure à une reprise. |
+
+- **Prévisions air et mer :** `provider_error` compte les zones cibles dont
+  le dernier essai reste en erreur. Une seule zone ne suffit pas à conclure à
+  une panne nationale. `no_recent_forecast` signifie qu’aucune zone cible de
+  cette source n’a de collecte réussie de moins de six heures ; un catalogue
+  sans cible donne `no_forecast_targets`.
+- **Produits officiels :** la vigilance non configurée est ignorée. Si activée,
+  un refus, un quota ou une indisponibilité est signalé, ainsi qu’un bulletin
+  absent ou lu il y a dix minutes ou plus. Pour le SHOM, la sonde distingue
+  temporisation, nombre de stations en échec et absence de toute vérification
+  réussie depuis sept jours. Elle ne transforme pas une référence manquante
+  en mesure marine ni un bulletin indisponible en alerte de baignade.
+- **Traitement :** `worker_silent` correspond à un battement absent ou vieux
+  d’au moins 120 s. `recent_job_failure` signale un échec conservé dans les
+  quinze dernières minutes, même après un nouvel essai réussi. Une file en
+  pause ou au moins 30 tâches en attente est aussi signalée. La file ARS n’est
+  lue que si l’import est activé.
+
+Le worker émet immédiatement sur sa sortie d’erreur des événements JSON
+`provider_failure`, `job_failure` et `worker_failure`, avec date, composant
+et motif bornés. Les répétitions identiques sont limitées à une par cinq
+minutes et par processus. Une tâche officielle peut se terminer correctement
+tout en enregistrant un échec fournisseur. Les nouveaux événements et motifs
+d’échec ne contiennent ni coordonnées, ni identifiant de tâche, ni texte
+d’exception d’origine. Les anciens enregistrements ne sont pas réécrits.
+
+En cas de quota, respecter la prochaine échéance et le délai du fournisseur ;
+ne pas purger la file ni forcer des collectes. En cas de silence, vérifier le
+worker, puis PostgreSQL et le Redis des jobs. La sonde est privée : ne pas
+l’exposer par HTTP. Le canal de notification, son test de livraison et le
+responsable d’astreinte restent à configurer sur l’hébergement cible (#30).

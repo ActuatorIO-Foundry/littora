@@ -2,7 +2,8 @@ require('reflect-metadata');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { randomUUID } = require('node:crypto');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
+const { createInterface } = require('node:readline');
 const { once } = require('node:events');
 const { resolve } = require('node:path');
 const { setTimeout: sleep } = require('node:timers/promises');
@@ -48,9 +49,19 @@ test('weather worker: shared collection, search projection, restart, durable coo
   assert.equal((await pool.query('select * from forecast_targets')).rowCount,1,'Shared air zone, no marine collection on unclassified sites');
   const catalogue=async()=>(await pool.query('select to_jsonb(b) item from beaches b order by id')).rows;
   const before=await catalogue();
-  const start=()=>{
+  const events=[];
+  const start=(quota=false)=>{
     worker=spawn(process.execPath,['--require',resolve(__dirname,'../fixtures/worker-provider.cjs'),resolve(__dirname,'../../dist/worker.js')],
-      { env:{...process.env,METEOFRANCE_API_KEY:'',DATABASE_URL:url.href,REDIS_URL:redisUrl,JOBS_REDIS_URL:redisUrl},stdio:'ignore' });
+      { env:{...process.env,METEOFRANCE_API_KEY:'',TEST_FORECAST_QUOTA:quota?'1':'0',DATABASE_URL:url.href,REDIS_URL:redisUrl,JOBS_REDIS_URL:redisUrl},
+        stdio:['ignore','ignore','pipe'] });
+    createInterface({input:worker.stderr}).on('line',line=>{ if(line.startsWith('{')) events.push(JSON.parse(line)); });
+  };
+  const check=(extra={})=>{
+    const result=spawnSync(process.execPath,[resolve(__dirname,'../../scripts/forecast-check.cjs')],{
+      env:{...process.env,DATABASE_URL:url.href,REDIS_URL:redisUrl,JOBS_REDIS_URL:redisUrl,METEOFRANCE_API_KEY:'',ARS_IMPORT_ENABLED:'false',...extra},
+      encoding:'utf8',timeout:16000});
+    assert.equal(result.stderr,'');
+    return {code:result.status,body:JSON.parse(result.stdout)};
   };
   start();
   await until(async()=>(await pool.query('select 1 from forecast_zones where last_success_at is not null')).rowCount===1);
@@ -64,6 +75,7 @@ test('weather worker: shared collection, search projection, restart, durable coo
   assert.ok((await redis.mget(...ports.map(shomKey))).some(v=>v && JSON.parse(v).height?.high===7.9));
   await queue.add('project',{}); // Exercise the real processor without waiting for its minute tick.
   await until(async()=>(await redis.mget(...ids.map(conditionKey))).every(v=>v && JSON.parse(v).weather.temperature_2m===17));
+  assert.deepEqual(check(),{code:0,body:{status:'ok',alerts:[]}});
   await stop();
   const store=new ForecastStore(pool);
   const first=await store.get('open-meteo',43,6);
@@ -82,5 +94,29 @@ test('weather worker: shared collection, search projection, restart, durable coo
   assert.equal(stale.status,'stale');assert.equal(stale.fetchedAt,first.fetchedAt);
   assert.ok(Date.parse(stale.nextCheckAt)>Date.now()+890000);
   assert.deepEqual(await collectOne(pool,request),{collected:0});
+  await pool.query('update forecast_zones set next_check_at=now(); update forecast_dispatch set next_request_at=now()');
+  start(true);
+  await queue.add('collect',{});
+  await until(async()=>events.some(e=>e.event==='provider_failure' && e.component==='open-meteo' && e.reason==='rate_limited'));
+  await until(async()=>events.some(e=>e.event==='job_failure' && e.component==='collect'));
+  const failedJob=await queue.add('private-fixture-name',{});
+  await until(async()=>await failedJob.getState()==='failed');
+  await until(async()=>events.some(e=>e.event==='job_failure' && e.component==='unknown'));
+  assert.equal((await queue.getJob(failedJob.id)).failedReason,'Collection job failed');
+  const active=check();
+  assert.equal(active.code,2);
+  assert.ok(active.body.alerts.some(a=>a.code==='provider_error' && a.zones===1));
+  assert.ok(active.body.alerts.some(a=>a.code==='recent_job_failure'));
+  assert.ok(!JSON.stringify([...events,active.body]).includes('private-fixture-name'));
+  const unknown=check({DATABASE_URL:'postgresql://127.0.0.1:1/absent'});
+  assert.deepEqual(unknown,{code:1,body:{status:'unknown',alerts:[{code:'check_unavailable'}]}});
+  assert.deepEqual(check({REDIS_URL:'redis://127.0.0.1:1/15'}),unknown);
+  await stop();
+  await pool.query('update forecast_zones set next_check_at=now(); update forecast_dispatch set next_request_at=now()');
+  start();await queue.add('collect',{});
+  await until(async()=>(await pool.query('select 1 from forecast_zones where error_code is null')).rowCount===1);
+  const recovered=check();
+  assert.ok(!recovered.body.alerts.some(a=>a.code==='provider_error'));
+  assert.ok(recovered.body.alerts.some(a=>a.code==='recent_job_failure'));
   assert.deepEqual(await catalogue(),before);
 });

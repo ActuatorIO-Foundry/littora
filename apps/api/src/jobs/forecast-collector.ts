@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import { normalizeForecast, readForecast, refreshSeconds, Source, sources } from '../shared/forecast-data';
 import { ScoreService } from '../modules/score/score.service';
+import { ForecastCollectionFailure } from './collection-signals';
 
 type Target = { source: Source; x: number; y: number; failures: number };
 export class ProviderFailure extends Error {
@@ -76,7 +77,7 @@ export async function collectOne(db: Pool, request = fetch) {
       now()+make_interval(secs=>$6::double precision)) where singleton and $6::double precision>0)
       update forecast_zones set failures=least(failures+1,3), error_code=$4,
       next_check_at=now()+make_interval(secs=>$5) where source=$1 and y=$2 and x=$3`, [...args,e.code,delay,pause]);
-    throw new Error(`${t.source} ${t.y}/${t.x}: ${e.code}`);
+    throw new ForecastCollectionFailure(t.source, e.code);
   }
   await db.query(`update forecast_zones set payload=$4,last_success_at=now(),error_code=null,failures=0,
     next_check_at=now()+make_interval(secs=>$5) where source=$1 and y=$2 and x=$3`, [...args,payload,refreshSeconds]);

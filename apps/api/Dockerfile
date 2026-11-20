@@ -26,6 +26,7 @@ COPY apps/api/scripts/classify-water.cjs ./apps/api/scripts/classify-water.cjs
 COPY apps/api/scripts/ars.cjs ./apps/api/scripts/ars.cjs
 COPY apps/api/scripts/amenities.cjs ./apps/api/scripts/amenities.cjs
 COPY apps/api/scripts/score-coverage.cjs ./apps/api/scripts/score-coverage.cjs
+COPY apps/api/scripts/forecast-check.cjs ./apps/api/scripts/forecast-check.cjs
 COPY apps/api/scripts/catalogue-zone*.cjs ./apps/api/scripts/
 COPY apps/api/migrations ./apps/api/migrations
 COPY apps/api/seeds ./apps/api/seeds

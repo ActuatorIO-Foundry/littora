@@ -11,6 +11,7 @@ global.fetch = async input => {
     return Response.json(ram);
   }
   if (url.hostname !== 'api.open-meteo.com') throw Error('unexpected provider');
+  if (process.env.TEST_FORECAST_QUOTA === '1') return new Response(null, {status:429,headers:{'retry-after':'900'}});
   return Response.json({ hourly_units: { temperature_2m: '°C' }, hourly: {
     time: [Math.floor(Date.now()/1000)], temperature_2m: [17] } });
 };

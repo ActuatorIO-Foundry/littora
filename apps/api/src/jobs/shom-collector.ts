@@ -3,7 +3,7 @@ import { boundedJson } from '../shared/bounded-json';
 import { ports } from '../modules/tides/shom-ports';
 import { PortCache, Product, productUrl, readHeight, readCurrent, refresh, shomKey, ttl } from '../modules/tides/shom-reference';
 
-const cooldown='shom:wfs:pause:v1';
+export const cooldown='shom:wfs:pause:v1';
 
 export async function collectShom(cache:Pick<CacheService,'getJson'|'setJson'>,request=fetch,now=Date.now()) {
   const port=ports[Math.floor(now/60000)%ports.length], key=shomKey(port);

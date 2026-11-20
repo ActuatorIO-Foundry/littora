@@ -47,9 +47,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           package-manager-cache: false
-      - name: Validate reverse proxy routing
-        run: node scripts/test-caddy.mjs
-      - name: Validate API migrations and startup on isolated storage
+      - name: Validate migrations, API startup and HTTPS through the real frontend and API
         run: node scripts/test-api-migrations.mjs
       - name: Install verified scanner
         run: |

@@ -64,9 +64,9 @@ corrections proxy/HTTPS (#29) et les images d'infrastructure (#33) restent
 bloquantes. Une CI verte des images applicatives ne valide pas toute la stack.
 
 ```bash
-cp .env.example .env.prod
-# Renseigner DOMAIN, JWT_SECRET et les clés API disponibles.
-npm run docker:prod
+test -f .env.prod || (umask 077 && cp .env.prod.example .env.prod)
+# Renseigner le domaine DNS et un secret PostgreSQL aléatoire (openssl rand -hex 32).
+npm run docker:prod -- --check
 ```
 
 Le lanceur reste bloque tant que l'exception de securite #33 existe. Ne pas
@@ -74,7 +74,9 @@ contourner ce controle par un `compose up` direct. La preparation explicite
 du schema avec le service `migrate` reste obligatoire avant toute future mise
 en service ; ce lot ne valide pas le deploiement de production (#29).
 
-Le reverse proxy Caddy expose le front et route `/api/*` vers NestJS.
+La vérification ci-dessus ne démarre aucun service. Seul Caddy publie les ports
+80/443. Le domaine public reste à valider après levée des blocages ; les tests
+HTTPS utilisent un certificat de recette, pas un certificat public.
 
 ## Ce que l'on peut consulter
 - Catalogue PostGIS et recherche par commune, zone et critères. La liste est partielle ; un équipement inconnu ne signifie pas absent.

@@ -18,7 +18,7 @@ export function amenityCategory(tags: Record<string, string>): AmenityCategory |
   if (['restaurant','cafe','ice_cream','fast_food'].includes(tags.amenity) || tags.shop === 'ice_cream') return 'food';
   return null;
 }
-export function parseAmenities(raw: any, beach: {lat: number; lon: number}): AmenityPoint[] {
+export function parseAmenities(raw: any, beach: {lat: number; lon: number}, candidateRadiusKm = 2.5): AmenityPoint[] {
   if (!Array.isArray(raw?.elements) || raw.remark || raw.elements.length > 5000) throw new Error('invalid-response');
   const unique = new Map<string, AmenityPoint>();
   for (const element of raw.elements) {
@@ -27,7 +27,7 @@ export function parseAmenities(raw: any, beach: {lat: number; lon: number}): Ame
     if (!category || !['node','way','relation'].includes(element.type) || !Number.isSafeInteger(element.id) || element.id<=0 ||
         !Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat)>90 || Math.abs(lon)>180) continue;
     const distanceKm=haversineKm(beach.lat,beach.lon,lat,lon);
-    if (distanceKm>2.5) continue;
+    if (distanceKm>candidateRadiusKm) continue;
     const id=`${element.type}/${element.id}`;
     unique.set(id,{id,name:String(element.tags.name || labels[category]).slice(0,300),category,lat,lon,
       distanceKm,source:'openstreetmap',verification:'listed',

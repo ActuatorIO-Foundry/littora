@@ -41,7 +41,14 @@ async function importCity(db, city, doc, apply) {
   const report={ sites:rows.length, edge:0, withoutPoints:0, withPoints:0, associations:0, updated:0, preserved:0, asOf:doc.asOf };
   for (const site of rows) {
     if (!covers(doc.bounds,site)) {report.edge++;continue;}
-    const points=parseAmenities(doc,site);
+    // Leave a small margin for the spherical approximation; use the same ellipsoid as the public map.
+    const candidates=parseAmenities(doc,site,2.52);
+    const matches=candidates.length ? (await db.query(`select i::int from
+      unnest($1::float8[], $2::float8[]) with ordinality as a(lat,lon,i)
+      where ST_DWithin(ST_SetSRID(ST_MakePoint(lon,lat),4326)::geography,
+        ST_SetSRID(ST_MakePoint($3,$4),4326)::geography,2500) order by i`,
+      [candidates.map(p=>p.lat),candidates.map(p=>p.lon),site.lon,site.lat])).rows : [];
+    const points=matches.map(({i})=>candidates[i-1]);
     if (!points.length) {report.withoutPoints++;continue;} // A partial offline extract cannot prove an empty inventory.
     report.withPoints++;report.associations+=points.length;
     if(apply) {

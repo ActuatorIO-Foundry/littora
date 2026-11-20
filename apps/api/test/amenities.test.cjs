@@ -81,7 +81,8 @@ test('amenities: offline preview rejects stale, malformed or out-of-scope data w
     {elements:[...doc.elements,...doc.elements]},{elements:[{...doc.elements[0],lat:45}]}])
     assert.throws(()=>validate({...doc,...invalid}));
   assert.ok(covers(doc.bounds,position));assert.equal(covers(doc.bounds,{lat:43.099,lon:6}),false);
-  const db={query:async(sql)=>{assert.match(sql,/^select id,lat,lon from beach_catalogue/);
+  const db={query:async(sql)=>{if(sql.startsWith('select i::int')){assert.match(sql,/ST_DWithin/);return {rows:[{i:1}]};}
+    assert.match(sql,/^select id,lat,lon from beach_catalogue/);
     return {rows:[{id:'a',...position},{id:'b',lat:43.099,lon:6},{id:'c',lat:43.06,lon:6}]};}};
   const report=await importCity(db,'Commune',doc,false);
   assert.deepEqual(report,{sites:3,edge:1,withoutPoints:1,withPoints:1,associations:1,updated:0,preserved:0,asOf});

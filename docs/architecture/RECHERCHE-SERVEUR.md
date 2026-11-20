@@ -82,3 +82,21 @@ beaucoup plus volumineux, l'ingestion persistante et les couches paginees de #24
 devront permettre de pousser ces jointures et le classement dans PostgreSQL.
 L'ancien endpoint `/recommendations` reste deprecie pour compatibilite ; la page
 recherche ne l'appelle plus. Aucune capacite de production complete n'est annoncee.
+## Recette de latence (#81)
+
+Depuis la racine : `node scripts/check-search-latency.mjs http://127.0.0.1:4200`.
+Le contrôle suit les pages de 200 résultats comme le site, alterne la zone témoin
+de Bandol (rectangle, pas la commune) et la France entière, et mesure 40 parcours
+par zone après échauffement. Il distingue première page, lecture d'un curseur
+et temps total. L'empreinte porte sur les lieux, leur ordre, leur milieu, leurs
+équipements et leur distance, pas sur les prévisions qui évoluent. Il s'agit
+d'une mesure locale séquentielle, pas d'un test de capacité publique.
+
+La migration `0010_search_amenity_presence.sql` conserve la vue commune au
+catalogue et à la recherche. Un index par plage et catégorie permet d'arrêter
+la recherche au premier équipement dans le rayon de 2,5 km. La supervision
+effective reste inconnue ; une collecte absente, déplacée ou expirée ne vaut
+pas une présence. Aucun nouvel équipement, cache de sécurité ou fournisseur.
+Pour une installation existante, suivre la [procédure de sauvegarde et de
+restauration](MIGRATIONS.md) avant migration ; redémarrer avec les images
+qui contiennent le manifeste 0010.

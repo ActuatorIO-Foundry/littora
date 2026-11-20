@@ -1,6 +1,7 @@
 @import "@fontsource-variable/plus-jakarta-sans";
 @import "@fontsource-variable/dm-sans";
 @import "leaflet/dist/leaflet.css";
+@import "leaflet.markercluster/dist/MarkerCluster.css";
 
 :root {
   --ink: #163b40;
@@ -524,4 +525,28 @@ input[type="checkbox"] {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+.map-point,
+.map-point-cluster {
+  display: grid;
+  place-items: center;
+}
+.map-point::after {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border: 2px solid white;
+  border-radius: 50%;
+  background: #007e88;
+  box-shadow: 0 0 0 1px #17444850;
+}
+.map-point.poi::after { background: #98620a; }
+.map-point.active::after { width: 16px; height: 16px; background: #d94d3b; }
+.map-point-cluster {
+  border: 2px solid white;
+  border-radius: 50%;
+  background: #145c61;
+  color: white;
+  font: 700 13px/1 sans-serif;
+  box-shadow: 0 0 0 1px #17444850;
 }

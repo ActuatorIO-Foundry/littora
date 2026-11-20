@@ -16,6 +16,7 @@ import { IconComponent } from "../../shared/icon.component";
 import { ComfortExplanationComponent } from '../../shared/comfort-explanation.component';
 import { LoadingComponent } from "../../shared/loading.component";
 import { CoastMapComponent } from "../../shared/coast-map.component";
+import { amenityGroups, listedAmenities } from "../../shared/map-points";
 import {
   metricValue,
   metricClass,
@@ -109,17 +110,10 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     { key: "wave", group: "marine", label: "Vagues", unit: "m", icon: "waves" },
     { key: "current", group: "marine", label: "Courant", unit: "m/s", icon: "water" },
   ];
-  readonly groups: Array<{
-    category: BeachAmenity["category"];
-    name: string;
-    icon: string;
-  }> = [
-    { category: "parking", name: "Stationnement", icon: "parking" },
-    { category: "toilets", name: "Toilettes", icon: "toilets" },
-    { category: "rescue", name: "Poste de secours", icon: "rescue" },
-    { category: "rental", name: "Locations nautiques", icon: "boat" },
-    { category: "food", name: "Restauration", icon: "compass" },
-  ];
+  realAmenities: BeachAmenity[] = [];
+  get groups() {
+    return amenityGroups.filter(g => g.category !== 'other' || this.realAmenities.some(p => p.category === 'other'));
+  }
   private readonly subscriptions = new Subscription();
   private beachRequests = new Subscription();
   private scoreRequest?: Subscription;
@@ -167,6 +161,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     this.beach = null;
     this.score = null;
     this.amenities = null;
+    this.realAmenities = [];
     this.reports = [];
     this.loading = true;
     this.loadingScore = true;
@@ -209,6 +204,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
         .subscribe({
           next: (r) => {
             this.amenities = r;
+            this.realAmenities = listedAmenities(r.amenities);
             this.amenitiesUnavailable = r.status === 'unknown';
             this.loadingAmenities = false;
             this.cdr.markForCheck();
@@ -396,11 +392,6 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
   }
   amenitiesBy(category: BeachAmenity["category"]): BeachAmenity[] {
     return this.realAmenities.filter((a) => a.category === category);
-  }
-  get realAmenities(): BeachAmenity[] {
-    return (this.amenities?.amenities ?? []).filter(
-      (a) => a.source !== "local-hint" && a.verification !== "to_verify",
-    );
   }
   signal(
     type: "jellyfish" | "pollution" | "current" | "crowd" | "flag",

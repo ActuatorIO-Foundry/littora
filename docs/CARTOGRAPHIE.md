@@ -26,6 +26,23 @@ du fond ou du trait officiel est affichee ; aucun trait fictif ne le remplace.
 Les attributions restent visibles. La CI utilise des images de test locales,
 sans solliciter OSM/Shom. La recette visuelle controle aussi les vraies tuiles.
 
+## Reperes et equipements
+
+Sur la carte de recherche, un nombre regroupe les plages proches parmi les
+resultats charges. Un clic ou la touche Entree ouvre le groupe ; les reperes
+superposes peuvent etre ecartes sans changer leurs coordonnees en base.
+Choisir une plage ouvre son apercu dans la liste, pas sa fiche detaillee.
+Le regroupement utilise [Leaflet.markercluster](https://github.com/Leaflet/Leaflet.markercluster/tree/v1.5.3).
+
+Sur une fiche, la plage reste un repere distinct. Le filtre de la carte permet
+de masquer chaque categorie d'equipement referencee ; son compteur porte sur
+les points retournes pour cette fiche, pas sur tous les equipements de la
+commune. Le clic sur un point affiche son nom, sa categorie et sa source.
+Deux parkings homonymes restent deux objets distincts. Les couches ne
+modifient ni la liste accessible « Acces & equipements », ni les filtres de
+recherche, ni le catalogue. La liste indique la date du releve et si celui-ci
+est ancien ; le referencement ne garantit pas l'ouverture ou la surveillance.
+
 ## Recherche geographique
 
 La recherche de commune (#34) utilise l'API Geo du service public, ses codes

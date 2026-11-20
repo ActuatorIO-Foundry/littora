@@ -436,7 +436,7 @@
             </h4>
             <p *ngFor="let item of amenitiesBy(group.category)">
               {{ item.name
-              }}<span>{{ item.distanceKm | number: "1.0-1" }} km · OSM</span>
+              }}<span>{{ item.distanceKm | number: "1.0-1" }} km · {{ item.source === 'openstreetmap' ? 'OSM' : item.source }}</span>
             </p>
             <small
               *ngIf="!amenitiesBy(group.category).length && !loadingAmenities"

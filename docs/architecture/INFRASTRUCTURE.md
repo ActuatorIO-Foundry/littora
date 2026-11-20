@@ -133,9 +133,28 @@ sur l'ancienne image, pas un downgrade des extensions mises a niveau.
 La CI reconstruit les images, teste catalogue et relations, restaure les tables
 avec des fixtures sanitaires et geometriques non vides, puis restaure un RDB avec
 des jobs BullMQ en pause/differes et execute un job apres reprise.
-Le test Caddy utilise un reseau interne avec serveurs factices et verifie `/api`,
-ses sous-routes/parametres et les routes frontend. `handle` conserve le prefixe
-Nest `/api`, contrairement a l'ancien `handle_path`.
+Le test des migrations lance aussi Caddy, Nginx/Angular et Nest sur un reseau
+interne, sans ports publies. Il verifie la redirection HTTP, le certificat de
+recette, l'acces direct aux pages, le prefixe API, les parametres, les origines
+autorisees et le redemarrage du proxy. La racine de confiance reste dans la
+recette jetable ; rien n'est installe sur l'hote.
+
+## Preparation HTTPS (#29)
+
+Le modele `.env.prod.example` est distinct du local. Renseigner le nom DNS seul
+et un mot de passe PostgreSQL aleatoire en hexadecimal (32 octets minimum).
+Sur une installation existante, ne pas changer les identifiants ou les volumes
+sans migration verifiee. Le lanceur controle le modele Compose effectif, y
+compris la coherence des identifiants API/worker/migrations, sans les afficher.
+`npm run docker:prod -- --check` est uniquement une verification de configuration.
+Le domaine fixe aussi l'unique origine navigateur de l'API ; seuls 80/443 sont
+publies. L'API et le worker partagent le Redis des jobs, distinct du cache.
+
+Avant ouverture : lever les exceptions de securite, verifier le retour arriere
+sur l'hebergement cible et la gestion des quotas derriere le proxy, puis verifier
+DNS A/AAAA, acces aux ports 80/443 et certificat public depuis l'exterieur.
+La recette locale ne prouve pas l'emission ni le renouvellement d'un certificat
+public. Voir [HTTPS automatique de Caddy](https://caddyserver.com/docs/automatic-https).
 
 ## Catalogue : 602 contre 180
 

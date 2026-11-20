@@ -18,10 +18,9 @@ test('development: native watch starts the TypeScript API without the Nest CLI',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  let logs = '';
   let spawnError;
-  child.stdout.on('data', (data) => { logs += data; });
-  child.stderr.on('data', (data) => { logs += data; });
+  child.stdout.resume();
+  child.stderr.resume();
   child.on('error', (error) => { spawnError = error; });
   const stopped = new Promise((done) => child.once('exit', done));
   t.after(async () => {
@@ -35,7 +34,7 @@ test('development: native watch starts the TypeScript API without the Nest CLI',
 
   for (let attempt = 0; attempt < 160; attempt++) {
     if (spawnError) throw spawnError;
-    assert.equal(child.exitCode, null, logs);
+    assert.equal(child.exitCode, null, 'Development server exited unexpectedly');
     let response;
     try {
       response = await fetch(`http://127.0.0.1:${port}/api/admin/health`, { signal: AbortSignal.timeout(200) });
@@ -49,5 +48,5 @@ test('development: native watch starts the TypeScript API without the Nest CLI',
     assert.match(body.requestId, /^[a-f0-9-]{36}$/);
     return;
   }
-  assert.fail(`Development server did not start: ${logs}`);
+  assert.fail('Development server did not start');
 });

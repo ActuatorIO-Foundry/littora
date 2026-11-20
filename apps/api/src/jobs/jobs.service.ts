@@ -9,6 +9,7 @@ export class JobsService {
     if(process.env.ARS_IMPORT_ENABLED!=='true')return {queued:false,provider:'ars-rapportage',warning:'Import ARS désactivé.'};
     if(!url)throw new ServiceUnavailableException('File sanitaire indisponible');
     const queue=new Queue('littora-ars',{connection:{url,enableOfflineQueue:false,maxRetriesPerRequest:1,connectTimeout:3000,retryStrategy:()=>null}});
+    queue.on('error', () => console.error('{"event":"ars_queue_unavailable"}'));
     try {
       await queue.waitUntilReady();
       const job=await queue.add('import',{},{deduplication:{id:edition},attempts:1,removeOnComplete:50,removeOnFail:50});

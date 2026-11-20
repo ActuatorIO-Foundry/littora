@@ -144,6 +144,9 @@ recette jetable ; rien n'est installe sur l'hote.
 
 ## Preparation HTTPS (#29)
 
+La [politique des journaux d’exploitation](JOURNAUX.md) couvre les services
+Compose et la recette de non-divulgation effectuée avant intégration.
+
 Le modele `.env.prod.example` est distinct du local. Renseigner le nom DNS seul
 et un mot de passe PostgreSQL aleatoire en hexadecimal (32 octets minimum).
 Sur une installation existante, ne pas changer les identifiants ou les volumes

@@ -9,4 +9,6 @@ COPY apps/web ./apps/web
 COPY packages/api-client ./packages/api-client
 WORKDIR /app/apps/web
 EXPOSE 4200
+COPY infra/diagnostics/daemon.sh /usr/local/bin/littora-daemon
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/littora-daemon"]
 CMD ["npm","start"]

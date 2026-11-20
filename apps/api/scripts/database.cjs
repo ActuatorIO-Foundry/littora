@@ -122,6 +122,6 @@ async function main() {
 
 module.exports = { MigrationError, manifest, status, assertCurrent, migrate, seed, lockKeys };
 if (require.main === module) main().catch(error => {
-  console.error(error instanceof MigrationError ? error.message : `Database operation failed (${error.code || 'unknown'}); no credentials logged.`);
+  console.error(error instanceof MigrationError ? error.message : '{"event":"database_operation_failed"}');
   process.exitCode = 1;
 });

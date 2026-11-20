@@ -17,13 +17,14 @@ import { ScoreService } from './modules/score/score.service';
 import { collectOne, projectDue } from './jobs/forecast-collector';
 import { intervalMs, recordCoverage } from './jobs/score-coverage';
 import { CollectionSignals } from './jobs/collection-signals';
+import { installFatalDiagnostics } from './shared/runtime-diagnostics';
 
 @Module({ imports: [ConfigModule.forRoot({ isGlobal: true }), DatabaseModule, CacheModule, ScoreModule] })
 class WorkerModule {}
 
 const signals = new CollectionSignals();
 async function start() {
-  const app = await NestFactory.createApplicationContext(WorkerModule);
+  const app = await NestFactory.createApplicationContext(WorkerModule, {logger:false, abortOnError:false});
   const db = app.get<Pool>(PG), scores = app.get(ScoreService);
   const url = process.env.JOBS_REDIS_URL || process.env.REDIS_URL;
   if (!url) throw new Error('Missing jobs Redis configuration');
@@ -68,4 +69,5 @@ async function start() {
   };
   process.once('SIGTERM', stop); process.once('SIGINT', stop);
 }
+installFatalDiagnostics('worker');
 start().catch(() => { signals.workerFailure('startup'); process.exit(1); });

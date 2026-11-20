@@ -21,6 +21,13 @@ const image = process.env.TEST_API_IMAGE || 'littora-api:ci';
 const postgres = `${name}-postgres`;
 const redis = `${name}-redis`;
 const domain = 'littora.internal';
+const privacyEntrypoint = ['-v', resolve('infra/diagnostics/daemon.sh') + ':/usr/local/bin/littora-daemon:ro', '--entrypoint', '/bin/sh'];
+const guard = '/usr/local/bin/littora-daemon';
+function privateOutput(container) {
+  const result = spawnSync('docker', ['logs', container], { encoding:'utf8', timeout:5000 });
+  assert.equal(result.status, 0, 'Cannot verify disposable service output');
+  return result.stdout + result.stderr;
+}
 const environment = ['-e', `DATABASE_URL=postgresql://littora:test-only-password@${postgres}:5432/littora_ci_test`,
   '-e', `REDIS_URL=redis://${redis}:6379/15`, '-e', 'API_PORT=3000', '-e', 'NODE_ENV=production',
   '-e', `CORS_ORIGIN=https://${domain}`];
@@ -78,17 +85,17 @@ try {
   docker(['run', '-d', '--name', postgres, '--network', name, '--platform', 'linux/amd64',
     '--tmpfs', '/var/lib/postgresql/data', '-e', 'POSTGRES_USER=littora',
     '-e', 'POSTGRES_PASSWORD=test-only-password', '-e', 'POSTGRES_DB=littora_ci_test',
-    'littora-postgres:16.16-3.7.0-r1']);
+    ...privacyEntrypoint, 'littora-postgres:16.16-3.7.0-r1', guard, 'postgres']);
   containers.push(redis);
-  docker(['run', '-d', '--name', redis, '--network', name, '--tmpfs', '/data', 'littora-redis:7.4.12-r1']);
+  docker(['run', '-d', '--name', redis, '--network', name, '--tmpfs', '/data', ...privacyEntrypoint,
+    'littora-redis:7.4.12-r1', guard, 'redis-server']);
   await until(() => docker(['exec', postgres, 'pg_isready', '-h', '127.0.0.1', '-U', 'littora']) !== '', 'PostgreSQL TCP');
   await until(() => docker(['exec', redis, 'redis-cli', 'ping']) === 'PONG', 'Redis');
 
   const unready = start('unmigrated');
   await until(() => docker(['inspect', '--format', '{{.State.Running}}', unready]) === 'false', 'startup refusal');
   assert.notEqual(docker(['inspect', '--format', '{{.State.ExitCode}}', unready]), '0');
-  const logs = spawnSync('docker', ['logs', unready], { encoding: 'utf8', timeout: 5000 });
-  assert.match(logs.stdout + logs.stderr, /Database migrations required/);
+  assert.ok(privateOutput(unready).includes('database_migrations_required'), 'Expected bounded migration diagnostic');
   assert.equal(sql("select to_regclass('public.schema_migrations')"), '', 'Startup must not modify the schema');
 
   const pending = JSON.parse(command('status')).filter(row => !row.applied).map(row => row.name);
@@ -110,7 +117,7 @@ try {
   containers.push(web);
   docker(['run', '-d', '--name', proxy, '--network', edge, '--network-alias', domain,
     '-e', `DOMAIN=${domain}`, '-v', `${resolve('infra/caddy/Caddyfile')}:/etc/caddy/Caddyfile:ro`,
-    'littora-caddy:2.11.9-r1']);
+    ...privacyEntrypoint, 'littora-caddy:2.11.9-r1', guard, 'caddy', 'run', '--config', '/etc/caddy/Caddyfile', '--adapter', 'caddyfile']);
   containers.push(proxy);
   docker(['network', 'connect', ingress, proxy]);
   const peer = docker(['inspect', '--format', `{{(index .NetworkSettings.Networks "${ingress}").IPAddress}}`, proxy]);
@@ -153,6 +160,30 @@ try {
     docker(['exec', visitors[1], 'node', '/tmp/test-contribution.mjs']);
     assert.equal(sql('select count(distinct network_hash) from report_contributions'), '2');
     assert.equal(sql("select count(distinct split_part(key,':',2)) from report_rate_limits where key like 'session-hour:%'"), '2');
+    const marker = 'private-' + randomUUID();
+    const probePrivacy = (path, method, expected) => docker(['exec', visitors[0], 'node', '-e',
+      `const marker=${JSON.stringify(marker)};
+       fetch(${JSON.stringify('https://' + domain + path)} + '?lat=43.987654321&lon=6.123456789&q=' + marker, {method:${JSON.stringify(method)},
+         headers:{authorization:'Bearer '+marker,cookie:'id='+marker,'user-agent':marker,'x-request-id':marker,'content-type':'application/json'},
+         body:${method === 'POST' ? 'JSON.stringify({message:marker})' : 'undefined'}})
+         .then(r=>{if(r.status!==${expected}) process.exit(1); console.log(r.headers.get('x-request-id') || 'none')})`]);
+    probePrivacy('/recherche', 'GET', 200);
+    probePrivacy('/api/reports', 'POST', 400);
+    const requestId = probePrivacy('/api/admin/health', 'GET', 503);
+    assert.match(requestId, /^[a-f0-9-]{36}$/);
+    const dbError = spawnSync('docker',['exec',postgres,'psql','-U','littora','-d','littora_ci_test','-c',`select '${marker}'::integer`],{stdio:'ignore'});
+    assert.equal(dbError.status,1);
+    assert.equal(docker(['exec',redis,'redis-cli','CONFIG','GET','slowlog-log-slower-than']), 'slowlog-log-slower-than\n-1');
+    assert.equal(docker(['exec',redis,'redis-cli','CONFIG','GET','acllog-max-len']), 'acllog-max-len\n0');
+    docker(['stop', web]);
+    probePrivacy('/recherche', 'GET', 502);
+    const visitorAddress = docker(['inspect','--format',`{{(index .NetworkSettings.Networks "${edge}").IPAddress}}`,visitors[0]]);
+    assert.ok(visitorAddress.startsWith('10.'));
+    for (const [container, signal] of [[api,requestId],[postgres,'database_error'],[redis,'redis_ready'],[web,'web_response'],[proxy,'proxy_warning']]) {
+      await until(() => privateOutput(container).includes(signal), 'safe diagnostic');
+      const captured = privateOutput(container);
+      assert.ok([marker,visitorAddress,'43.987654321','6.123456789'].every(value => !captured.includes(value)), 'Private fixture appeared in service output');
+    }
   } finally { rmSync(fixtureDir, { recursive: true, force: true }); }
   assert.equal(request(api, `/api/beaches/${id}`).body.id, id);
   assert.deepEqual(request(api, `/api/reports?beachId=${id}`).body, []);

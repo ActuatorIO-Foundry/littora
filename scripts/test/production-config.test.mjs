@@ -26,6 +26,12 @@ test('production model: private services, shared job queue, one HTTPS origin and
     '-f', 'docker-compose.prod.yml', '--profile', 'tools', 'config', '--format', 'json'], { cwd, env: dockerEnvironment() }));
   validateProduction(model);
   const { services } = model;
+  for (const name of ['postgres','redis','redis-jobs','caddy']) {
+    const executable = '/usr/local/bin/littora-daemon';
+    assert.deepEqual(services[name].entrypoint, ['/bin/sh', executable]);
+    assert.ok(services[name].volumes.some(v => v.type === 'bind' && v.target === executable && v.read_only &&
+      v.source.endsWith('/infra/diagnostics/daemon.sh')), name);
+  }
   for (const [name, service] of Object.entries(services)) {
     if (name !== 'caddy') assert.equal(service.ports, undefined, name);
   }

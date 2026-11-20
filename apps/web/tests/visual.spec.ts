@@ -173,12 +173,32 @@ test('Confort : le même profil et les mêmes points dans la liste et la fiche',
   await page.goto('/recherche?usage=family');
   await expect(page.locator('.beach-tags')).toContainText('Confort : 68/100');
   await page.getByRole('button',{name:'Plage des Pins'}).click();
-  await expect(page.locator('.beach-overview')).toContainText('Vagues : -32');
+  await expect(page.locator('.beach-overview')).toContainText('Vagues : 32 points retirés');
   await page.getByRole('link',{name:/Détails/}).first().click();
-  await expect(page.locator('.score-explanation')).toContainText('Vagues : -32');
+  await expect(page.locator('.score-explanation')).toContainText('Vagues : 32 points retirés');
   await page.getByRole('button',{name:/Baignade/}).first().click();
   await expect(page.locator('.score-explanation')).toContainText('5/6');
   await expect(page.locator('.score-explanation')).toContainText('Température de l’eau');
+});
+
+test('Disciplines : la note suit le sport sélectionné et la direction indique la provenance',async({page})=>{
+  const e={version:'voile-loisir-1',score:85,status:'calculated',available:4,required:4,
+    missing:[],invalid:[],stale:[],factors:[]};
+  await page.route('**/api/score/beach/*',route=>route.fulfill({json:{...score,
+    current:{...score.current,weather:{...score.current.weather,wind_direction_10m:270}},
+    dataStatus:{...score.dataStatus,weather:{...airStatus,units:{wind_direction_10m:'°'}}},
+    explanations:{paddle:{...e,score:43},catamaran:e,windsurf:{...e,score:null,partialScore:62,status:'partial',available:2}}}}));
+  await page.goto('/plages/test-sea');
+  await expect(page.locator('.wind-origin')).toHaveText('Provenance : ouest · 270°');
+  const card=page.getByRole('button',{name:/Sports nautiques/});
+  await card.click();
+  const sports=page.getByLabel('Discipline nautique');
+  await expect(card).toContainText('43');
+  await sports.selectOption('catamaran');await expect(card).toContainText('85');
+  await expect(page.locator('.score-explanation')).toContainText('85/100');
+  await sports.selectOption('windsurf');await expect(card).toContainText('≤ 62');
+  await expect(page.locator('.score-explanation')).toContainText('2/4');
+  await noOverflow(page);
 });
 
 test('Confort partiel : plafond nul visible et vent/UV périmés distincts des valeurs absentes',async({page})=>{
@@ -189,14 +209,27 @@ test('Confort partiel : plafond nul visible et vent/UV périmés distincts des v
   await page.route('**/api/score/beach/*',r=>r.fulfill({json:{...score,
     dataStatus:{...score.dataStatus,weather:{...airStatus,status:'stale'}},scores:{...score.scores,bathing:null},explanations:{bathing:e}}}));
   await page.goto('/recherche');
-  await expect(page.locator('.beach-tags')).toContainText('Confort partiel : ≤ 0/100 · 3/6 mesures');
+  await expect(page.locator('.beach-tags')).toContainText('Confort partiel : 0/100 · 3/6 mesures');
   await page.getByRole('link',{name:/Détails/}).first().click();
   await expect(page.locator('.usage-scores button').first()).toContainText('Partiel · 3/6 mesures');
-  await expect(page.locator('.score-explanation')).toContainText('au plus 0/100');
+  await expect(page.locator('.score-explanation')).toContainText('Indice partiel : 0/100');
+  await expect(page.locator('.score-explanation')).not.toContainText('pourraient abaisser');
   await expect(page.locator('.score-explanation')).toContainText('Prévisions périmées, exclues du calcul : Vent, Indice UV');
   await expect(page.locator('.score-explanation')).toContainText('Non renseigné : Rafales');
   await expect(page.locator('.conditions-grid > div').filter({hasText:'Indice UV'})).toContainText('Prévision périmée');
   await noOverflow(page);
+});
+
+test('Direction du vent : nord, calme et valeur inconnue restent distincts',async({page})=>{
+  let degrees:number|null=0,speed=12;
+  await page.route('**/api/score/beach/*',r=>r.fulfill({json:{...score,
+    current:{...score.current,weather:{wind_speed_10m:speed,wind_direction_10m:degrees}},
+    dataStatus:{...score.dataStatus,weather:{...airStatus,units:{wind_speed_10m:'km/h',wind_direction_10m:'°'}}}}}));
+  await page.goto('/plages/test-sea');
+  await expect(page.locator('.wind-origin')).toHaveText('Provenance : nord · 0°');
+  degrees=360;await page.reload();await expect(page.locator('.wind-origin')).toHaveText('Provenance : nord · 0°');
+  speed=0;await page.reload();await expect(page.locator('.wind-origin')).toHaveText('Vent calme · sans direction');
+  speed=12;degrees=null;await page.reload();await expect(page.locator('.wind-origin')).toHaveText('Direction non renseignée');
 });
 
 test('SHOM : références du port distinctes des horaires et retrait à échéance', async ({page})=>{
@@ -537,6 +570,8 @@ test("detail : series reelles, indisponibilite et equipements", async ({
   await page.goto("/plages/test-sea");
   await expect(page.locator(".conditions-grid")).toBeVisible();
   await expect(page.locator(".official-status")).toContainText("Non renseigné");
+  await expect(page.getByRole('link',{name:/Itinéraire vers Parking du port/})).toHaveCount(0);
+  await page.locator('.amenity-group summary').filter({hasText:'Stationnement'}).press('Enter');
   await expect(
     page.getByText("Parking du port", { exact: false }),
   ).toBeVisible();
@@ -668,13 +703,20 @@ test('contributions : doublon et quota produisent des erreurs actionnables', asy
   await noOverflow(page);
 });
 
-test('equipements : tous les homonymes restent visibles et la source ancienne est explicite', async ({ page }) => {
+test('equipements : homonymes distincts, sections repliées et itinéraire vers le GPS exact', async ({ page }) => {
   const points = Array.from({length:8}, (_,i)=>({id:`node/${i+1}`,name:'Parking du port',category:'parking',
     lat:43.08+i*.0001,lon:6.15,distanceKm:i*.01,source:'openstreetmap',verification:'listed'}));
   await page.route('**/api/beaches/test-sea/amenities',route=>route.fulfill({json:{beachId:'test-sea',
     provider:'openstreetmap-overpass',radiusMeters:2500,status:'stale',fetchedAt:'2026-11-16T12:00:00Z',total:8,amenities:points}}));
   await page.goto('/plages/test-sea');
   await expect(page.locator('.amenity-group p')).toHaveCount(8);
+  const list=page.locator('.amenity-group').filter({has:page.locator('summary',{hasText:'Stationnement'})});
+  await expect(list.locator('p').first()).toBeHidden();
+  await list.locator('summary').press('Space');
+  await expect(list.getByRole('link')).toHaveCount(8);
+  await expect(list.getByRole('link').first()).toHaveAttribute('href','https://www.google.com/maps/dir/?api=1&destination=43.08%2C6.15');
+  await list.locator('summary').press('Enter');
+  await expect(list.locator('p').first()).toBeHidden();
   await expect(page.getByText('Relevé ancien',{exact:false})).toBeVisible();
   await expect(page.getByText('Ouverture et surveillance en service non confirmées.',{exact:false})).toBeVisible();
   await noOverflow(page);
@@ -698,6 +740,7 @@ test('carte : équipements superposés, filtres indépendants et provenance au c
   const amenities = [
     {...point,id:'p1',category:'parking',name:'Parking du port'},
     {...point,id:'p2',category:'parking',name:'Parking du port'},
+    {...point,id:'p1',category:'parking',name:'Parking du port'},
     {...point,id:'t1',category:'toilets',name:'Sanitaires du port'},
     {...point,id:'x',category:'parking',name:'Point non confirmé',verification:'to_verify'},
   ];
@@ -706,20 +749,21 @@ test('carte : équipements superposés, filtres indépendants et provenance au c
   await page.goto('/plages/test-sea');
   const map=page.locator('app-coast-map'), layers=map.locator('summary');
   await expect(map.getByRole('status')).toContainText('Fond de carte indisponible');
-  await expect(map.getByRole('button',{name:'3 équipements'})).toBeVisible();
+  await expect(map.getByRole('button',{name:'2 équipements'})).toBeVisible();
   await layers.press('Enter');
-  const parking=map.getByRole('checkbox',{name:'Stationnement (2)'});
+  const parking=map.getByRole('checkbox',{name:'Stationnement (1)'});
   await parking.uncheck();
   await expect(map.locator('.map-point-cluster')).toHaveCount(0);
-  await expect(page.locator('.amenity-group p')).toHaveCount(3);
+  await expect(page.locator('.amenity-group p')).toHaveCount(2);
+  await expect(page.locator('.amenity-group p').filter({hasText:'Parking du port'})).toContainText('2 références OSM');
   await layers.press('Enter');
   const toilet=map.getByRole('button',{name:'Équipement : Sanitaires du port'});
   await toilet.press('Enter');
   await expect(map.locator('.leaflet-popup-content')).toContainText('Toilettes · OpenStreetMap');
   await map.locator('.leaflet-popup-close-button').click();
   await layers.press('Enter');await parking.check();await layers.press('Enter');
-  await map.getByRole('button',{name:'3 équipements'}).press('Enter');
-  await expect(map.getByRole('button',{name:'Équipement : Parking du port'})).toHaveCount(2);
+  await map.getByRole('button',{name:'2 équipements'}).press('Enter');
+  await expect(map.getByRole('button',{name:'Équipement : Parking du port'})).toHaveCount(1);
   await expect(page.getByText('Point non confirmé')).toHaveCount(0);
   await noOverflow(page);
 });

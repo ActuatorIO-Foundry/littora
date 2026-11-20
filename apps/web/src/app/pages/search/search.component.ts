@@ -68,7 +68,7 @@ export class SearchComponent implements OnInit, OnDestroy {
   readonly usages = [
     { id: "bathing", label: "Baignade", icon: "bathing" },
     { id: "family", label: "Famille", icon: "family" },
-    { id: "paddle", label: "Sports nautiques", icon: "wind" },
+    { id: "paddle", label: "Paddle", icon: "wind" },
     { id: "boat", label: "Bateau", icon: "boat" },
   ];
   readonly metricValue = metricValue;

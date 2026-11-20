@@ -16,7 +16,7 @@ import { IconComponent } from "../../shared/icon.component";
 import { ComfortExplanationComponent } from '../../shared/comfort-explanation.component';
 import { LoadingComponent } from "../../shared/loading.component";
 import { CoastMapComponent } from "../../shared/coast-map.component";
-import { amenityGroups, listedAmenities } from "../../shared/map-points";
+import { amenityGroups, directionsTo, listedAmenities } from "../../shared/map-points";
 import {
   metricValue,
   metricClass,
@@ -62,6 +62,34 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
   reportsUnavailable = false;
   amenitiesUnavailable = false;
   selectedUsage: UsageKey = "bathing";
+  readonly sports = [
+    {key:'paddle', label:'Paddle', description:'Le calme est privilégié. Vent, rafales, vagues et courant réduisent l’indice.'},
+    {key:'catamaran', label:'Catamaran', description:'Pour la voile de loisir, le manque de vent comme le vent fort réduisent l’indice. Les rafales, les vagues et le courant comptent aussi.'},
+    {key:'windsurf', label:'Planche à voile', description:'Ce profil privilégie un vent établi pour la glisse. Le petit temps, le vent fort, les rafales et une mer agitée réduisent l’indice.'},
+  ] as const;
+  sport: (typeof this.sports)[number] = this.sports[0];
+  readonly directionsTo = directionsTo;
+  chooseSport(key: string) {
+    this.sport = this.sports.find(s => s.key === key) ?? this.sports[0];
+  }
+  explanation(usage: UsageKey) {
+    return this.score?.explanations?.[usage === 'paddle' ? this.sport.key : usage];
+  }
+  completeScore(usage: UsageKey) {
+    const e = this.explanation(usage);
+    if (e) return e.score;
+    return usage === 'paddle' && this.sport.key !== 'paddle' ? null : this.score?.scores[usage];
+  }
+  get windOrigin(): string {
+    const weather = this.score?.current?.weather;
+    const meta = this.score?.dataStatus?.['weather'];
+    if (!meta || meta.kind !== 'forecast' || meta.status === 'unknown') return 'Direction non renseignée';
+    if (weather?.['wind_speed_10m'] === 0 && meta.units?.['wind_speed_10m'] === 'km/h') return 'Vent calme · sans direction';
+    const degrees = weather?.['wind_direction_10m'];
+    if (meta?.units?.['wind_direction_10m'] !== '°' || typeof degrees !== 'number' || !Number.isFinite(degrees) || degrees < 0 || degrees > 360) return 'Direction non renseignée';
+    const compass = ['nord','nord-est','est','sud-est','sud','sud-ouest','ouest','nord-ouest'];
+    return 'Provenance : '+compass[Math.round(degrees/45)%8]+' · '+Math.round(degrees)%360+'°';
+  }
   selectedChart = "air";
   sanitaryReading(m?: ArsMeasurement): string {
     if (m?.value == null || m.qualifier === 'missing') return 'non renseigné';

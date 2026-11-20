@@ -1,7 +1,8 @@
 import { refreshSeconds } from '../../shared/forecast-data';
-import { explainAll, measured, modelVersion } from '../score/comfort-model';
+import { explainAll, measured } from '../score/comfort-model';
 
-export const conditionKey = (id: string) => `search:conditions:${modelVersion}:${id.toLowerCase()}`;
+// The cache contains raw inputs, unchanged since confort-2; never cache the derived index here.
+export const conditionKey = (id: string) => `search:conditions:confort-2:${id.toLowerCase()}`;
 type Row = Record<string, any>;
 
 export function freshSource(data: Row | undefined, now: number): boolean {
@@ -48,10 +49,18 @@ export function searchConditions(beach: Row, snapshot: Row | null, now: number, 
     !(snapshot.quality === 'closed' && !closed);
   const weather = valid && freshSource(snapshot.dataStatus?.weather, now);
   const marine = beach.waterType === 'sea' && valid && freshSource(snapshot.dataStatus?.marine, now);
-  const read = (group: 'weather' | 'marine', key: string) =>
-    (group === 'weather' ? weather : marine) && snapshot
-      ? measured(key, snapshot[group]?.[key], snapshot.dataStatus[group].units?.[key])
-      : null;
+  const read = (group: 'weather' | 'marine', key: string): number | 'invalid' | 'stale' | null => {
+    if (!valid || (group === 'marine' && beach.waterType !== 'sea')) return null;
+    const raw = snapshot[group]?.[key];
+    if (raw == null) return null;
+    const source = snapshot.dataStatus?.[group];
+    const value = measured(key, raw, source?.units?.[key]);
+    if (value === null || source?.kind !== 'forecast' || !['available','partial','stale'].includes(source.status)
+      || !Number.isFinite(Date.parse(source.fetchedAt)) || Date.parse(source.fetchedAt) > now
+      || !Number.isFinite(Date.parse(source.validAt)) || Date.parse(source.validAt) >= now + 3600_000) return 'invalid';
+    return (group === 'weather' ? weather : marine) ? value : 'stale';
+  };
+  const numeric = (value: ReturnType<typeof read>) => typeof value === 'number' ? value : null;
   const values = {
     wind_speed_10m: read('weather', 'wind_speed_10m'),
     wind_gusts_10m: read('weather', 'wind_gusts_10m'),
@@ -70,10 +79,10 @@ export function searchConditions(beach: Row, snapshot: Row | null, now: number, 
   const { bathing, family, paddle, boat } = explanations;
   return {
     explanations,
-    estimatedFlag: estimatedFlag(bathing.score,values.wave_height,values.ocean_current_velocity,closed),
+    estimatedFlag: estimatedFlag(bathing.score,numeric(values.wave_height),numeric(values.ocean_current_velocity),closed),
     scores: { bathing: bathing.score, family: family.score, paddle: paddle.score, boat: boat.score },
-    waterTemp: values.sea_surface_temperature,
-    airTemp: read('weather', 'temperature_2m'),
+    waterTemp: numeric(values.sea_surface_temperature),
+    airTemp: numeric(read('weather', 'temperature_2m')),
     conditions: {
       calculatedAt: valid ? snapshot.calculatedAt : null,
       weather: weather ? snapshot!.dataStatus.weather : null,

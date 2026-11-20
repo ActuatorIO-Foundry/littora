@@ -1,6 +1,6 @@
 # Indices de confort par usage (#21)
 
-`confort-2` est un modèle éditorial expérimental de comparaison des **plages de mer**, pas une probabilité, un indice réglementaire, un drapeau ni un outil de navigation. Les coefficients ne sont pas validés cliniquement ou par un organisme de secours. Les [prévisions marines de Météo-France](https://meteofrance.com/meteo-a-z/meteo-france-et-la-mer) motivent la prise en compte du vent et de l'état de mer ; l'[indice UV de l'OMS](https://www.who.int/news-room/questions-and-answers/item/radiation-the-ultraviolet-%28UV%29-INDEX) motive la prise en compte de l'exposition à partir de 3. Aucune de ces références ne valide les points Littora.
+`confort-3` est un modèle éditorial expérimental de comparaison des **plages de mer**, pas une probabilité, un indice réglementaire, un drapeau ni un outil de navigation. Le barème complet de `confort-2` est conservé. Les coefficients ne sont pas validés cliniquement ou par un organisme de secours. Les [prévisions marines de Météo-France](https://meteofrance.com/meteo-a-z/meteo-france-et-la-mer) motivent la prise en compte du vent et de l'état de mer ; l'[indice UV de l'OMS](https://www.who.int/news-room/questions-and-answers/item/radiation-the-ultraviolet-%28UV%29-INDEX) motive la prise en compte de l'exposition à partir de 3. Aucune de ces références ne valide les points Littora.
 
 ## Règle reproductible
 
@@ -17,7 +17,9 @@ Le profil famille accorde plus de poids aux vagues, aux UV, à la température e
 
 ## Couverture et restrictions
 
-Les 6 mesures essentielles (baignade/famille) ou 4 (paddle/bateau) doivent toutes avoir la bonne unité, être physiquement plausibles et provenir de prévisions datées utilisables. Sinon : score nul au sens JSON (`null`), couverture et mesures manquantes, jamais 0/100 par défaut. Une valeur mesurée de zéro reste valide. Lac, rivière et milieu inconnu : modèle non applicable. Aucun courant d'atlas SHOM, température marine ou coefficient de marée ne remplace une mesure locale manquante.
+Les 6 mesures (baignade/famille) ou 4 (paddle/bateau) doivent toutes être utilisables pour un indice comparable. Avec au moins une mesure utilisable mais pas toutes, le modèle calcule un **indice partiel** : 100 moins les seules déductions établies, borné à zéro. Comme les déductions sont toujours positives ou nulles, le résultat est un plafond à données connues constantes, pas une estimation des mesures écartées. L'API l'expose dans `explanations[usage].partialScore` avec le statut `partial` et la couverture ; `scores[usage]` reste nul afin de ne pas classer, filtrer ou estimer un drapeau avec un plafond. Un zéro mesuré est utilisable ; un plafond calculé de zéro est affiché. Sans mesure utilisable, aucun score ni plafond.
+
+Une valeur visible issue d'une prévision périmée figure dans `stale`, pas dans `missing`. Une unité, une valeur ou une datation non exploitable figure dans `invalid`. Les champs sans valeur figurent dans `missing`. Lac, rivière et milieu inconnu : modèle non applicable. Aucun courant d'atlas SHOM, température marine ou coefficient de marée ne remplace une mesure locale manquante.
 
 Une interdiction officielle active neutralise baignade et famille (0, statut `closed`), quel que soit le milieu, sans fabriquer de drapeau. Après levée, une projection datant de la fermeture est écartée. Surveillance sur place, dangers localisés, vigilance, compétences et embarcation ne sont pas validés par le modèle.
 
@@ -27,4 +29,4 @@ Les recommandations excluent les indices inconnus, non applicables, nuls et les 
 
 ## Scénarios de régression
 
-Vent 8, rafales 10, vagues 0,3, courant 0,05, UV 3, eau 22 : **77 / 72 / 63 / 77** (ordre du tableau). Mêmes entrées avec vagues 4 et courant 1 : **0 / 0 / 0 / 0**. Avec eau manquante seulement : **indisponible / indisponible / 63 / 77**. Avec prélèvement récent défavorable et signalement pollution au plafond : **20 / 15 / 63 / 77**. Le gel des scénarios vérifie le calcul, pas sa capacité prédictive. Ne pas généraliser aux eaux intérieures sans données et calibration propres.
+Vent 8, rafales 10, vagues 0,3, courant 0,05, UV 3, eau 22 : **77 / 72 / 63 / 77** (ordre du tableau). Mêmes entrées avec vagues 4 et courant 1 : **0 / 0 / 0 / 0**. Avec eau manquante seulement : **≤ 77 (5/6) / ≤ 72 (5/6) / 63 / 77**. Avec prélèvement récent défavorable et signalement pollution au plafond : **20 / 15 / 63 / 77**. Le gel des scénarios vérifie le calcul, pas sa capacité prédictive. Ne pas généraliser aux eaux intérieures sans données et calibration propres.

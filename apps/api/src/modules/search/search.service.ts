@@ -27,7 +27,7 @@ export class SearchService {
       const match = /^([a-f0-9-]{36}):([1-9][0-9]*)$/.exec(cursor);
       if (!match) throw new BadRequestException('Invalid search cursor');
       id = match[1] as typeof id; offset = Number(match[2]);
-      const saved = await this.cache.getJson<Snapshot>(`search:page:v4:${id}`);
+      const saved = await this.cache.getJson<Snapshot>(`search:page:v5:${id}`);
       if (!saved || saved.closedKey!==closedKey || saved.communityKey!==live.key || Date.parse(saved.expiresAt) <= Date.now()) throw new ConflictException('Search expired; restart from first page');
       if (saved.hash !== hash || !Number.isSafeInteger(offset) || offset >= saved.items.length || offset % limit) {
         throw new BadRequestException('Cursor does not match search');
@@ -60,7 +60,7 @@ export class SearchService {
           airTemperature: enriched.filter(b => b.airTemp !== null).length,
           scores: enriched.filter(b => b.selectedScore !== null).length, flags: enriched.filter(b => b.flag !== null).length } };
       // A frozen short-lived result prevents changing weather or reports from duplicating/skipping pages.
-      if (items.length > limit && !await this.cache.setJson(`search:page:v4:${id}`, snapshot, 120)) {
+      if (items.length > limit && !await this.cache.setJson(`search:page:v5:${id}`, snapshot, 120)) {
         throw new ServiceUnavailableException('Stable pagination unavailable');
       }
     }

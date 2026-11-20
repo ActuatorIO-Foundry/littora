@@ -335,6 +335,10 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
   get chartStatus() {
     return this.score?.dataStatus?.[this.chart.group];
   }
+  oldReading(group: 'weather' | 'marine', key: string): boolean {
+    const status = this.score?.dataStatus?.[group];
+    return !!status && this.score?.current?.[group]?.[key] != null && forecastIsStale(status);
+  }
   get chartCaption(): string {
     const status = this.chartStatus;
     if (!status) return '';

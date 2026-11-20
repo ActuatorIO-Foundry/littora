@@ -82,6 +82,7 @@
               >{{ metricValue(score.current?.weather, "temperature_2m")
               }}<small> °C</small></strong
             >
+            <small *ngIf="oldReading('weather','temperature_2m')">Prévision périmée</small>
           </div>
           <div
             [ngClass]="
@@ -96,6 +97,7 @@
               >{{ metricValue(score.current?.marine, "sea_surface_temperature")
               }}<small> °C</small></strong
             >
+            <small *ngIf="oldReading('marine','sea_surface_temperature')">Prévision périmée</small>
           </div>
           <div
             [ngClass]="
@@ -107,6 +109,7 @@
               >{{ metricValue(score.current?.weather, "wind_speed_10m")
               }}<small> km/h</small></strong
             >
+            <small *ngIf="oldReading('weather','wind_speed_10m')">Prévision périmée</small>
           </div>
           <div
             [ngClass]="metricClass('uv', score.current?.weather?.['uv_index'])"
@@ -116,6 +119,7 @@
               >{{ metricValue(score.current?.weather, "uv_index")
               }}<small> / 11+</small></strong
             >
+            <small *ngIf="oldReading('weather','uv_index')">Prévision périmée</small>
           </div>
           <div
             [ngClass]="
@@ -127,6 +131,7 @@
               >{{ metricValue(score.current?.marine, "wave_height")
               }}<small> m</small></strong
             >
+            <small *ngIf="oldReading('marine','wave_height')">Prévision périmée</small>
           </div>
         </div>
         <div class="alerts" *ngIf="score.safety?.alerts?.length">
@@ -163,7 +168,13 @@
               (click)="selectedUsage = usage.key"
             >
               <app-icon [name]="usage.icon" /><span>{{ usage.label }}</span
-              ><strong>{{ score.scores[usage.key] ?? '—' }}<small *ngIf="score.scores[usage.key] != null">/100</small></strong>
+              >
+              @if (score.explanations?.[usage.key]?.status === 'partial') {
+                <strong>≤ {{ score.explanations?.[usage.key]?.partialScore }}<small>/100</small></strong>
+                <small>Partiel · {{ score.explanations?.[usage.key]?.available }}/{{ score.explanations?.[usage.key]?.required }} mesures</small>
+              } @else {
+                <strong>{{ score.scores[usage.key] ?? '—' }}<small *ngIf="score.scores[usage.key] != null">/100</small></strong>
+              }
             </button>
           </div>
           <div class="score-explanation">

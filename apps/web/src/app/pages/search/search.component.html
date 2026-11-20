@@ -291,6 +291,7 @@
             </p>
             <div class="beach-tags">
               <span *ngIf="beach.scoreExplanation?.status === 'calculated'">Confort : {{ beach.selectedScore }}/100</span>
+              <span *ngIf="beach.scoreExplanation?.status === 'partial'">Confort partiel : ≤ {{ beach.scoreExplanation?.partialScore }}/100 · {{ beach.scoreExplanation?.available }}/{{ beach.scoreExplanation?.required }} mesures</span>
               <span *ngIf="beach.bathingRestriction === 'closed'"><app-icon name="alert" [size]="13" />Baignade interdite</span>
               <span>{{ waterLabel(beach.waterType) }}</span><span
                 *ngIf="beach.has_parking"

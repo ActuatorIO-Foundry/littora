@@ -130,7 +130,8 @@ sur l'ancienne image, pas un downgrade des extensions mises a niveau.
 ## Tests reproductibles
 
 `docker-compose.test.yml` est exclusivement jetable (PostgreSQL en tmpfs).
-La CI reconstruit les images, teste catalogue et relations, restaure les tables
+La CI reconstruit les images, teste catalogue et relations, restaure une
+[sauvegarde PostgreSQL chiffrée](SAUVEGARDES.md) sur un second serveur isolé
 avec des fixtures sanitaires et geometriques non vides, puis restaure un RDB avec
 des jobs BullMQ en pause/differes et execute un job apres reprise.
 Le test des migrations lance aussi Caddy, Nginx/Angular et Nest sur des reseaux

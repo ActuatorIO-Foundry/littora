@@ -78,6 +78,16 @@ test('isolated PostGIS catalogue, reports and Redis cache', { timeout: 30000 }, 
       assert.equal(seen.size, Number((await pool.query('select count(*) from beaches')).rows[0].count));
       assert.ok(seen.has('10000000-0000-4000-8000-000000000602'));
       assert.equal((await beaches.catalogue(undefined, 200, '0,0,1,1')).beaches.length, 0);
+      const bounds = '43.0,6.2,43.2,6.4';
+      const cursor = '10000000-0000-4000-8000-000000000100';
+      for (const limit of [1, 20, 500]) {
+        const historical = await pool.query(`select id,facility_facts from beach_catalogue where id>$1
+          and lat between 43.0 and 43.2 and lon between 6.2 and 6.4 order by id limit $2`, [cursor, limit+1]);
+        const page = await beaches.catalogue(cursor, limit, bounds);
+        const visible = historical.rows.slice(0, limit);
+        assert.deepEqual(page.beaches.map(b => [b.id,b.facilities]), visible.map(b => [b.id,b.facility_facts]));
+        assert.equal(page.nextCursor, historical.rows.length > limit ? visible.at(-1).id : null);
+      }
     } finally {
       await pool.query("delete from beaches where id::text like '10000000-0000-4000-8000-%'");
     }

@@ -84,6 +84,9 @@ Le reverse proxy Caddy expose le front et route `/api/*` vers NestJS.
 
 Pour mesurer la couverture du catalogue servi, sans import :
 `npm run check:v1-coverage -- http://127.0.0.1:4200`.
+Pour mesurer la latence de lecture via le site local :
+`node scripts/check-catalogue-latency.mjs` (40 lectures par parcours, une à la
+fois, catalogue inchangé pendant la mesure). Ce relevé ne simule pas une charge publique.
 
 ## Variables principales
 Voir `.env.example`.

@@ -233,7 +233,7 @@ test('Confort : le même profil et les mêmes points dans la liste et la fiche',
   await page.route('**/api/score/beach/*',route=>route.fulfill({json:{...score,scores:{...score.scores,family:68,bathing:null},explanations:{family,bathing}}}));
   await page.goto('/recherche?usage=family');
   await expect(page.locator('.beach-tags')).toContainText('Confort : 68/100');
-  await page.getByRole('button',{name:'Plage des Pins'}).click();
+  await page.locator('.beach-result').getByRole('button',{name:'Plage des Pins',exact:true}).click();
   await expect(page.locator('.beach-overview')).toContainText('Vagues : 32 points retirés');
   await page.getByRole('link',{name:/Détails/}).first().click();
   await expect(page.locator('.score-explanation')).toContainText('Vagues : 32 points retirés');

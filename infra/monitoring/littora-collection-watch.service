@@ -1,0 +1,16 @@
+[Unit]
+Description=Littora collection incident notification
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env node /opt/littora/scripts/notify-collection.mjs
+StateDirectory=littora-astreinte
+StateDirectoryMode=0700
+UMask=0077
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+NoNewPrivileges=true
+TimeoutStartSec=90s

@@ -26,6 +26,8 @@ jobs:
           package-manager-cache: false
       - run: npm run check:toolchain
       - run: npm run test:ops
+      - name: Validate collection supervision units without activating them
+        run: systemd-analyze verify infra/monitoring/littora-collection-watch.{service,timer}
 
   images:
     name: Runtime image security

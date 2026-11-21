@@ -106,6 +106,8 @@ Suivre la [matrice de recette V1](docs/PERIMETRE-V1.md), le registre de
 [préversion #43](https://github.com/ActuatorIO-Foundry/littora/issues/43) et
 les blocages de mise en service. Ni la disponibilité des fournisseurs ni
 l'autorisation de diffusion ne se déduisent d'un build réussi.
+La [procédure d’incident et d’astreinte](docs/architecture/INCIDENTS.md)
+précise qui intervient, comment tester le canal privé et comment vérifier la reprise.
 
 ## Vérifications utiles
 La [décision d'architecture](docs/architecture/ADR-001-monolithe-modulaire.md)

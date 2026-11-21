@@ -185,5 +185,5 @@ d’exception d’origine. Les anciens enregistrements ne sont pas réécrits.
 En cas de quota, respecter la prochaine échéance et le délai du fournisseur ;
 ne pas purger la file ni forcer des collectes. En cas de silence, vérifier le
 worker, puis PostgreSQL et le Redis des jobs. La sonde est privée : ne pas
-l’exposer par HTTP. Le canal de notification, son test de livraison et le
-responsable d’astreinte restent à configurer sur l’hébergement cible (#30).
+l’exposer par HTTP. Le [relais privé et la procédure d’intervention](INCIDENTS.md)
+sont disponibles ; la livraison et la prise en charge humaine restent à vérifier sur la cible.

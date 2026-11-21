@@ -2,7 +2,7 @@ name: littora-tests
 
 services:
   postgres:
-    image: littora-postgres:16.16-3.7.0-r1
+    image: littora-postgres:16.16-3.7.0-r2
     platform: linux/amd64
     build: ./infra/postgres
     environment:

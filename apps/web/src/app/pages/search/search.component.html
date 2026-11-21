@@ -128,12 +128,21 @@
         />Poste de secours</label
       >
     </fieldset>
-    <label class="field dog-filter">
+    <label class="field access-filter">
       <span><app-icon name="paw" [size]="15" aria-hidden="true" /> Accès avec un chien</span>
       <select [(ngModel)]="dogAccess" (ngModelChange)="syncFilters()">
         <option value="all">Indifférent</option>
         <option value="welcome">Admis, même sous conditions</option>
         <option value="allowed">Sans condition signalée</option>
+      </select>
+    </label>
+    <label class="field access-filter">
+      <span><app-icon name="sun" [size]="15" aria-hidden="true" /> Naturisme</span>
+      <select [(ngModel)]="naturism" (ngModelChange)="syncFilters()">
+        <option value="all">Indifférent</option>
+        <option value="verified">Plage ou secteur naturiste</option>
+        <option value="dedicated">Plage entièrement naturiste</option>
+        <option value="section">Secteur délimité uniquement</option>
       </select>
     </label>
     <label class="field"
@@ -261,7 +270,7 @@
       <div *ngIf="!loading && !error && !displayedBeaches().length" class="empty-state">
         <app-icon name="compass" [size]="35" />
         <h3>Aucune plage pour ces critères</h3>
-        <p>{{ dogAccess === 'all' ? 'Essayez une autre zone ou élargissez votre recherche.'
+        <p>{{ dogAccess === 'all' && naturism === 'all' ? 'Essayez une autre zone ou élargissez votre recherche.'
           : 'Aucun accès correspondant n’est confirmé pour cette recherche. Les plages sans règle vérifiée ne sont pas affichées.' }}</p>
         <button class="btn" (click)="resetFilters()">
           Effacer les filtres
@@ -295,6 +304,7 @@
             </p>
             <div class="beach-tags">
               <app-dog-access *ngIf="beach.dogAccess && beach.dogAccess.status !== 'unknown'" [access]="beach.dogAccess" />
+              <app-naturism *ngIf="beach.naturism && beach.naturism.status !== 'unknown'" [info]="beach.naturism" />
               <span *ngIf="beach.scoreExplanation?.status === 'calculated'">Confort : {{ beach.selectedScore }}/100</span>
               <span *ngIf="beach.scoreExplanation?.status === 'partial'">Confort partiel : {{ beach.scoreExplanation?.partialScore ? '≤ ' : '' }}{{ beach.scoreExplanation?.partialScore }}/100 · {{ beach.scoreExplanation?.available }}/{{ beach.scoreExplanation?.required }} mesures</span>
               <span *ngIf="beach.bathingRestriction === 'closed'"><app-icon name="alert" [size]="13" />Baignade interdite</span>

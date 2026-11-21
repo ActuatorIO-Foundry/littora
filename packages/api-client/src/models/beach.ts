@@ -3,6 +3,7 @@
 
 import { DogAccess } from '../models/dog-access';
 import { FacilityPresence } from '../models/facility-presence';
+import { Naturism } from '../models/naturism';
 export interface Beach {
   city: string | null;
   coastline: string | null;
@@ -22,6 +23,7 @@ export interface Beach {
   lat: number;
   lon: number;
   name: string;
+  naturism: Naturism;
   osm_id: string | null;
   region: string | null;
 

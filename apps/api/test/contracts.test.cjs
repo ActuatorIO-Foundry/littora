@@ -93,7 +93,8 @@ test('contract: search body is strict, coordinates stay out of URLs, responses a
   assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');
   assert.equal(schemaValidator('SearchPage')(await response.json()),true);
   for(const dogAccess of ['welcome', 'allowed']) assert.equal((await request({dogAccess})).status,200);
-  for(const body of [{dogAccess:'unknown'},{dogAccess:true},{waterType:'ocean'},{parking:'true'},{limit:201},{radiusKm:0},{minWaterTemp:null},
+  for(const naturism of ['dedicated','section','verified']) assert.equal((await request({naturism})).status,200);
+  for(const body of [{naturism:'unknown'},{naturism:true},{dogAccess:'unknown'},{dogAccess:true},{waterType:'ocean'},{parking:'true'},{limit:201},{radiusKm:0},{minWaterTemp:null},
     {lat:91,lon:0,radiusKm:50},{flag:'calculated'},{q:'x'.repeat(81)},{invented:1}]) {
     const before=calls;assert.equal((await request(body)).status,400,JSON.stringify(body));assert.equal(calls,before);
   }

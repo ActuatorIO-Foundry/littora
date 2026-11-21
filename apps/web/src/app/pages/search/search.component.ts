@@ -10,6 +10,7 @@ import { LittoraApiService } from "../../services/littora-api.service";
 import { IconComponent } from "../../shared/icon.component";
 import { ComfortExplanationComponent } from '../../shared/comfort-explanation.component';
 import { DogAccessComponent } from '../../shared/dog-access.component';
+import { NaturismComponent } from '../../shared/naturism.component';
 import { LoadingComponent } from "../../shared/loading.component";
 import { CoastMapComponent } from "../../shared/coast-map.component";
 import { COASTAL_ZONES, CoastalZone } from "../../shared/coastal-zones";
@@ -32,6 +33,7 @@ type Result = Beach & {
     IconComponent,
     ComfortExplanationComponent,
     DogAccessComponent,
+    NaturismComponent,
     LoadingComponent,
     CoastMapComponent,
   ],
@@ -67,6 +69,7 @@ export class SearchComponent implements OnInit, OnDestroy {
   }
   requiredFlag = "all";
   dogAccess: 'all' | NonNullable<BeachSearch['dogAccess']> = 'all';
+  naturism: 'all' | NonNullable<BeachSearch['naturism']> = 'all';
   requireParking = false;
   requireToilets = false;
   requireLifeguard = false;
@@ -150,6 +153,8 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.requireLifeguard = p.get("rescue") === "1";
     const dogs = p.get('dogs');
     this.dogAccess = dogs === 'welcome' || dogs === 'allowed' ? dogs : 'all';
+    const naturism = p.get('naturism');
+    this.naturism = naturism === 'verified' || naturism === 'dedicated' || naturism === 'section' ? naturism : 'all';
     this.requiredFlag = ["green", "yellow", "red"].includes(p.get("flag") ?? "")
       ? p.get("flag")!
       : "all";
@@ -305,6 +310,7 @@ export class SearchComponent implements OnInit, OnDestroy {
       ...(this.requireToilets ? { toilets: true } : {}),
       ...(this.requireLifeguard ? { rescueStation: true } : {}),
       ...(this.dogAccess !== 'all' ? { dogAccess: this.dogAccess } : {}),
+      ...(this.naturism !== 'all' ? { naturism: this.naturism } : {}),
       ...(this.minWaterTemp !== null ? { minWaterTemp: this.minWaterTemp } : {}),
       ...(this.maxWaterTemp !== null ? { maxWaterTemp: this.maxWaterTemp } : {}),
     };
@@ -506,6 +512,7 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.query = "";
     this.requiredFlag = "all";
     this.dogAccess = 'all';
+    this.naturism = 'all';
     this.requireParking = false;
     this.requireToilets = false;
     this.requireLifeguard = false;
@@ -523,6 +530,7 @@ export class SearchComponent implements OnInit, OnDestroy {
     return (
       Number(this.requiredFlag !== "all") +
       Number(this.dogAccess !== 'all') +
+      Number(this.naturism !== 'all') +
       Number(this.requireParking) +
       Number(this.requireToilets) +
       Number(this.requireLifeguard) +
@@ -540,6 +548,7 @@ export class SearchComponent implements OnInit, OnDestroy {
         toilets: this.requireToilets ? "1" : null,
         rescue: this.requireLifeguard ? "1" : null,
         dogs: this.dogAccess === 'all' ? null : this.dogAccess,
+        naturism: this.naturism === 'all' ? null : this.naturism,
         flag: this.requiredFlag === "all" ? null : this.requiredFlag,
         min: this.minWaterTemp,
         max: this.maxWaterTemp,

@@ -20,6 +20,11 @@ export interface BeachSearch {
   minAirTemp?: number;
   minScore?: number;
   minWaterTemp?: number;
+
+  /**
+   * Verified naturism on the entire beach or a marked section. Omit to include unverified beaches.
+   */
+  naturism?: 'verified' | 'dedicated' | 'section';
   parking?: boolean;
   q?: string;
   radiusKm?: number;

@@ -1,10 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
+import type { DogAccessFilter } from '../beaches/dog-access';
 
 export type SearchInput = {
   q?: string; bbox?: string; communeCode?: string;
   lat?: number; lon?: number; radiusKm?: number;
   waterType?: 'sea' | 'lake' | 'river' | 'unknown';
   parking?: boolean; toilets?: boolean; rescueStation?: boolean;
+  dogAccess?: DogAccessFilter;
   flag?: 'green' | 'yellow' | 'red';
   minWaterTemp?: number; maxWaterTemp?: number;
   minAirTemp?: number; maxAirTemp?: number; minScore?: number;

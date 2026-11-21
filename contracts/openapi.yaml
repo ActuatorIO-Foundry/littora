@@ -416,6 +416,7 @@ components:
         parking: {type: boolean}
         toilets: {type: boolean}
         rescueStation: {type: boolean}
+        dogAccess: {type: string, enum: [welcome, allowed], description: "Verified current access: welcome includes conditional access; allowed excludes it. Omit for all beaches."}
         flag: {type: string, enum: [green, yellow, red]}
         minWaterTemp: {type: number, minimum: 0, maximum: 45}
         maxWaterTemp: {type: number, minimum: 0, maximum: 45}

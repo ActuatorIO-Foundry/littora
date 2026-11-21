@@ -67,6 +67,10 @@
 .filter-panel .field {
   justify-content: start;
 }
+.dog-filter > span { display: flex; align-items: center; gap: 5px; }
+@media (max-width: 570px) {
+  .dog-filter { grid-column: 1 / -1; }
+}
 .temperature-inputs {
   display: flex;
   align-items: center;

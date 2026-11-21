@@ -25,6 +25,9 @@ const measurements = (current: Row, data: Partial<ForecastData>) => Object.fromE
 export const presentForecast = (data: ForecastData) => ({ ...data, isDemo: false, measurements: measurements(data.current, data) });
 
 export function presentBeach(beach: Row) {
+  return presentBeachAt(beach, new Date());
+}
+function presentBeachAt(beach: Row, at: Date) {
   const presence = (value: unknown) => ({
     value: typeof value === 'boolean' ? value : null,
     status: value === true ? 'present' : value === false ? 'absent' : 'unknown',
@@ -33,7 +36,7 @@ export function presentBeach(beach: Row) {
   return { ...beach, city: beach.city ?? null, department: beach.department ?? null,
     region: beach.region ?? null, coastline: beach.coastline ?? null, osm_id: beach.osm_id ?? null,
     distanceKm: beach.distanceKm ?? null,
-    dogAccess: dogAccess(beach.osm_id),
+    dogAccess: dogAccess(beach.osm_id, at),
     has_lifeguard: beach.has_lifeguard ?? null, has_parking: beach.has_parking ?? null, has_toilets: beach.has_toilets ?? null,
     facilities: beach.facilities ?? { lifeguard: presence(beach.has_lifeguard), parking: presence(beach.has_parking), toilets: presence(beach.has_toilets) },
   };
@@ -67,7 +70,10 @@ export const presentReport = (row: Row) => ({ id:row.id,beach_id:row.beach_id,ty
 
 export function present(operation: string, data: any, query: Row): unknown {
   switch (operation) {
-    case 'searchBeaches': return { ...data, items: data.items.map(presentBeach) };
+    case 'searchBeaches': {
+      const at = new Date(data.asOf);
+      return { ...data, items: data.items.map((beach: Row) => presentBeachAt(beach, at)) };
+    }
     case 'listBeaches': case 'getRecommendations': return data.map(presentBeach);
     case 'getBeach': return presentBeach(data);
     case 'getBeachAmenities': return { ...data, amenities: data.amenities.map((amenity: Row) => ({

@@ -66,6 +66,7 @@ export class SearchComponent implements OnInit, OnDestroy {
     return params;
   }
   requiredFlag = "all";
+  dogAccess: 'all' | NonNullable<BeachSearch['dogAccess']> = 'all';
   requireParking = false;
   requireToilets = false;
   requireLifeguard = false;
@@ -147,6 +148,8 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.requireParking = p.get("parking") === "1";
     this.requireToilets = p.get("toilets") === "1";
     this.requireLifeguard = p.get("rescue") === "1";
+    const dogs = p.get('dogs');
+    this.dogAccess = dogs === 'welcome' || dogs === 'allowed' ? dogs : 'all';
     this.requiredFlag = ["green", "yellow", "red"].includes(p.get("flag") ?? "")
       ? p.get("flag")!
       : "all";
@@ -301,6 +304,7 @@ export class SearchComponent implements OnInit, OnDestroy {
       ...(this.requireParking ? { parking: true } : {}),
       ...(this.requireToilets ? { toilets: true } : {}),
       ...(this.requireLifeguard ? { rescueStation: true } : {}),
+      ...(this.dogAccess !== 'all' ? { dogAccess: this.dogAccess } : {}),
       ...(this.minWaterTemp !== null ? { minWaterTemp: this.minWaterTemp } : {}),
       ...(this.maxWaterTemp !== null ? { maxWaterTemp: this.maxWaterTemp } : {}),
     };
@@ -501,6 +505,7 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.communeCode = null;
     this.query = "";
     this.requiredFlag = "all";
+    this.dogAccess = 'all';
     this.requireParking = false;
     this.requireToilets = false;
     this.requireLifeguard = false;
@@ -517,6 +522,7 @@ export class SearchComponent implements OnInit, OnDestroy {
   filterCount(): number {
     return (
       Number(this.requiredFlag !== "all") +
+      Number(this.dogAccess !== 'all') +
       Number(this.requireParking) +
       Number(this.requireToilets) +
       Number(this.requireLifeguard) +
@@ -533,6 +539,7 @@ export class SearchComponent implements OnInit, OnDestroy {
         parking: this.requireParking ? "1" : null,
         toilets: this.requireToilets ? "1" : null,
         rescue: this.requireLifeguard ? "1" : null,
+        dogs: this.dogAccess === 'all' ? null : this.dogAccess,
         flag: this.requiredFlag === "all" ? null : this.requiredFlag,
         min: this.minWaterTemp,
         max: this.maxWaterTemp,

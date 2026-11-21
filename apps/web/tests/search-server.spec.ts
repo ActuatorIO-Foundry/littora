@@ -5,6 +5,37 @@ const beach={id:'server-601',name:'Plage distante',city:'Test',department:'Var',
   waterType:'sea',has_parking:true,has_toilets:true,has_lifeguard:null,waterTemp:21,flag:'green',
   facilities:{rescueStation:{value:true}},scores:{bathing:50,family:85,paddle:20,boat:30},selectedScore:85};
 
+test('filtre chiens : critère serveur, compteur, lien partageable et réinitialisation', async ({page})=>{
+  const rows=['allowed','conditional','prohibited','unknown'].map((status,i)=>({...beach,
+    id:'test-'+i,name:'Plage '+i,dogAccess:{status}}));
+  const calls:any[]=[];
+  await page.route('**/api/search/beaches',r=>{
+    const body=r.request().postDataJSON(); calls.push(body);
+    return r.fulfill({json:searchResult(body,rows)});
+  });
+  await page.goto('/recherche');
+  const toggle=page.getByRole('button',{name:/Filtres/}), choice=page.getByLabel('Accès avec un chien');
+  await toggle.click();
+  await choice.selectOption('welcome');
+  await expect(page.locator('.results-heading h2')).toContainText('2 plages');
+  await expect(page.locator('.beach-result .dog-label')).toHaveText(['Chiens admis','Chiens admis sous conditions']);
+  expect(calls.at(-1).dogAccess).toBe('welcome');
+  await expect(toggle).toContainText('1');
+  await choice.selectOption('allowed');
+  await expect(page.locator('.beach-result')).toHaveCount(1);
+  await expect(page).toHaveURL(/dogs=allowed/);
+  await expect(page.getByRole('link',{name:'Détails'})).toHaveAttribute('href',/dogs=allowed/);
+  await page.reload();
+  await expect(page.locator('.beach-name')).toContainText('Plage 0');
+  expect(calls.at(-1).dogAccess).toBe('allowed');
+  await toggle.click();
+  await expect(choice).toHaveValue('allowed');
+  await page.getByRole('button',{name:'Réinitialiser'}).click();
+  await expect(page.locator('.beach-result')).toHaveCount(4);
+  await expect(page).not.toHaveURL(/dogs=/);
+  expect(calls.at(-1).dogAccess).toBeUndefined();
+});
+
 test('recherche serveur: criteres combines, usage, total et carte partagent la meme reponse',async({page})=>{
   const requests:any[]=[];
   await page.route('**/api/search/beaches',route=>{

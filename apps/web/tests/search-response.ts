@@ -2,6 +2,7 @@
 export function searchResult(input: any, rows: any[], commune: any = null) {
   const items = rows.filter(b => (!input.q || commune || `${b.name} ${b.city} ${b.region}`.toLocaleLowerCase('fr').includes(input.q.toLocaleLowerCase('fr'))) &&
     (!input.waterType || b.waterType === input.waterType) && (!input.parking || b.has_parking === true) &&
+    (!input.dogAccess || b.dogAccess?.status === 'allowed' || input.dogAccess === 'welcome' && b.dogAccess?.status === 'conditional') &&
     (!input.toilets || b.has_toilets === true) && (!input.rescueStation || b.facilities?.rescueStation?.value === true) &&
     (!input.flag || b.flag === input.flag) &&
     (input.minWaterTemp === undefined || b.waterTemp != null && b.waterTemp >= input.minWaterTemp) &&

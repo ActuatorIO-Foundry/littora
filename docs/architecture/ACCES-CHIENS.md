@@ -25,3 +25,9 @@ saisonnière, les dates sont inclusives, au fuseau Europe/Paris. Une période
 échue, une revue en retard ou des règles actives concurrentes ne doivent pas
 produire de badge positif. Un signalement communautaire peut motiver une
 nouvelle revue, pas modifier la règle publiée.
+
+Dans la recherche, le critère facultatif `dogAccess` accepte `welcome`
+(admis, y compris sous conditions) ou `allowed` (admis sans condition
+signalée). Il s’applique avant pagination, avec les autres filtres, au jour
+de la recherche à Paris. Une recherche paginée avec ce critère expire au
+changement de jour. Sans ce critère, la liste reste inchangée.

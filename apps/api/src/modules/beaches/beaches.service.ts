@@ -2,6 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 import { CacheService } from '../../cache/cache.service';
 import { PG } from '../../database/database.module';
 import { WaterType } from './water-classification';
+import { dogFriendlySites } from './dog-access';
 import { AmenitiesService } from './amenities.service';
 import type { SearchInput } from '../search/search-input';
 import type { Commune } from '../places/places.service';
@@ -108,7 +109,7 @@ export class BeachesService {
     return new Set(rows.map((r:{beach_id:string})=>r.beach_id));
   }
 
-  async searchCandidates(input: SearchInput, commune: Commune | null) {
+  async searchCandidates(input: SearchInput, commune: Commune | null, at: Date) {
     const params: unknown[] = [];
     const bind = (value: unknown) => { params.push(value); return `$${params.length}`; };
     const where: string[] = [];
@@ -131,6 +132,7 @@ export class BeachesService {
       where.push(`(ST_DWithin(geom,${point},${radius}) or geom is null and ST_DWithin(${location},${point},${radius}))`);
     }
     if (input.waterType) where.push(`water_type=${bind(input.waterType)}`);
+    if (input.dogAccess) where.push(`osm_id = ANY(${bind(dogFriendlySites(input.dogAccess, at))}::text[])`);
     for (const key of ['parking','toilets','rescueStation'] as const) {
       if (input[key]) where.push(`facility_facts->'${key}'->>'value'='true'`);
     }

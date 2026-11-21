@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, ServiceUnavailableE
 import { createHash, randomUUID } from 'node:crypto';
 import { CacheService } from '../../cache/cache.service';
 import { BeachesService } from '../beaches/beaches.service';
+import { dogRuleDay } from '../beaches/dog-access';
 import { PlacesService } from '../places/places.service';
 import { ReportsService } from '../reports/reports.service';
 import { conditionKey, searchConditions } from './search-conditions';
@@ -32,13 +33,17 @@ export class SearchService {
       if (saved.hash !== hash || !Number.isSafeInteger(offset) || offset >= saved.items.length || offset % limit) {
         throw new BadRequestException('Cursor does not match search');
       }
+      if (input.dogAccess && dogRuleDay(new Date(saved.asOf)) !== dogRuleDay(new Date())) {
+        throw new ConflictException('Search expired; restart from first page');
+      }
       snapshot = saved;
     } else {
       const commune = input.communeCode ? await this.places.get(input.communeCode) : null;
-      const candidates = await this.beaches.searchCandidates(input, commune);
+      const at = new Date();
+      const candidates = await this.beaches.searchCandidates(input, commune, at);
       const cached = await this.cache.getManyJson<Record<string, any>>(candidates.map(b => conditionKey(b.id)));
       const flags = await this.reports.flagConsensuses(candidates.map(b => b.id));
-      const now = Date.now(), usage = input.usage ?? 'bathing';
+      const now = at.getTime(), usage = input.usage ?? 'bathing';
       const enriched = candidates.map((beach, i) => {
         const {explanations,estimatedFlag,...conditions} = searchConditions(beach, cached[i], now, closed.has(beach.id),live.byBeach.get(beach.id));
         const community = flags.get(beach.id);

@@ -128,6 +128,14 @@
         />Poste de secours</label
       >
     </fieldset>
+    <label class="field dog-filter">
+      <span><app-icon name="paw" [size]="15" aria-hidden="true" /> Accès avec un chien</span>
+      <select [(ngModel)]="dogAccess" (ngModelChange)="syncFilters()">
+        <option value="all">Indifférent</option>
+        <option value="welcome">Admis, même sous conditions</option>
+        <option value="allowed">Sans condition signalée</option>
+      </select>
+    </label>
     <label class="field"
       >Drapeau renseigné<select
         [(ngModel)]="requiredFlag"
@@ -253,7 +261,8 @@
       <div *ngIf="!loading && !error && !displayedBeaches().length" class="empty-state">
         <app-icon name="compass" [size]="35" />
         <h3>Aucune plage pour ces critères</h3>
-        <p>Essayez une autre zone ou élargissez votre recherche.</p>
+        <p>{{ dogAccess === 'all' ? 'Essayez une autre zone ou élargissez votre recherche.'
+          : 'Aucun accès correspondant n’est confirmé pour cette recherche. Les plages sans règle vérifiée ne sont pas affichées.' }}</p>
         <button class="btn" (click)="resetFilters()">
           Effacer les filtres
         </button>

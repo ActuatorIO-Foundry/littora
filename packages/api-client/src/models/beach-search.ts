@@ -6,6 +6,11 @@ export interface BeachSearch {
   bbox?: Bounds;
   communeCode?: string;
   cursor?: string;
+
+  /**
+   * Verified current access: welcome includes conditional access; allowed excludes it. Omit for all beaches.
+   */
+  dogAccess?: 'welcome' | 'allowed';
   flag?: 'green' | 'yellow' | 'red';
   lat?: number;
   limit?: number;

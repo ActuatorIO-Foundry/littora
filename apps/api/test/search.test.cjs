@@ -54,6 +54,15 @@ test('search: foreign, malformed and expired cursors never silently restart or c
   for(const [key,value] of stored)if(key.startsWith('search:page:'))value.expiresAt='2000-01-01T00:00:00Z';
   await assert.rejects(service.search({limit:2,cursor}),e=>e.getStatus()===409);
 });
+test('search: a dog-filtered cursor cannot survive a change of mode or the local seasonal boundary',async t=>{
+  t.mock.timers.enable({apis:['Date'],now:Date.parse('2027-06-14T21:59:40Z')});
+  const {service}=fixture(),criteria={dogAccess:'welcome',limit:1};
+  const {pageInfo:{nextCursor:cursor}}=await service.search(criteria);
+  assert.ok(cursor);
+  await assert.rejects(service.search({...criteria,dogAccess:'allowed',cursor}),e=>e.getStatus()===400);
+  t.mock.timers.tick(20000);
+  await assert.rejects(service.search({...criteria,cursor}),e=>e.getStatus()===409);
+});
 test('search: stale, missing, future and moved conditions cannot satisfy numeric filters',()=>{
   for(const modify of [s=>s.dataStatus.marine.status='stale',s=>s.dataStatus.marine.fetchedAt='2000-01-01T00:00:00Z',
     s=>s.dataStatus.marine.validAt='2099-01-01T00:00:00Z',s=>s.lat=44,s=>s.waterType='lake']) {

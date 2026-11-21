@@ -29,11 +29,13 @@ const rules: readonly Rule[] = [
     detail: 'Chiens de compagnie interdits sur cette plage. À Bandol, la Dog Beach située près du stade Deferrari est un site distinct.' },
 ];
 const paris = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' });
+export const dogRuleDay = (now: Date) => paris.format(now);
+export type DogAccessFilter = 'welcome' | 'allowed';
 
 export function dogAccess(site: string | null, now = new Date(), records = rules) {
   const matched = site ? records.filter(rule => rule.sites.includes(site)) : [];
   if (!matched.length) return { status: 'unknown', reason: 'unlisted' };
-  const day = paris.format(now);
+  const day = dogRuleDay(now);
   const active = matched.filter(r => r.checkedOn <= day && day <= r.reviewBy && (!r.validUntil || day <= r.validUntil));
   if (active.length !== 1) return { status: 'unknown', reason: active.length ? 'conflict' : 'outdated' };
   const { status, detail, source, sourceUrl, checkedOn, validUntil, closedSeason } = active[0];
@@ -41,4 +43,11 @@ export function dogAccess(site: string | null, now = new Date(), records = rules
   const closed = closedSeason && (closedSeason[0] <= closedSeason[1]
     ? md >= closedSeason[0] && md <= closedSeason[1] : md >= closedSeason[0] || md <= closedSeason[1]);
   return { status: closed ? 'prohibited' : status, detail, source, sourceUrl, checkedOn, ...(validUntil ? { validUntil } : {}) };
+}
+
+export function dogFriendlySites(filter: DogAccessFilter, at: Date) {
+  return [...new Set(rules.flatMap(rule => rule.sites))].filter(site => {
+    const { status } = dogAccess(site, at);
+    return status === 'allowed' || (filter === 'welcome' && status === 'conditional');
+  });
 }

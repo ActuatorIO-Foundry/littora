@@ -7,6 +7,6 @@ RUN tar -xzf /tmp/tiger.tar.gz -C /tmp \
 
 # The upstream gosu binary embeds an obsolete Go runtime. Keep the entrypoint
 # contract with Alpine's equivalent privilege-dropping utility.
-RUN apk add --no-cache su-exec=0.3-r0 \
+RUN apk add --no-cache su-exec=0.3-r0 libxml2=2.13.9-r3 \
     && rm /usr/local/bin/gosu /usr/local/bin/su-exec \
     && sed -i 's/exec gosu postgres/exec su-exec postgres/' /usr/local/bin/docker-entrypoint.sh

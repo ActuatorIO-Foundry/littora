@@ -9,6 +9,7 @@ import { Commune } from "../../models/commune.model";
 import { LittoraApiService } from "../../services/littora-api.service";
 import { IconComponent } from "../../shared/icon.component";
 import { ComfortExplanationComponent } from '../../shared/comfort-explanation.component';
+import { DogAccessComponent } from '../../shared/dog-access.component';
 import { LoadingComponent } from "../../shared/loading.component";
 import { CoastMapComponent } from "../../shared/coast-map.component";
 import { COASTAL_ZONES, CoastalZone } from "../../shared/coastal-zones";
@@ -30,6 +31,7 @@ type Result = Beach & {
     RouterLink,
     IconComponent,
     ComfortExplanationComponent,
+    DogAccessComponent,
     LoadingComponent,
     CoastMapComponent,
   ],

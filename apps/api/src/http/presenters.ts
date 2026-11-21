@@ -1,5 +1,6 @@
 import { ForecastData, finiteMetric } from '../shared/forecast-data';
 import { modelVersion } from '../modules/score/comfort-model';
+import { dogAccess } from '../modules/beaches/dog-access';
 
 type Row = Record<string, any>;
 const date = (value: unknown): string | null => {
@@ -32,6 +33,7 @@ export function presentBeach(beach: Row) {
   return { ...beach, city: beach.city ?? null, department: beach.department ?? null,
     region: beach.region ?? null, coastline: beach.coastline ?? null, osm_id: beach.osm_id ?? null,
     distanceKm: beach.distanceKm ?? null,
+    dogAccess: dogAccess(beach.osm_id),
     has_lifeguard: beach.has_lifeguard ?? null, has_parking: beach.has_parking ?? null, has_toilets: beach.has_toilets ?? null,
     facilities: beach.facilities ?? { lifeguard: presence(beach.has_lifeguard), parking: presence(beach.has_parking), toilets: presence(beach.has_toilets) },
   };

@@ -20,6 +20,7 @@ export type { CommunityFlag } from './models/community-flag';
 export type { ContributionSession } from './models/contribution-session';
 export type { DataStatus } from './models/data-status';
 export type { Discovery } from './models/discovery';
+export type { DogAccess } from './models/dog-access';
 export type { FacilityPresence } from './models/facility-presence';
 export type { Forecast } from './models/forecast';
 export type { IngestionReceipt } from './models/ingestion-receipt';

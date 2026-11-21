@@ -13,6 +13,7 @@ export interface Beach {
   has_toilets: boolean | null;
   facilities?: import('@littora/api-client/models').Beach['facilities'];
   osm_id: string | null;
+  dogAccess?: import('@littora/api-client/models').DogAccess;
   distanceKm: number | null;
 }
 

@@ -40,6 +40,7 @@ import {
   LucideCheck,
   LucideMessageCircle,
   LucideAnchor,
+  LucidePawPrint,
 } from "@lucide/angular";
 @Component({
   selector: "app-icon",
@@ -90,5 +91,6 @@ export class IconComponent {
     check: LucideCheck,
     message: LucideMessageCircle,
     anchor: LucideAnchor,
+    paw: LucidePawPrint,
   };
 }

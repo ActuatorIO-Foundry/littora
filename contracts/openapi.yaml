@@ -327,10 +327,28 @@ components:
         verified: {type: boolean, enum: [false]}
         fetchedAt: {type: string, format: date-time, nullable: true}
         scope: {type: string, enum: [nearby, unknown], description: Nearby infrastructure is not proof of current operation or on-site presence.}
+    DogAccess:
+      type: object
+      additionalProperties: false
+      required: [status]
+      oneOf:
+        - properties: {status: {enum: [unknown]}}
+          required: [reason]
+        - properties: {status: {enum: [allowed, conditional, prohibited]}}
+          required: [detail, source, sourceUrl, checkedOn]
+      properties:
+        status: {type: string, enum: [allowed, conditional, prohibited, unknown]}
+        reason: {type: string, enum: [unlisted, outdated, conflict]}
+        detail: {type: string}
+        source: {type: string}
+        sourceUrl: {type: string, format: uri}
+        checkedOn: {type: string, format: date}
+        validUntil: {type: string, format: date}
     Beach:
       type: object
-      required: [id, name, city, department, region, coastline, waterType, lat, lon, has_lifeguard, has_parking, has_toilets, osm_id, distanceKm, facilities]
+      required: [id, name, city, department, region, coastline, waterType, lat, lon, has_lifeguard, has_parking, has_toilets, osm_id, distanceKm, facilities, dogAccess]
       properties:
+        dogAccess: {$ref: '#/components/schemas/DogAccess'}
         id: {type: string, format: uuid}
         waterClassification:
           type: object

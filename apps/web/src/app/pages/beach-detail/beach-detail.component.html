@@ -441,6 +441,7 @@
           {{ beach.lon | number: "1.4-4"
           }}<app-icon name="external" [size]="13"
         /></a>
+        <app-dog-access class="on-site" [access]="beach.dogAccess" [detailed]="true" />
         <div class="amenities">
           <h3>Accès & équipements</h3>
           <p *ngIf="loadingAmenities" class="caption" role="status">Recherche des équipements à proximité…</p>

@@ -131,6 +131,35 @@ async function noOverflow(page: Page) {
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
   await page.waitForTimeout(100);
 }
+test('accès des chiens : badge en recherche, conditions et source sur la fiche, silence sans preuve', async ({page}) => {
+  const access = { status:'conditional', detail:'Uniquement en laisse, avant 9 h.', source:'Gestionnaire de test',
+    sourceUrl:'https://example.org/reglement', checkedOn:'2026-11-21' };
+  const listed = {...beaches[0], dogAccess:access};
+  const others = [
+    {...beaches[1], waterType:'sea'},
+    {...listed, id:'test-allowed', name:'Plage canine', dogAccess:{...access,status:'allowed'}},
+    {...listed, id:'test-prohibited', name:'Plage interdite aux chiens', dogAccess:{...access,status:'prohibited'}},
+  ];
+  await page.route('**/api/search/beaches', r => r.fulfill({json:searchResult(r.request().postDataJSON(),[listed,...others])}));
+  await page.goto('/recherche');
+  await expect(page.locator('.beach-result')).toHaveCount(4);
+  await expect(page.getByText('Chiens admis',{exact:true})).toBeVisible();
+  await expect(page.getByText('Chiens de compagnie interdits',{exact:true})).toBeVisible();
+  await expect(page.locator('.beach-result').filter({hasText:listed.name}).getByText('Chiens admis sous conditions')).toBeVisible();
+  await expect(page.locator('.beach-result').filter({hasText:beaches[1].name}).locator('app-dog-access')).toHaveCount(0);
+  await page.route('**/api/beaches/test-sea', r => r.fulfill({json:listed}));
+  await page.locator('.beach-result').filter({hasText:listed.name}).getByRole('link',{name:'Détails'}).click();
+  const block = page.locator('#sur-place app-dog-access');
+  await expect(block.getByText(access.detail)).toBeVisible();
+  await expect(block.getByRole('link',{name:access.source})).toHaveAttribute('href',access.sourceUrl);
+  await expect(block).toContainText('21/11/2026');
+  await noOverflow(page);
+  await page.route('**/api/beaches/test-sea', r => r.fulfill({json:{...listed,dogAccess:{status:'unknown',reason:'conflict'}}}));
+  await page.reload();
+  await expect(block).toContainText('Non renseigné.');
+  await expect(block).toContainText('Les sources se contredisent');
+  await expect(block.locator('.dog-label')).toHaveCount(0);
+});
 test.beforeEach(async ({ page }) => {
   await mockApi(page);
 });

@@ -29,6 +29,7 @@ export type { Measurement } from './models/measurement';
 export type { MeasurementMap } from './models/measurement-map';
 export type { MetricPoint } from './models/metric-point';
 export type { NamedArea } from './models/named-area';
+export type { Naturism } from './models/naturism';
 export type { Outline } from './models/outline';
 export type { PageInfo } from './models/page-info';
 export type { Recommendation } from './models/recommendation';

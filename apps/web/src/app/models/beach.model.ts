@@ -14,6 +14,7 @@ export interface Beach {
   facilities?: import('@littora/api-client/models').Beach['facilities'];
   osm_id: string | null;
   dogAccess?: import('@littora/api-client/models').DogAccess;
+  naturism?: import('@littora/api-client/models').Naturism;
   distanceKm: number | null;
 }
 

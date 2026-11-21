@@ -131,6 +131,38 @@ async function noOverflow(page: Page) {
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
   await page.waitForTimeout(100);
 }
+test('naturisme : filtres partageables, badge de secteur et source sur la fiche', async ({page}) => {
+  const info = { status:'section', detail:'Uniquement au nord du repère.', source:'Mairie de test',
+    sourceUrl:'https://example.org/plage', checkedOn:'2026-11-21' };
+  const listed = {...beaches[0], naturism:info};
+  const rows = [listed,{...listed,id:'entire',name:'Autre plage',naturism:{...info,status:'dedicated'}},
+    {...listed,id:'unsourced',name:'Plage naturiste sans preuve',naturism:{status:'unknown'}}];
+  await page.route('**/api/search/beaches', r => r.fulfill({json:searchResult(r.request().postDataJSON(),rows)}));
+  await page.route('**/api/beaches/test-sea', r => r.fulfill({json:listed}));
+  await page.goto('/recherche');
+  const filters = page.getByRole('button',{name:/Filtres/}), choice = page.getByRole('combobox',{name:'Naturisme',exact:true});
+  await filters.click();
+  await choice.selectOption('verified');
+  await expect(page.locator('.beach-result')).toHaveCount(2);
+  await expect(page.locator('.naturism-label')).toHaveText(['Plage naturiste','Secteur naturiste']);
+  await choice.selectOption('dedicated'); await expect(page.locator('.beach-result')).toHaveCount(1);
+  await expect(page.locator('.beach-name')).toContainText('Autre plage');
+  await choice.selectOption('section'); await expect(page).toHaveURL(/naturism=section/);
+  await page.reload(); await expect(page.locator('.beach-result')).toHaveCount(1);
+  await expect(filters).toContainText('1');
+  await filters.click(); await expect(choice).toHaveValue('section');
+  await page.getByRole('button',{name:'Réinitialiser'}).click();
+  await expect(page.locator('.beach-result')).toHaveCount(3); await expect(page).not.toHaveURL(/naturism=/);
+  await expect(page.locator('.beach-result').filter({hasText:'sans preuve'}).locator('app-naturism')).toHaveCount(0);
+  await page.locator('.beach-result').filter({hasText:listed.name}).getByRole('link',{name:'Détails'}).click();
+  const block = page.locator('#sur-place app-naturism');
+  await expect(block.getByText(info.detail)).toBeVisible();
+  await expect(block.getByRole('link',{name:info.source})).toHaveAttribute('href',info.sourceUrl);
+  await expect(block).toContainText('21/11/2026'); await noOverflow(page);
+  await page.route('**/api/beaches/test-sea', r => r.fulfill({json:{...listed,naturism:{status:'unknown'}}}));
+  await page.reload(); await expect(block).toContainText('Aucune information vérifiée');
+  await expect(block.locator('.naturism-label')).toHaveCount(0);
+});
 test('accès des chiens : badge en recherche, conditions et source sur la fiche, silence sans preuve', async ({page}) => {
   const access = { status:'conditional', detail:'Uniquement en laisse, avant 9 h.', source:'Gestionnaire de test',
     sourceUrl:'https://example.org/reglement', checkedOn:'2026-11-21' };
@@ -201,7 +233,7 @@ test('Confort : le même profil et les mêmes points dans la liste et la fiche',
   await page.route('**/api/score/beach/*',route=>route.fulfill({json:{...score,scores:{...score.scores,family:68,bathing:null},explanations:{family,bathing}}}));
   await page.goto('/recherche?usage=family');
   await expect(page.locator('.beach-tags')).toContainText('Confort : 68/100');
-  await page.getByRole('button',{name:'Plage des Pins'}).click();
+  await page.locator('.beach-result').getByRole('button',{name:'Plage des Pins',exact:true}).click();
   await expect(page.locator('.beach-overview')).toContainText('Vagues : 32 points retirés');
   await page.getByRole('link',{name:/Détails/}).first().click();
   await expect(page.locator('.score-explanation')).toContainText('Vagues : 32 points retirés');

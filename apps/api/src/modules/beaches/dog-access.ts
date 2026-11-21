@@ -1,3 +1,5 @@
+import { beachRuleDay } from './beach-rule-day';
+
 // Scope is a reviewed catalogue feature, never a place name, radius or whole municipality.
 type Rule = {
   sites: readonly string[];
@@ -28,14 +30,12 @@ const rules: readonly Rule[] = [
     source: 'Bandol Tourisme', sourceUrl: 'https://www.bandoltourisme.fr/bandol/la-destination/les-plages/',
     detail: 'Chiens de compagnie interdits sur cette plage. À Bandol, la Dog Beach située près du stade Deferrari est un site distinct.' },
 ];
-const paris = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' });
-export const dogRuleDay = (now: Date) => paris.format(now);
 export type DogAccessFilter = 'welcome' | 'allowed';
 
 export function dogAccess(site: string | null, now = new Date(), records = rules) {
   const matched = site ? records.filter(rule => rule.sites.includes(site)) : [];
   if (!matched.length) return { status: 'unknown', reason: 'unlisted' };
-  const day = dogRuleDay(now);
+  const day = beachRuleDay(now);
   const active = matched.filter(r => r.checkedOn <= day && day <= r.reviewBy && (!r.validUntil || day <= r.validUntil));
   if (active.length !== 1) return { status: 'unknown', reason: active.length ? 'conflict' : 'outdated' };
   const { status, detail, source, sourceUrl, checkedOn, validUntil, closedSeason } = active[0];

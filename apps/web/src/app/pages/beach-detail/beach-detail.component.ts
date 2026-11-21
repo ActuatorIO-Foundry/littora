@@ -15,6 +15,7 @@ import { LittoraApiService } from "../../services/littora-api.service";
 import { IconComponent } from "../../shared/icon.component";
 import { ComfortExplanationComponent } from '../../shared/comfort-explanation.component';
 import { DogAccessComponent } from '../../shared/dog-access.component';
+import { NaturismComponent } from '../../shared/naturism.component';
 import { LoadingComponent } from "../../shared/loading.component";
 import { CoastMapComponent } from "../../shared/coast-map.component";
 import { amenityGroups, directionsTo, listedAmenities } from "../../shared/map-points";
@@ -36,6 +37,7 @@ type UsageKey = "bathing" | "family" | "paddle" | "boat";
     IconComponent,
     ComfortExplanationComponent,
     DogAccessComponent,
+    NaturismComponent,
     LoadingComponent,
     CoastMapComponent,
   ],

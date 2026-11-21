@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, Injectable, ServiceUnavailableE
 import { createHash, randomUUID } from 'node:crypto';
 import { CacheService } from '../../cache/cache.service';
 import { BeachesService } from '../beaches/beaches.service';
-import { dogRuleDay } from '../beaches/dog-access';
+import { beachRuleDay } from '../beaches/beach-rule-day';
 import { PlacesService } from '../places/places.service';
 import { ReportsService } from '../reports/reports.service';
 import { conditionKey, searchConditions } from './search-conditions';
@@ -33,7 +33,7 @@ export class SearchService {
       if (saved.hash !== hash || !Number.isSafeInteger(offset) || offset >= saved.items.length || offset % limit) {
         throw new BadRequestException('Cursor does not match search');
       }
-      if (input.dogAccess && dogRuleDay(new Date(saved.asOf)) !== dogRuleDay(new Date())) {
+      if ((input.dogAccess || input.naturism) && beachRuleDay(new Date(saved.asOf)) !== beachRuleDay(new Date())) {
         throw new ConflictException('Search expired; restart from first page');
       }
       snapshot = saved;

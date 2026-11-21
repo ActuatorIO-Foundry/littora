@@ -3,6 +3,7 @@ import { CacheService } from '../../cache/cache.service';
 import { PG } from '../../database/database.module';
 import { WaterType } from './water-classification';
 import { dogFriendlySites } from './dog-access';
+import { naturistSites } from './naturism';
 import { AmenitiesService } from './amenities.service';
 import type { SearchInput } from '../search/search-input';
 import type { Commune } from '../places/places.service';
@@ -133,6 +134,7 @@ export class BeachesService {
     }
     if (input.waterType) where.push(`water_type=${bind(input.waterType)}`);
     if (input.dogAccess) where.push(`osm_id = ANY(${bind(dogFriendlySites(input.dogAccess, at))}::text[])`);
+    if (input.naturism) where.push(`osm_id = ANY(${bind(naturistSites(input.naturism, at))}::text[])`);
     for (const key of ['parking','toilets','rescueStation'] as const) {
       if (input[key]) where.push(`facility_facts->'${key}'->>'value'='true'`);
     }

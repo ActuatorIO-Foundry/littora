@@ -36,7 +36,7 @@ test('search: complete PostGIS scope, amenities, fresh conditions, stable Redis 
     ($1,'Outside triangle',43.9,6.9,ST_SetSRID(ST_MakePoint(6.9,43.9),4326)::geography),
     ($2,'Monaco',43.739,7.427,ST_SetSRID(ST_MakePoint(7.427,43.739),4326)::geography)`,[id(603),id(604)]);
   await pool.query('update beaches set geom=null where id=$1',[id(602)]);
-  for (const [n,ref] of [[598,'way/77594385'],[599,'way/961374583'],[600,'way/30585237'],[601,'way/167688426']]) {
+  for (const [n,ref] of [[596,'way/25661665'],[597,'relation/13587236'],[598,'way/77594385'],[599,'way/961374583'],[600,'way/30585237'],[601,'way/167688426']]) {
     await pool.query('update beaches set osm_id=$2 where id=$1',[id(n),ref]);
   }
   for(const [n,type]of [[600,'sea'],[601,'lake'],[602,'river']])await review(pool,id(n),type,'https://example.org/test-reference','Isolated search fixture');
@@ -52,12 +52,17 @@ test('search: complete PostGIS scope, amenities, fresh conditions, stable Redis 
   const commune={code:'83009',name:'Test',department:{code:'83',name:'Var'},region:{code:'93',name:'Provence'},
     center:{lat:43,lon:6},bbox:[42.9,5.9,44,7],contour:{type:'Polygon',coordinates:[[[5.9,42.9],[7,42.9],[5.9,44],[5.9,42.9]]]}};
   const service=new SearchService(beaches,{get:async()=>commune},reports,cache);
-  const dogIds=async(criteria,date)=>(await beaches.searchCandidates(criteria,null,new Date(date))).map(b=>b.id);
-  assert.deepEqual(await dogIds({dogAccess:'welcome'},'2026-12-01'),[id(599),id(600),id(601)]);
-  assert.deepEqual(await dogIds({dogAccess:'welcome'},'2027-07-01'),[id(599),id(600)]);
-  assert.deepEqual(await dogIds({dogAccess:'allowed'},'2026-12-01'),[id(599)]);
-  assert.deepEqual(await dogIds({dogAccess:'welcome',parking:true},'2026-12-01'),[id(600)]);
-  assert.deepEqual(await dogIds({dogAccess:'welcome'},'2028-01-01'),[]);
+  const candidateIds=async(criteria,date)=>(await beaches.searchCandidates(criteria,null,new Date(date))).map(b=>b.id);
+  assert.deepEqual(await candidateIds({naturism:'verified'},'2026-12-01'),[id(596),id(597)]);
+  assert.deepEqual(await candidateIds({naturism:'section'},'2026-12-01'),[id(597)]);
+  assert.deepEqual(await candidateIds({naturism:'dedicated'},'2026-12-01'),[id(596)]);
+  assert.deepEqual(await candidateIds({naturism:'verified',parking:true},'2026-12-01'),[]);
+  assert.deepEqual(await candidateIds({naturism:'verified'},'2028-01-01'),[]);
+  assert.deepEqual(await candidateIds({dogAccess:'welcome'},'2026-12-01'),[id(599),id(600),id(601)]);
+  assert.deepEqual(await candidateIds({dogAccess:'welcome'},'2027-07-01'),[id(599),id(600)]);
+  assert.deepEqual(await candidateIds({dogAccess:'allowed'},'2026-12-01'),[id(599)]);
+  assert.deepEqual(await candidateIds({dogAccess:'welcome',parking:true},'2026-12-01'),[id(600)]);
+  assert.deepEqual(await candidateIds({dogAccess:'welcome'},'2028-01-01'),[]);
   const originalFetch=global.fetch;global.fetch=()=>{throw Error('Search must not call providers');};t.after(()=>global.fetch=originalFetch);
   const result=await service.search({minWaterTemp:21,maxWaterTemp:21,usage:'family',minScore:80});
   assert.equal(result.total,1);assert.equal(result.items[0].id,target.id);

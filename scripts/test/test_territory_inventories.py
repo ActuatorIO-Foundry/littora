@@ -1,9 +1,89 @@
 import runpy
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from subprocess import CompletedProcess
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
+import osmium
 from shapely.geometry import box
 
 geo = runpy.run_path(str(Path(__file__).resolve().parents[1] / "territory-inventories.py"))
+
+
+class Transfers(unittest.TestCase):
+    polygon = b"test\n1\n0 0\n0 4\n4 4\n4 0\n0 0\nEND\nEND\n"
+    name = "bretagne-latest.osm.pbf"
+
+    def setUp(self):
+        directory = TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.cache = Path(directory.name)
+        self.download = geo["Downloads"](self.cache, 10000, "1M")
+        self.calls, self.responses = [], []
+        def transport(args, **options):
+            self.calls.append(args)
+            rc, status, body = self.responses.pop(0)
+            Path(args[args.index("--output") + 1]).write_bytes(body)
+            return CompletedProcess(args, rc, stdout=status, stderr="private test detail")
+        self.enterContext(patch("subprocess.run", side_effect=transport))
+        self.sleep = self.enterContext(patch("time.sleep"))
+
+    def get(self, name):
+        return self.download.get(name, "bretagne/"+name, 10000)
+
+    def pbf(self, age):
+        path = self.cache / f"fixture-{age}.osm.pbf"
+        header = osmium.io.Header()
+        stamp = (datetime.now(timezone.utc)-timedelta(days=age)).isoformat()
+        header.set("osmosis_replication_timestamp", stamp.split(".")[0]+"Z")
+        with osmium.SimpleWriter(str(path), header=header):
+            pass
+        return path.read_bytes()
+
+    def test_transient_transfer_retries_once_charging_partial_bytes(self):
+        self.responses = [(18,"200",b"partial"), (0,"200",self.polygon)]
+        self.assertEqual(self.get("bretagne.poly").read_bytes(), self.polygon)
+        self.assertEqual(self.sleep.call_count, 1)
+        self.assertEqual(self.download.remaining, 10000 - 7 - len(self.polygon))
+        self.assertEqual(self.calls[1][self.calls[1].index("--max-filesize")+1], "9993")
+
+    def test_exhausted_or_throttled_transfer_never_replaces_cache(self):
+        target = self.cache/"bretagne.poly"
+        target.write_bytes(self.polygon)
+        for rc, status, body, budget in [(22,"429",b"",10000), (22,"503",b"",10000),
+                                         (6,"000",b"",10000), (18,"200",b"x",1)]:
+            with self.subTest(rc=rc,status=status):
+                self.calls.clear()
+                self.download.remaining = budget
+                self.responses = [(rc,status,body)] * (2 if rc==6 else 1)
+                with self.assertRaises(geo["DownloadError"]):
+                    self.get(target.name)
+                self.assertFalse(self.responses)
+                self.assertEqual(target.read_bytes(), self.polygon)
+
+    def test_dated_fallback_uses_only_own_publisher_and_counts_index(self):
+        payload = self.pbf(1)
+        index = (b'<a href="bretagne-260101.osm.pbf">old</a><a href="bretagne-261121.osm.pbf">new</a>'
+                 b'<a href="https://example.org/bretagne-991231.osm.pbf">external</a>')
+        self.responses = [(22,"404",b""), (0,"200",index), (0,"200",payload)]
+        self.assertEqual(self.get(self.name).read_bytes(), payload)
+        self.assertEqual(self.calls[-1][-1], geo["ROOT"]+"bretagne/bretagne-261121.osm.pbf")
+        self.assertEqual(self.download.remaining, 10000-len(index)-len(payload))
+
+    def test_unchanged_corrupt_older_and_expired_responses_preserve_good_copy(self):
+        target = self.cache/self.name
+        original = self.pbf(1)
+        target.write_bytes(original)
+        timestamp = target.stat().st_mtime_ns
+        self.responses = [(0,"304",b"")]
+        self.assertEqual(self.get(self.name), target)
+        for payload in (b"not a PBF", self.pbf(2), self.pbf(8), b""):
+            self.responses = [(0,"200",payload)]
+            with self.assertRaises((ValueError, RuntimeError, OSError)):
+                self.get(self.name)
+        self.assertEqual(target.read_bytes(), original)
+        self.assertEqual(target.stat().st_mtime_ns, timestamp)
 
 
 class Planning(unittest.TestCase):

@@ -116,6 +116,15 @@ meme cache. Le service compare les dates de fichier (HTTP 304) et conserve
 la derniere preparation par region. Une relecture de la meme edition est
 idempotente et ne rafraichit pas artificiellement son age.
 
+Une coupure de connexion ou certaines erreurs HTTP temporaires donnent lieu
+a un seul nouvel essai apres trois secondes. Les transferts partiels et la
+lecture de l'index debitent aussi le quota du cycle. Pour HTTP 429 ou 503,
+il n'y a pas de nouvel essai immediat du fichier. Si l'alias regional est
+introuvable ou boucle, seul un extrait date de la meme region sur l'index
+du fournisseur peut le remplacer. Un en-tete PBF illisible, une edition
+perimee ou anterieure a celle du cache utilisable ne remplace pas le fichier.
+Une reponse HTTP 304 conserve la date et le contenu du cache.
+
 Une verification horaire lance le premier cycle du jour UTC, y compris apres
 un redemarrage. Une erreur ou une replication de plus de 48 h signale un cycle
 degrade, avec nouvelle tentative apres temporisation ; un extrait de 7 jours

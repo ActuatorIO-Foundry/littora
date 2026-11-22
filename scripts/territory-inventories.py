@@ -9,6 +9,7 @@ import runpy
 import subprocess
 import sys
 import tempfile
+import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from html.parser import HTMLParser
@@ -38,46 +39,79 @@ class DatedLinks(HTMLParser):
             self.links.append(url)
 
 
+class DownloadError(ValueError):
+    """Only fixed reason codes reach the operator's diagnostics."""
+
+
+def replication(reader):
+    stamp = reader.header.get("osmosis_replication_timestamp")
+    if not stamp:
+        raise ValueError("Missing replication date")
+    dt = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    if dt.tzinfo is None or not 0 <= (datetime.now(timezone.utc) - dt).total_seconds() < 7*86400:
+        raise ValueError("Invalid replication date")
+    return stamp, dt
+
+
 class Downloads:
     def __init__(self, cache, budget, rate):
         self.cache, self.remaining, self.rate = cache, budget, rate
         self.aging = []
 
-    def get(self, name, path, limit):
-        target = self.cache / name
-        with tempfile.NamedTemporaryFile(dir=self.cache) as tmp:
-            # The outer temporary file is private to this attempt, including errors and HTTP 304.
+    def request(self, url, dest, limit, cached=None, timeout=900):
+        for attempt in range(2):
+            if self.remaining <= 0:
+                raise DownloadError("transfer-quota")
+            dest.write_bytes(b"")
             cmd = ["curl", "--silent", "--show-error", "--fail", "--proto", "=https", "--location",
                    "--proto-redir", "=https", "--max-redirs", "2", "--remote-time",
-                   "--connect-timeout", "20", "--max-time", "900", "--limit-rate", self.rate,
-                   "--max-filesize", str(min(limit, self.remaining)), "--output", tmp.name,
+                   "--connect-timeout", "20", "--max-time", str(timeout), "--limit-rate", self.rate,
+                   "--max-filesize", str(min(limit, self.remaining)), "--output", str(dest),
                    "--write-out", "%{http_code}", "--user-agent", "Littora/0.1 (+https://github.com/ActuatorIO-Foundry/littora)"]
-            if self.remaining <= 0:
-                raise ValueError("Cycle transfer quota exhausted")
-            if target.exists():
-                cmd.extend(["--time-cond", str(target)])
-            result = subprocess.run([*cmd, ROOT + path], capture_output=True, text=True)
-            if result.returncode == 47 and name.endswith("-latest.osm.pbf"):
-                # A looping latest alias must not prevent use of the dated file in the official index.
-                index = subprocess.run(["curl","-fsSL","--max-redirs","2","--max-filesize",str(MIB),
-                                        "--max-time","20","--proto","=https","--proto-redir","=https",
-                                        urljoin(ROOT+path,"./")], capture_output=True,text=True)
+            if cached and cached.is_file():
+                cmd.extend(["--time-cond", str(cached)])
+            result = subprocess.run([*cmd, url], capture_output=True, text=True)
+            self.remaining -= dest.stat().st_size
+            transient = result.returncode in (6, 7, 18, 28, 52, 55, 56) or (
+                result.returncode == 22 and result.stdout in {"408", "500", "502", "504"})
+            if not transient or attempt or self.remaining <= 0:
+                return result
+            time.sleep(3)
+
+    def get(self, name, path, limit):
+        target = self.cache / name
+        pbf = name.endswith("-latest.osm.pbf")
+        with tempfile.NamedTemporaryFile(dir=self.cache, suffix=".osm.pbf" if pbf else ".poly") as tmp:
+            dest = Path(tmp.name)
+            result = self.request(ROOT + path, dest, limit, cached=target)
+            if pbf and (result.returncode == 47 or result.returncode == 22 and result.stdout in {"404", "410"}):
+                # Only the publisher's dated file for this exact region is eligible.
+                index = self.request(urljoin(ROOT+path,"./"), dest, MIB, timeout=20)
                 links = DatedLinks(path)
-                links.feed(index.stdout)
-                if index.returncode == 0 and links.links:
-                    edition = max(links.links)
-                    if target.is_file():
-                        stamp = osm["open_extract"](target).header.get("osmosis_replication_timestamp")
-                        if stamp and edition.endswith(datetime.fromisoformat(stamp.replace("Z","+00:00")).strftime("-%y%m%d.osm.pbf")):
-                            return target
-                    result = subprocess.run([*cmd,edition], capture_output=True, text=True)
-            self.remaining -= os.stat(tmp.name).st_size
+                if index.returncode == 0 and index.stdout == "200":
+                    links.feed(dest.read_text())
+                if not links.links:
+                    raise DownloadError("edition-index")
+                result = self.request(max(links.links), dest, limit, cached=target)
             if result.returncode:
-                raise ValueError(f"Download failed: {name} (curl {result.returncode})")
+                if result.stdout in {"429", "503"}:
+                    raise DownloadError("provider-backoff")
+                raise DownloadError("transfer-failed")
             if result.stdout == "304" and target.is_file():
                 return target
-            if result.stdout != "200" or not os.stat(tmp.name).st_size:
-                raise ValueError(f"Invalid download: {name}")
+            if result.stdout != "200" or not dest.stat().st_size:
+                raise DownloadError("invalid-response")
+            if pbf:
+                _, incoming = replication(osm["open_extract"](dest))
+                if target.is_file():
+                    try:
+                        _, existing = replication(osm["open_extract"](target))
+                    except (ValueError, OSError, RuntimeError):
+                        existing = None
+                    if existing and incoming < existing:
+                        raise DownloadError("older-edition")
+            else:
+                polygon(dest)
             # Hard-link then rename on the same filesystem; retain the provider's modification date.
             staged = Path(tmp.name + ".ready")
             os.link(tmp.name, staged)
@@ -135,10 +169,8 @@ def bundle(region, sites, downloads):
     path = region + "/" + name
     pbf = downloads.get(name, path, 650*MIB)
     reader = osm["open_extract"](pbf)
-    date = reader.header.get("osmosis_replication_timestamp")
-    age = (datetime.now(timezone.utc)-datetime.fromisoformat(date.replace("Z","+00:00"))).total_seconds()
-    if not 0 <= age < 7*86400:
-        raise ValueError("Missing, future or expired replication date")
+    date, edition = replication(reader)
+    age = (datetime.now(timezone.utc)-edition).total_seconds()
     if age >= 48*3600:
         downloads.aging.append(region)
         print(f"{region}: replication older than 48 h", file=sys.stderr)
@@ -203,9 +235,10 @@ def main():
                     out = bundle(r, groups[r], downloads)
                     print(str(out.resolve()), file=manifest, flush=True)
                     print(f"{r}: {len(groups[r])} inventories prepared", flush=True)
-                except (ValueError, OSError, RuntimeError):
+                except (ValueError, OSError, RuntimeError) as error:
                     failures.append(r)
-                    print(f"{r}: inventory preparation failed", file=sys.stderr, flush=True)
+                    reason = str(error) if isinstance(error, DownloadError) else "invalid-extract-or-storage"
+                    print(f"{r}: inventory preparation failed ({reason})", file=sys.stderr, flush=True)
     return 2 if failures or uncovered or downloads.aging else 0
 
 

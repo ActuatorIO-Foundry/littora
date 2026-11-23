@@ -177,7 +177,16 @@ n'ont pas migre la base locale active ni applique le seed sur celle-ci.
 - `scripts/test-api-migrations.mjs` : reseau Docker interne sans ports publics,
   stockage temporaire, refus de demarrage avant migration, CLI de l'image finale,
   double seed, API HTTP non-root et lectures sans modification de donnees.
-- `PREVIOUS_API_IMAGE` active en plus le test de compatibilite de l'image precedente.
+- Le retour applicatif est obligatoire. La CI construit les images de reference
+  depuis la revision figee dans le workflow, sans utiliser `main`. Pour rejouer
+  localement, fournir les quatre images via `TEST_API_IMAGE`, `TEST_WEB_IMAGE`,
+  `PREVIOUS_API_IMAGE`, `PREVIOUS_WEB_IMAGE`, puis lancer
+  `node scripts/test-api-migrations.mjs` depuis la racine. Les images PostGIS,
+  Redis et Caddy de recette doivent etre presentes. Une reference absente,
+  identique a l'API candidate ou incompatible avec le schema fait echouer le
+  controle. Ne changer la reference qu'apres avoir qualifie la nouvelle paire
+  de retour et documente son schema compatible. Voir la
+  [procedure de retour applicatif](INFRASTRUCTURE.md#retour-applicatif-29).
 - La CI execute le test de l'image, la restauration PostgreSQL/Redis, les suites
   API/UI et le controle des images. La production reste bloquee par #33/#29.
 

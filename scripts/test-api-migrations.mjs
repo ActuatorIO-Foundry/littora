@@ -17,7 +17,12 @@ const containers = [];
 const networks = [];
 const edge = name + '-edge';
 const ingress = name + '-ingress';
-const image = process.env.TEST_API_IMAGE || 'littora-api:ci';
+const imageId = ref => docker(['image','inspect','--format','{{.Id}}',ref]);
+const image = imageId(process.env.TEST_API_IMAGE || 'littora-api:ci');
+const previousImage = imageId(process.env.PREVIOUS_API_IMAGE || 'littora-api:rollback-ci');
+assert.notEqual(image, previousImage, 'Rollback requires two distinct API images');
+const webImage = imageId(process.env.TEST_WEB_IMAGE || 'littora-web:ci');
+const previousWebImage = imageId(process.env.PREVIOUS_WEB_IMAGE || 'littora-web:rollback-ci');
 const postgres = `${name}-postgres`;
 const redis = `${name}-redis`;
 const domain = 'littora.internal';
@@ -111,18 +116,23 @@ try {
   assert.equal(sql('select count(*) from beaches where has_parking is null and has_toilets is null and has_lifeguard is null'), '5');
 
   const web = `${name}-web`;
+  const previousWeb = `${name}-previous-web`;
   const proxy = `${name}-proxy`;
-  docker(['run', '-d', '--name', web, '--network', edge, '--network-alias', 'web',
-    process.env.TEST_WEB_IMAGE || 'littora-web:ci']);
-  containers.push(web);
+  for (const [container, build] of [[web, webImage], [previousWeb, previousWebImage]]) {
+    docker(['create','--name',container,'--network',edge,'--network-alias','web',build]);
+    containers.push(container);
+  }
+  docker(['start', previousWeb]);
   docker(['run', '-d', '--name', proxy, '--network', edge, '--network-alias', domain,
     '-e', `DOMAIN=${domain}`, '-v', `${resolve('infra/caddy/Caddyfile')}:/etc/caddy/Caddyfile:ro`,
     ...privacyEntrypoint, 'littora-caddy:2.11.9-r1', guard, 'caddy', 'run', '--config', '/etc/caddy/Caddyfile', '--adapter', 'caddyfile']);
   containers.push(proxy);
   docker(['network', 'connect', ingress, proxy]);
   const peer = docker(['inspect', '--format', `{{(index .NetworkSettings.Networks "${ingress}").IPAddress}}`, proxy]);
-  const api = start('ready', image, ['-e', 'REPORT_PROXY_IPV4=' + peer, '-e', 'REPORT_IP_HASH_KEY=' + randomUUID()]);
-  docker(['network', 'connect', '--alias', 'api', ingress, api]);
+  const reportConfig = ['-e', 'REPORT_PROXY_IPV4=' + peer, '-e', 'REPORT_IP_HASH_KEY=' + randomUUID()];
+  const previous = start('previous', previousImage, reportConfig);
+  const api = start('ready', image, reportConfig);
+  docker(['network', 'connect', '--alias', 'api', ingress, previous]);
   await until(() => request(api, '/api/beaches?limit=1').status === 200, 'HTTP after migration');
   assert.notEqual(docker(['exec', api, 'id', '-u']), '0');
   const response = request(api, '/api/beaches/catalogue');
@@ -148,18 +158,57 @@ try {
       docker(['cp', resolve('scripts/test-caddy.mjs'), visitor + ':/tmp/test-caddy.mjs']);
       docker(['cp', resolve('scripts/test-proxy-contribution.mjs'), visitor + ':/tmp/test-contribution.mjs']);
     }
-    const probe = () => docker(['exec', visitors[0], 'node', '/tmp/test-caddy.mjs']);
+    const probe = activeWeb => {
+      const [digest] = docker(['exec', activeWeb, 'sha256sum', '/usr/share/nginx/html/index.html']).split(/\s+/);
+      return docker(['exec','-e','TEST_INDEX_SHA256='+digest,visitors[0],'node','/tmp/test-caddy.mjs']);
+    };
     const proxyReady = () => docker(['exec', visitors[0], 'node', '-e',
       `fetch('https://${domain}',{signal:AbortSignal.timeout(1500)}).then(r=>process.exit(r.ok?0:1))`]) === '';
     await until(proxyReady, 'trusted HTTPS');
-    probe();
+    const viaProxy = () => docker(['exec', visitors[0], 'node', '-e',
+      `fetch('https://${domain}/api/beaches/${id}',{signal:AbortSignal.timeout(1500)})
+       .then(async r=>process.exit(r.ok && (await r.json()).id===${JSON.stringify(id)}?0:1)).catch(()=>process.exit(1))`]) === '';
+    const baseline = {api:previous, web:previousWeb}, candidate = {api, web};
+    const switchRelease = async (from, to) => {
+      const outgoing = from.api, incoming = to.api;
+      if (docker(['inspect','--format','{{.State.Running}}',incoming]) !== 'true') docker(['start',incoming]);
+      await until(() => request(incoming, '/api/beaches?limit=1').status === 200, 'incoming API readiness');
+      docker(['stop','--time','3',from.web]);
+      docker(['network','disconnect',ingress,outgoing]);
+      docker(['stop','--time','3',outgoing]);
+      docker(['network','connect','--alias','api',ingress,incoming]);
+      docker(['start',to.web]);
+      await until(viaProxy, 'new upstream through trusted HTTPS');
+      await until(proxyReady, 'frontend through trusted HTTPS');
+      probe(to.web);
+    };
+    await until(viaProxy, 'baseline API through trusted HTTPS');
+    probe(previousWeb);
+    await switchRelease(baseline, candidate);
     docker(['exec', visitors[0], 'node', '/tmp/test-contribution.mjs']);
     docker(['restart', proxy]);
     await until(proxyReady, 'trusted HTTPS after restart');
-    probe();
+    probe(web);
     docker(['exec', visitors[1], 'node', '/tmp/test-contribution.mjs']);
     assert.equal(sql('select count(distinct network_hash) from report_contributions'), '2');
     assert.equal(sql("select count(distinct split_part(key,':',2)) from report_rate_limits where key like 'session-hour:%'"), '2');
+    // Equal row counts alone would not catch changed observations, authors or moderation state.
+    const storedState = () => sql(`select
+      (select md5(string_agg(to_jsonb(b)::text,'' order by id)) from beaches b),
+      (select md5(string_agg(to_jsonb(m)::text,'' order by version)) from schema_migrations m),
+      (select md5(string_agg(to_jsonb(r)::text,'' order by id)) from reports r),
+      (select md5(string_agg(to_jsonb(c)::text,'' order by report_id)) from report_contributions c),
+      (select md5(string_agg(to_jsonb(a)::text,'' order by id)) from report_contributors a)`);
+    assert.equal(sql("select count(*) from reports where status='pending'"), '2');
+    const afterWrites = storedState();
+    await switchRelease(candidate, baseline);
+    assert.equal(storedState(), afterWrites, 'Upgrade-time writes changed on rollback');
+    docker(['exec','-e','TEST_NEXT_BEACH_ID='+response.body.beaches[1].id,visitors[0],
+      'node','/tmp/test-contribution.mjs','--after-rollback']);
+    assert.equal(sql("select count(*) from reports where status='pending'"), '3');
+    const afterRollbackWrite = storedState();
+    await switchRelease(baseline, candidate);
+    assert.equal(storedState(), afterRollbackWrite, 'Rollback-time write lost returning to candidate');
     const marker = 'private-' + randomUUID();
     const probePrivacy = (path, method, expected) => docker(['exec', visitors[0], 'node', '-e',
       `const marker=${JSON.stringify(marker)};
@@ -199,14 +248,9 @@ try {
   }
   assert.equal(sql("select md5(string_agg(to_jsonb(b)::text,'' order by id)) from beaches b"), before);
 
-  if (process.env.PREVIOUS_API_IMAGE) {
-    const previous = start('previous', process.env.PREVIOUS_API_IMAGE);
-    await until(() => request(previous, '/api/beaches?limit=1').status === 200, 'previous API compatibility');
-    assert.equal(request(previous, `/api/beaches/${id}`).body.id, id);
-  }
   console.log(JSON.stringify({ verified: true, readonlyStartup: true, migrations: pending.length, verifiedHttps: true,
     seedIdempotent: true, beaches: 5, sanitarySamples: 0, http: true, offlineScoreContract: true,
-    previousImage: Boolean(process.env.PREVIOUS_API_IMAGE) }));
+    verifiedApplicationRollback: true, pendingReportsPreserved: 3 }));
 } finally {
   const failures = [];
   for (const container of containers.reverse()) {

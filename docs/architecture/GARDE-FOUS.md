@@ -19,7 +19,7 @@ npm run check:toolchain
 npm run install:ci
 npm run test:api
 npm run build:web
-npm exec --prefix apps/web -- playwright install chromium
+npm exec --prefix apps/web -- playwright install chromium firefox webkit
 npm run test:ui
 ```
 

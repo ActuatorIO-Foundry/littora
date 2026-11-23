@@ -12,9 +12,11 @@ import { ComfortExplanationComponent } from '../../shared/comfort-explanation.co
 import { DogAccessComponent } from '../../shared/dog-access.component';
 import { NaturismComponent } from '../../shared/naturism.component';
 import { LoadingComponent } from "../../shared/loading.component";
+import { MetricReadingComponent } from '../../shared/metric-reading.component';
+import { RequestErrorComponent } from '../../shared/request-error.component';
 import { CoastMapComponent } from "../../shared/coast-map.component";
 import { COASTAL_ZONES, CoastalZone } from "../../shared/coastal-zones";
-import { metricValue, providerLabel, dataStatusLabel, flagLabel } from "../../shared/presentation";
+import { providerLabel, dataStatusLabel, flagLabel } from "../../shared/presentation";
 type Result = Beach & Partial<Pick<SearchBeach, 'flag' | 'flagSource' | 'recentRedAt' | 'bathingRestriction'>> & {
   selectedScore?: number | null;
   scoreExplanation?: import('@littora/api-client/models').ScoreExplanation;
@@ -33,6 +35,8 @@ type Result = Beach & Partial<Pick<SearchBeach, 'flag' | 'flagSource' | 'recentR
     DogAccessComponent,
     NaturismComponent,
     LoadingComponent,
+    MetricReadingComponent,
+    RequestErrorComponent,
     CoastMapComponent,
   ],
   templateUrl: "./search.component.html",
@@ -92,7 +96,6 @@ export class SearchComponent implements OnInit, OnDestroy {
     { id: "paddle", label: "Paddle", icon: "wind" },
     { id: "boat", label: "Bateau", icon: "boat" },
   ];
-  readonly metricValue = metricValue;
   readonly providerLabel = providerLabel;
   readonly dataStatusLabel = dataStatusLabel;
   private listRequest?: Subscription;

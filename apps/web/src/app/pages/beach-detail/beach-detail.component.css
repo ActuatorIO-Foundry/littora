@@ -76,6 +76,7 @@
   font-size: 11px;
 }
 .conditions-grid {
+  --reading-size: 29px;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   border-block: 1px solid var(--line);
@@ -102,11 +103,6 @@
   font-size: 11px;
   color: var(--muted);
   margin-bottom: 5px;
-}
-.conditions-grid strong {
-  font-size: 29px;
-  font-weight: 650;
-  color: var(--metric-color);
 }
 .conditions-grid small {
   font-size: 12px;
@@ -510,8 +506,8 @@
   .conditions-grid > div {
     padding-inline: 15px;
   }
-  .conditions-grid strong {
-    font-size: 25px;
+  .conditions-grid {
+    --reading-size: 25px;
   }
   .usage-scores {
     gap: 6px;
@@ -549,8 +545,8 @@
   .conditions-grid > div:nth-child(4) {
     padding-left: 0;
   }
-  .conditions-grid strong {
-    font-size: 24px;
+  .conditions-grid {
+    --reading-size: 24px;
   }
   .conditions-grid span {
     font-size: 10px;

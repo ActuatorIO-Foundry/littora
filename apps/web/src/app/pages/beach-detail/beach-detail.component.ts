@@ -18,10 +18,11 @@ import { DogAccessComponent } from '../../shared/dog-access.component';
 import { NaturismComponent } from '../../shared/naturism.component';
 import { FlagBulletinComponent } from '../../shared/flag-bulletin.component';
 import { LoadingComponent } from "../../shared/loading.component";
+import { MetricReadingComponent } from '../../shared/metric-reading.component';
+import { RequestErrorComponent } from '../../shared/request-error.component';
 import { CoastMapComponent } from "../../shared/coast-map.component";
 import { amenityGroups, directionsTo, listedAmenities } from "../../shared/map-points";
 import {
-  metricValue,
   metricClass,
   providerLabel,
   dataStatusLabel,
@@ -42,6 +43,8 @@ type UsageKey = "bathing" | "family" | "paddle" | "boat";
     NaturismComponent,
     FlagBulletinComponent,
     LoadingComponent,
+    MetricReadingComponent,
+    RequestErrorComponent,
     CoastMapComponent,
   ],
   templateUrl: "./beach-detail.component.html",
@@ -105,7 +108,6 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
     const value = m.value.toLocaleString('fr-FR') + ' / 100 ml';
     return m.qualifier === 'detection-limit' ? 'limite de détection : ' + value : value;
   }
-  readonly metricValue = metricValue;
   readonly metricClass = metricClass;
   readonly providerLabel = providerLabel;
   readonly dataStatusLabel = dataStatusLabel;

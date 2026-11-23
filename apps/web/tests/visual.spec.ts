@@ -573,6 +573,58 @@ test('actualisation discrète : un filtre conserve la liste pendant la requête,
   await expect(page.locator('.beach-name')).toContainText('Plage des Pins');
 });
 
+test('UI-02 : mêmes mesures et états dans la recherche et la fiche', async ({page}) => {
+  await page.route('**/api/score/beach/*', route => route.fulfill({json: {
+    ...score, current: {weather: {temperature_2m: 0, wind_speed_10m: null}, marine: {sea_surface_temperature: 18.5}},
+    dataStatus: {weather: {...airStatus, status:'stale'}, marine: {...airStatus, fetchedAt:new Date().toISOString()}},
+  }}));
+  await page.goto('/recherche');
+  const open = page.getByRole('button', {name:beaches[0].name, exact:true});
+  await open.focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  await expect(open).toBeFocused();
+  await expect(open).toHaveCSS('outline-style','solid');
+  await open.press('Enter');
+  for (const selector of ['.overview-metrics', '.conditions-grid']) {
+    if (selector === '.conditions-grid') await page.locator('#beach-test-sea').getByRole('link',{name:'Détails'}).press('Enter');
+    const readings = page.locator(selector).locator('app-metric-reading');
+    await expect(readings.nth(0)).toHaveText(/0\s*°C\s*Prévision périmée/);
+    await expect(readings.nth(1)).toHaveText(/18,5\s*°C\s*$/);
+    await expect(readings.nth(2)).toHaveText('Non renseigné');
+    await noOverflow(page);
+  }
+});
+
+test('UI-02 : contraste des libellés secondaires, liens, alertes et focus', async ({page}) => {
+  await page.goto('/contact');
+  const ratios = await page.evaluate(() => {
+    const css = getComputedStyle(document.documentElement);
+    const luminance = (token:string) => {
+      const raw = css.getPropertyValue(token).trim().slice(1);
+      const hex = raw.length === 3 ? [...raw].map(c=>c+c).join('') : raw;
+      const [r,g,b] = [0,2,4].map(i=>parseInt(hex.slice(i,i+2),16)/255)
+        .map(n=>n <= 0.04045 ? n/12.92 : ((n+0.055)/1.055)**2.4);
+      return 0.2126*r+0.7152*g+0.0722*b;
+    };
+    return ['--paper','--wash','--aqua','--sand'].flatMap(bg =>
+      ['--ink','--muted','--sea','--danger'].map(fg => (luminance(bg)+0.05)/(luminance(fg)+0.05)));
+  });
+  expect(Math.min(...ratios)).toBeGreaterThanOrEqual(4.5);
+});
+
+test('UI-02 : repli du contenu au format équivalent à un zoom de 200 %', async ({page}, info) => {
+  test.skip(info.project.name !== 'desktop', 'Le viewport physique de référence est 1440 par 1000.');
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setDeviceMetricsOverride', {width:720,height:500,deviceScaleFactor:2,mobile:false});
+  for (const [url, ready] of [['/','.coast-image'],['/recherche','.beach-name'],['/plages/test-sea','.conditions-grid'],['/contact','textarea']]) {
+    await page.goto(url);
+    await expect(page.locator(ready).first()).toBeVisible();
+    expect(await page.evaluate(()=>[innerWidth, devicePixelRatio])).toEqual([720,2]);
+    await noOverflow(page);
+  }
+});
+
 test('conditions : panne fournisseur sans faux score ni courbe', async ({ page }) => {
   await page.route('**/api/score/beach/*', route => route.fulfill({ json: {
     ...score, scores: { bathing: null, family: null, paddle: null, boat: null },

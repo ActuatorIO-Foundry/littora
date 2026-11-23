@@ -26,6 +26,7 @@ export type { IngestionReceipt } from './models/ingestion-receipt';
 export type { LegacyMetrics } from './models/legacy-metrics';
 export type { Measurement } from './models/measurement';
 export type { MeasurementMap } from './models/measurement-map';
+export type { MemberSession } from './models/member-session';
 export type { MetricPoint } from './models/metric-point';
 export type { NamedArea } from './models/named-area';
 export type { Naturism } from './models/naturism';

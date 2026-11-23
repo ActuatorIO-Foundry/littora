@@ -29,6 +29,11 @@ en V1. La préversion (#43) peut consigner un seuil manqué, jamais le masquer.
 **Décision du 23 novembre 2026 (#26).** Cette révision avance les comptes membres en V1.
 Il s'agit d'un objectif de livraison, pas de l'annonce d'une connexion déjà disponible.
 
+Le contrat 0.8 retire les anciens `GET /api/auth/status` et `GET /api/favorites`,
+qui renvoyaient toujours « prêt » ou une liste vide. Une réponse 404 sur ces
+anciens chemins ne décrit pas une session. Le jeton de contribution anonyme
+reste strictement réservé aux signalements ; il ne donne aucun accès membre.
+
 - **Connexion.** Préférer un service d'identité éprouvé compatible [OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect).
   NestJS termine le flux code avec PKCE, vérifie le retour et ouvre une session Littora révocable par cookie sécurisé, inaccessible au JavaScript.
   Ne pas fusionner deux identités sur la seule égalité d'un e-mail. Une panne d'identité ne bloque pas les plages ni les dépôts sans compte.

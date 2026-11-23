@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Littora API
-  version: 0.7.0
+  version: 0.8.0
   description: >-
     Additive contract for the existing API. Model forecasts are not observations or
     official bathing instructions. Null means unknown, never zero or false.
@@ -200,22 +200,6 @@ paths:
       description: Issues an anonymous, non-account token valid for 30 days. Limited to 3 sessions/hour and 8/day per network address; no raw address is stored. Requires server REPORT_IP_HASH_KEY configuration.
       responses:
         '201': {description: Private session, content: {application/json: {schema: {$ref: '#/components/schemas/ContributionSession'}}}}
-        default: {$ref: '#/components/responses/Error'}
-  /auth/status:
-    get:
-      operationId: getAuthStatus
-      tags: [Littora]
-      description: Legacy scaffold status; registration and login are not implemented.
-      responses:
-        '200': {description: Scaffold status, content: {application/json: {schema: {$ref: '#/components/schemas/AuthStatus'}}}}
-        default: {$ref: '#/components/responses/Error'}
-  /favorites:
-    get:
-      operationId: getFavorites
-      tags: [Littora]
-      description: Placeholder, always empty; persistent favorites are not implemented.
-      responses:
-        '200': {description: Empty list, content: {application/json: {schema: {type: array, maxItems: 0, items: {$ref: '#/components/schemas/Beach'}}}}}
         default: {$ref: '#/components/responses/Error'}
   /admin/health:
     get:
@@ -987,10 +971,6 @@ components:
             source: {type: string, enum: [littora-reports]}
             isDemo: {type: boolean}
             verified: {type: boolean}
-    AuthStatus:
-      type: object
-      required: [ready, mode, next]
-      properties: {ready: {type: boolean}, mode: {type: string}, next: {type: string}}
     AdminHealth:
       type: object
       required: [status, moderationQueue]

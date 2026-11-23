@@ -13,7 +13,6 @@ import { StrictHttpResponse } from '../strict-http-response';
 import { AdminHealth } from '../models/admin-health';
 import { Alerts } from '../models/alerts';
 import { Amenities } from '../models/amenities';
-import { AuthStatus } from '../models/auth-status';
 import { Beach } from '../models/beach';
 import { BeachPage } from '../models/beach-page';
 import { BeachScore } from '../models/beach-score';
@@ -32,8 +31,6 @@ import { getAdminHealth } from '../fn/littora/get-admin-health';
 import { GetAdminHealth$Params } from '../fn/littora/get-admin-health';
 import { getAlerts } from '../fn/littora/get-alerts';
 import { GetAlerts$Params } from '../fn/littora/get-alerts';
-import { getAuthStatus } from '../fn/littora/get-auth-status';
-import { GetAuthStatus$Params } from '../fn/littora/get-auth-status';
 import { getBeach } from '../fn/littora/get-beach';
 import { GetBeach$Params } from '../fn/littora/get-beach';
 import { getBeachAmenities } from '../fn/littora/get-beach-amenities';
@@ -44,8 +41,6 @@ import { getCatalogue } from '../fn/littora/get-catalogue';
 import { GetCatalogue$Params } from '../fn/littora/get-catalogue';
 import { getCommuneCatalogue } from '../fn/littora/get-commune-catalogue';
 import { GetCommuneCatalogue$Params } from '../fn/littora/get-commune-catalogue';
-import { getFavorites } from '../fn/littora/get-favorites';
-import { GetFavorites$Params } from '../fn/littora/get-favorites';
 import { getMarine } from '../fn/littora/get-marine';
 import { GetMarine$Params } from '../fn/littora/get-marine';
 import { getRecommendations } from '../fn/littora/get-recommendations';
@@ -610,68 +605,6 @@ export class LittoraService extends BaseService {
     const resp = this.createContributionSession$Response(params, context);
     return resp.pipe(
       map((r: StrictHttpResponse<ContributionSession>): ContributionSession => r.body)
-    );
-  }
-
-  /** Path part for operation `getAuthStatus()` */
-  static readonly GetAuthStatusPath = '/auth/status';
-
-  /**
-   * Legacy scaffold status; registration and login are not implemented.
-   *
-   * This method provides access to the full `HttpResponse`, allowing access to response headers.
-   * To access only the response body, use `getAuthStatus()` instead.
-   *
-   * This method doesn't expect any request body.
-   */
-  getAuthStatus$Response(params?: GetAuthStatus$Params, context?: HttpContext): Observable<StrictHttpResponse<AuthStatus>> {
-    const obs = getAuthStatus(this.http, this.rootUrl, params, context);
-    return obs;
-  }
-
-  /**
-   * Legacy scaffold status; registration and login are not implemented.
-   *
-   * This method provides access only to the response body.
-   * To access the full response (for headers, for example), `getAuthStatus$Response()` instead.
-   *
-   * This method doesn't expect any request body.
-   */
-  getAuthStatus(params?: GetAuthStatus$Params, context?: HttpContext): Observable<AuthStatus> {
-    const resp = this.getAuthStatus$Response(params, context);
-    return resp.pipe(
-      map((r: StrictHttpResponse<AuthStatus>): AuthStatus => r.body)
-    );
-  }
-
-  /** Path part for operation `getFavorites()` */
-  static readonly GetFavoritesPath = '/favorites';
-
-  /**
-   * Placeholder, always empty; persistent favorites are not implemented.
-   *
-   * This method provides access to the full `HttpResponse`, allowing access to response headers.
-   * To access only the response body, use `getFavorites()` instead.
-   *
-   * This method doesn't expect any request body.
-   */
-  getFavorites$Response(params?: GetFavorites$Params, context?: HttpContext): Observable<StrictHttpResponse<Array<Beach>>> {
-    const obs = getFavorites(this.http, this.rootUrl, params, context);
-    return obs;
-  }
-
-  /**
-   * Placeholder, always empty; persistent favorites are not implemented.
-   *
-   * This method provides access only to the response body.
-   * To access the full response (for headers, for example), `getFavorites$Response()` instead.
-   *
-   * This method doesn't expect any request body.
-   */
-  getFavorites(params?: GetFavorites$Params, context?: HttpContext): Observable<Array<Beach>> {
-    const resp = this.getFavorites$Response(params, context);
-    return resp.pipe(
-      map((r: StrictHttpResponse<Array<Beach>>): Array<Beach> => r.body)
     );
   }
 

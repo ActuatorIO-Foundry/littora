@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Littora API
-  version: 0.8.0
+  version: 0.8.1
   description: >-
     Additive contract for the existing API. Model forecasts are not observations or
     official bathing instructions. Null means unknown, never zero or false.
@@ -201,6 +201,27 @@ paths:
       responses:
         '201': {description: Private session, content: {application/json: {schema: {$ref: '#/components/schemas/ContributionSession'}}}}
         default: {$ref: '#/components/responses/Error'}
+  /member/session:
+    get:
+      operationId: getMemberSession
+      tags: [Littora]
+      security: [{MemberSessionCookie: []}]
+      description: Current member only. No user ID parameter. Disabled until private storage is configured.
+      responses:
+        '200': {description: Private session, content: {application/json: {schema: {$ref: '#/components/schemas/MemberSession'}}}}
+        '401': {$ref: '#/components/responses/Error'}
+        '503': {$ref: '#/components/responses/Error'}
+        default: {$ref: '#/components/responses/Error'}
+    delete:
+      operationId: endMemberSession
+      tags: [Littora]
+      security: [{MemberSessionCookie: []}]
+      description: Same-origin browser operation. Revokes only the session identified by the cookie.
+      responses:
+        '200': {description: Signed out, content: {application/json: {schema: {type: object, additionalProperties: false, required: [signedOut], properties: {signedOut: {type: boolean, enum: [true]}}}}}}
+        '403': {$ref: '#/components/responses/Error'}
+        '503': {$ref: '#/components/responses/Error'}
+        default: {$ref: '#/components/responses/Error'}
   /admin/health:
     get:
       operationId: getAdminHealth
@@ -221,6 +242,7 @@ paths:
         default: {$ref: '#/components/responses/Error'}
 components:
   securitySchemes:
+    MemberSessionCookie: {type: apiKey, in: cookie, name: __Host-littora-member}
     InternalKey: {type: http, scheme: bearer, description: Internal ADMIN_API_TOKEN; not a user JWT.}
     ContributionToken: {type: http, scheme: bearer, description: Opaque anonymous contribution token. Not an account or an official source.}
   parameters:
@@ -971,6 +993,13 @@ components:
             source: {type: string, enum: [littora-reports]}
             isDemo: {type: boolean}
             verified: {type: boolean}
+    MemberSession:
+      type: object
+      additionalProperties: false
+      required: [memberId, expiresAt]
+      properties:
+        memberId: {type: string, format: uuid}
+        expiresAt: {type: string, format: date-time}
     AdminHealth:
       type: object
       required: [status, moderationQueue]

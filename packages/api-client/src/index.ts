@@ -32,6 +32,7 @@ export type { IngestionReceipt } from './models/ingestion-receipt';
 export type { LegacyMetrics } from './models/legacy-metrics';
 export type { Measurement } from './models/measurement';
 export type { MeasurementMap } from './models/measurement-map';
+export type { MemberSession } from './models/member-session';
 export type { MetricPoint } from './models/metric-point';
 export type { NamedArea } from './models/named-area';
 export type { Naturism } from './models/naturism';
@@ -89,6 +90,10 @@ export type { CreateReport$Params as CreateReport$Params } from './fn/littora/cr
 export { createReport as createReport } from './fn/littora/create-report';
 export type { CreateContributionSession$Params as CreateContributionSession$Params } from './fn/littora/create-contribution-session';
 export { createContributionSession as createContributionSession } from './fn/littora/create-contribution-session';
+export type { GetMemberSession$Params as GetMemberSession$Params } from './fn/littora/get-member-session';
+export { getMemberSession as getMemberSession } from './fn/littora/get-member-session';
+export type { EndMemberSession$Params as EndMemberSession$Params } from './fn/littora/end-member-session';
+export { endMemberSession as endMemberSession } from './fn/littora/end-member-session';
 export type { GetAdminHealth$Params as GetAdminHealth$Params } from './fn/littora/get-admin-health';
 export { getAdminHealth as getAdminHealth } from './fn/littora/get-admin-health';
 export type { IngestWaterQuality$Params as IngestWaterQuality$Params } from './fn/littora/ingest-water-quality';

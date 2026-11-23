@@ -26,6 +26,8 @@ import { CreateReport$Params } from '../fn/littora/create-report';
 import { discoverBeaches } from '../fn/littora/discover-beaches';
 import { DiscoverBeaches$Params } from '../fn/littora/discover-beaches';
 import { Discovery } from '../models/discovery';
+import { endMemberSession } from '../fn/littora/end-member-session';
+import { EndMemberSession$Params } from '../fn/littora/end-member-session';
 import { Forecast } from '../models/forecast';
 import { getAdminHealth } from '../fn/littora/get-admin-health';
 import { GetAdminHealth$Params } from '../fn/littora/get-admin-health';
@@ -43,6 +45,8 @@ import { getCommuneCatalogue } from '../fn/littora/get-commune-catalogue';
 import { GetCommuneCatalogue$Params } from '../fn/littora/get-commune-catalogue';
 import { getMarine } from '../fn/littora/get-marine';
 import { GetMarine$Params } from '../fn/littora/get-marine';
+import { getMemberSession } from '../fn/littora/get-member-session';
+import { GetMemberSession$Params } from '../fn/littora/get-member-session';
 import { getRecommendations } from '../fn/littora/get-recommendations';
 import { GetRecommendations$Params } from '../fn/littora/get-recommendations';
 import { getReports } from '../fn/littora/get-reports';
@@ -58,6 +62,7 @@ import { ingestWaterQuality } from '../fn/littora/ingest-water-quality';
 import { IngestWaterQuality$Params } from '../fn/littora/ingest-water-quality';
 import { listBeaches } from '../fn/littora/list-beaches';
 import { ListBeaches$Params } from '../fn/littora/list-beaches';
+import { MemberSession } from '../models/member-session';
 import { Recommendation } from '../models/recommendation';
 import { Report } from '../models/report';
 import { searchBeaches } from '../fn/littora/search-beaches';
@@ -605,6 +610,76 @@ export class LittoraService extends BaseService {
     const resp = this.createContributionSession$Response(params, context);
     return resp.pipe(
       map((r: StrictHttpResponse<ContributionSession>): ContributionSession => r.body)
+    );
+  }
+
+  /** Path part for operation `getMemberSession()` */
+  static readonly GetMemberSessionPath = '/member/session';
+
+  /**
+   * Current member only. No user ID parameter. Disabled until private storage is configured.
+   *
+   * This method provides access to the full `HttpResponse`, allowing access to response headers.
+   * To access only the response body, use `getMemberSession()` instead.
+   *
+   * This method doesn't expect any request body.
+   */
+  getMemberSession$Response(params?: GetMemberSession$Params, context?: HttpContext): Observable<StrictHttpResponse<MemberSession>> {
+    const obs = getMemberSession(this.http, this.rootUrl, params, context);
+    return obs;
+  }
+
+  /**
+   * Current member only. No user ID parameter. Disabled until private storage is configured.
+   *
+   * This method provides access only to the response body.
+   * To access the full response (for headers, for example), `getMemberSession$Response()` instead.
+   *
+   * This method doesn't expect any request body.
+   */
+  getMemberSession(params?: GetMemberSession$Params, context?: HttpContext): Observable<MemberSession> {
+    const resp = this.getMemberSession$Response(params, context);
+    return resp.pipe(
+      map((r: StrictHttpResponse<MemberSession>): MemberSession => r.body)
+    );
+  }
+
+  /** Path part for operation `endMemberSession()` */
+  static readonly EndMemberSessionPath = '/member/session';
+
+  /**
+   * Same-origin browser operation. Revokes only the session identified by the cookie.
+   *
+   * This method provides access to the full `HttpResponse`, allowing access to response headers.
+   * To access only the response body, use `endMemberSession()` instead.
+   *
+   * This method doesn't expect any request body.
+   */
+  endMemberSession$Response(params?: EndMemberSession$Params, context?: HttpContext): Observable<StrictHttpResponse<{
+'signedOut': true;
+}>> {
+    const obs = endMemberSession(this.http, this.rootUrl, params, context);
+    return obs;
+  }
+
+  /**
+   * Same-origin browser operation. Revokes only the session identified by the cookie.
+   *
+   * This method provides access only to the response body.
+   * To access the full response (for headers, for example), `endMemberSession$Response()` instead.
+   *
+   * This method doesn't expect any request body.
+   */
+  endMemberSession(params?: EndMemberSession$Params, context?: HttpContext): Observable<{
+'signedOut': true;
+}> {
+    const resp = this.endMemberSession$Response(params, context);
+    return resp.pipe(
+      map((r: StrictHttpResponse<{
+'signedOut': true;
+}>): {
+'signedOut': true;
+} => r.body)
     );
   }
 

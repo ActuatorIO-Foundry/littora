@@ -72,10 +72,19 @@ restent à livrer avant ouverture (#26, #30, #31).
 Ne jamais journaliser les cookies ni sauvegarder les sessions pour les rejouer.
 Pour une sauvegarde logique de la base privée, exclure les lignes de session
 avec `pg_dump --exclude-table-data=members.session` et chiffrer l'archive.
-Après restauration, **vider la table des sessions avant de reconnecter l’API** :
-une ancienne sauvegarde pourrait autrement réactiver une session révoquée.
-Tester cette procédure, la récupération MFA et la révocation de tous les
-appareils avant ouverture ; ce lot n’active aucun accès privilégié (#97).
+Restaurer hors réseau applicatif, avec les rôles attendus déjà provisionnés.
+Si la base cible a été créée séparément, retirer le droit `CONNECT` de
+`PUBLIC` et le réserver aux deux groupes et au propriétaire ; restaurer les
+propriétaires et ACL des objets. **Vider la table des sessions avant de
+reconnecter l’API** : une ancienne sauvegarde pourrait autrement réactiver
+une session révoquée. Vérifier que le lecteur ne peut ni lire la table des
+comptes ni émettre de sessions.
+
+Recette sur deux bases jetables : un compte conservé, zéro session restaurée,
+ancien secret refusé ; droits du lecteur inchangés après restauration.
+Répéter hors hôte sur la cible avant ouverture. La récupération MFA et la
+révocation des appareils associée restent à livrer ; ce lot n’active aucun
+accès privilégié (#97).
 
 Références : [gestion des sessions (OWASP)](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
 et [fonctions avec droits du propriétaire (PostgreSQL)](https://www.postgresql.org/docs/16/sql-createfunction.html#SQL-CREATEFUNCTION-SECURITY).

@@ -4,6 +4,7 @@
 import { DogAccess } from '../models/dog-access';
 import { FacilityPresence } from '../models/facility-presence';
 import { Naturism } from '../models/naturism';
+import { OfficialFlagBulletin } from '../models/official-flag-bulletin';
 export interface Beach {
   city: string | null;
   coastline: string | null;
@@ -24,6 +25,7 @@ export interface Beach {
   lon: number;
   name: string;
   naturism: Naturism;
+  officialFlagBulletin?: OfficialFlagBulletin;
   osm_id: string | null;
   region: string | null;
 

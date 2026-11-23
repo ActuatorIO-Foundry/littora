@@ -16,6 +16,7 @@ import { IconComponent } from "../../shared/icon.component";
 import { ComfortExplanationComponent } from '../../shared/comfort-explanation.component';
 import { DogAccessComponent } from '../../shared/dog-access.component';
 import { NaturismComponent } from '../../shared/naturism.component';
+import { FlagBulletinComponent } from '../../shared/flag-bulletin.component';
 import { LoadingComponent } from "../../shared/loading.component";
 import { CoastMapComponent } from "../../shared/coast-map.component";
 import { amenityGroups, directionsTo, listedAmenities } from "../../shared/map-points";
@@ -39,6 +40,7 @@ type UsageKey = "bathing" | "family" | "paddle" | "boat";
     ComfortExplanationComponent,
     DogAccessComponent,
     NaturismComponent,
+    FlagBulletinComponent,
     LoadingComponent,
     CoastMapComponent,
   ],

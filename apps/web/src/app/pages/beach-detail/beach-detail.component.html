@@ -31,11 +31,15 @@
         class="official-status closure" [routerLink]="[]" queryParamsHandling="preserve" fragment="sources">
         <app-icon name="alert" [size]="20" /><span>Décision officielle<strong>Baignade interdite</strong></span>
       </a>
-      <ng-template #unknownFlag><span class="official-status"
-        ><app-icon name="flag" [size]="20" /><span
-          >Drapeau officiel<strong>Non renseigné</strong></span
-        ></span
-      ></ng-template>
+      <ng-template #unknownFlag>
+        @if (beach.officialFlagBulletin) {
+          <a class="official-status" [routerLink]="[]" queryParamsHandling="preserve" fragment="bulletin-sauveteurs">
+            <app-icon name="flag" [size]="20" /><span>Drapeau officiel<strong>Consulter le bulletin local</strong></span>
+          </a>
+        } @else {
+          <span class="official-status"><app-icon name="flag" [size]="20" /><span>Drapeau officiel<strong>Non renseigné</strong></span></span>
+        }
+      </ng-template>
     </header>
     <nav class="section-nav" aria-label="Sections de la plage">
       <a [routerLink]="[]" queryParamsHandling="preserve" fragment="conditions"
@@ -488,6 +492,9 @@
         <h2>Sources & disponibilité</h2>
         <p>Une seule source de prévision par mesure : pas de comparaison ni de moyenne. Une donnée absente ne signifie pas une absence de risque.</p>
       </div>
+      @if (beach.officialFlagBulletin && score?.current?.waterQuality?.restriction?.status !== 'closed') {
+        <app-flag-bulletin id="bulletin-sauveteurs" [bulletin]="beach.officialFlagBulletin" />
+      }
       <dl>
         <div>
           <dt>Météo</dt>

@@ -358,12 +358,25 @@ components:
         source: {type: string}
         sourceUrl: {type: string, format: uri}
         checkedOn: {type: string, format: date}
+    OfficialFlagBulletin:
+      type: object
+      additionalProperties: false
+      description: Publisher-hosted lifeguard bulletin for the exact verified site. This is not a time-stamped flag observation or a bathing authorization.
+      required: [provider, publisher, zone, widgetId, sourceUrl, linkVerifiedOn]
+      properties:
+        provider: {type: string, enum: [plages-landes]}
+        publisher: {type: string}
+        zone: {type: string}
+        widgetId: {type: integer, minimum: 1}
+        sourceUrl: {type: string, format: uri}
+        linkVerifiedOn: {type: string, format: date, description: "Date of the geographical and editorial link check, not the flag observation time."}
     Beach:
       type: object
       required: [id, name, city, department, region, coastline, waterType, lat, lon, has_lifeguard, has_parking, has_toilets, osm_id, distanceKm, facilities, dogAccess, naturism]
       properties:
         dogAccess: {$ref: '#/components/schemas/DogAccess'}
         naturism: {$ref: '#/components/schemas/Naturism'}
+        officialFlagBulletin: {$ref: '#/components/schemas/OfficialFlagBulletin'}
         id: {type: string, format: uuid}
         waterClassification:
           type: object

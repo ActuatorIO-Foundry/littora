@@ -15,6 +15,7 @@ export interface Beach {
   osm_id: string | null;
   dogAccess?: import('@littora/api-client/models').DogAccess;
   naturism?: import('@littora/api-client/models').Naturism;
+  officialFlagBulletin?: import('@littora/api-client/models').OfficialFlagBulletin;
   distanceKm: number | null;
 }
 

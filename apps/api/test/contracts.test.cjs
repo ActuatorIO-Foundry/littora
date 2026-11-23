@@ -137,6 +137,23 @@ test('contract: presenters preserve unknowns, zero, stale timestamps and safety 
   assert.equal(presentReport({ ...report, confidence: null }).confidence, null);
 });
 
+test('official bulletin: exact coverage, no promotion of conflicting or obsolete colours', () => {
+  const site = { ...row, osm_id:'node/2417680230', lat:43.6417672, lon:-1.4475108 };
+  const bulletin = presentBeach(site).officialFlagBulletin;
+  assert.equal(schemaValidator('OfficialFlagBulletin')(bulletin),true);
+  assert.equal(bulletin.widgetId,560);
+  for (const other of [{osm_id:null},{osm_id:'way/2417680230'},{waterType:'lake'},{lat:43.5},{lon:null}]) {
+    assert.equal(presentBeach({...site,...other,officialFlagBulletin:bulletin}).officialFlagBulletin,undefined);
+  }
+  const result = presentScore({...score,beach:site,current:{...score.current,waterQuality:{restriction:{status:'closed'}}},
+    safety:{...score.safety,communityFlag:{...score.safety.communityFlag,flag:'green'},
+      officialFlag:{value:'red',validAt:'2020-01-01T12:00:00Z',source:'unverified'}}});
+  assert.deepEqual(result.safety.officialFlag,{value:null,status:'unknown',source:null,validAt:null});
+  assert.equal(result.safety.communityFlag.flag,'green');
+  assert.equal(result.current.waterQuality.restriction.status,'closed');
+  assert.deepEqual(result.beach.officialFlagBulletin,bulletin);
+});
+
 test('contract: all public data routes return schema-conformant JSON', async () => {
   const routes = [
     ['/beaches?limit=1', '/beaches'], ['/beaches/catalogue?limit=1', '/beaches/catalogue'],

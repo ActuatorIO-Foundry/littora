@@ -334,7 +334,11 @@
           /></a>
         </div>
         <div class="beach-overview" *ngIf="selectedBeach?.id === beach.id">
-          <div class="overview-flag"><app-icon name="flag" [size]="15" />Drapeau officiel non renseigné</div>
+          <div class="overview-flag"><app-icon name="flag" [size]="15" />
+            @if (beach.officialFlagBulletin && beach.bathingRestriction !== 'closed') {
+              <a [href]="beach.officialFlagBulletin.sourceUrl" target="_blank" rel="noopener noreferrer">Consulter le bulletin des sauveteurs · {{ beach.officialFlagBulletin.publisher }}</a>
+            } @else { Drapeau officiel non renseigné }
+          </div>
           <app-comfort-explanation [value]="beach.scoreExplanation" />
           <p *ngIf="loadingScore && !score" role="status" class="caption">Lecture des conditions…</p>
           <p *ngIf="scoreError" class="notice error">{{ scoreError }}</p>

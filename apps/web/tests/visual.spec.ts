@@ -826,6 +826,42 @@ test('hub : attente, publication, contestation privée, retrait et expiration sa
   await noOverflow(page);
 });
 
+test('bulletin local : lecture volontaire, retour à la source et priorité à la fermeture',async({page})=>{
+  const bulletin={provider:'plages-landes',publisher:'Landes Attractivité',zone:'Plage de la Piste · Capbreton',
+    widgetId:560,sourceUrl:'https://www.plages-landes.info/plages/plage-de-la-piste/',linkVerifiedOn:'2026-11-23'};
+  const site={...beaches[0],name:'Plage de la Piste',officialFlagBulletin:bulletin};
+  const communityFlag={flag:'green',status:'consensus',participants:5,history:[],counts:{green:5,yellow:0,red:0}};
+  let closed=false, requests=0;
+  await page.clock.install({time:new Date('2026-11-23T10:00:00Z')});
+  await page.route('**/api/beaches/test-sea',r=>r.fulfill({json:site}));
+  await page.route('**/api/score/**',r=>r.fulfill({json:{...score,beach:site,safety:{...score.safety,communityFlag},
+    current:{...score.current,waterQuality:{restriction:{status:closed?'closed':'unknown',decisions:[]}}}}}));
+  await page.route('https://www.plages-landes.info/widget-plages-des-landes/**',r=>{
+    requests++;expect(new URL(r.request().url()).searchParams.get('plgs')).toBe('560');
+    expect(r.request().headers()['referer']).toBeUndefined();
+    return r.fulfill({contentType:'text/html',body:'<h2>Bulletin de recette</h2>'});
+  });
+  await page.goto('/plages/test-sea');
+  await page.locator('.official-status').click();
+  await expect(page).toHaveURL(/#bulletin-sauveteurs$/);
+  const panel=page.locator('#bulletin-sauveteurs');
+  await expect(panel).toContainText(bulletin.zone);
+  await expect(panel.getByRole('link')).toHaveAttribute('href',bulletin.sourceUrl);
+  await expect(panel.locator('iframe')).toHaveCount(0);
+  expect(requests).toBe(0);
+  await panel.getByRole('button').click();
+  await expect(page.frameLocator('#bulletin-sauveteurs iframe').getByRole('heading')).toHaveText('Bulletin de recette');
+  expect(requests).toBe(1);
+  await page.clock.fastForward(300001);
+  await expect(panel.locator('iframe')).toHaveCount(0);
+  await expect(panel.getByRole('button')).toHaveAttribute('aria-expanded','false');
+  closed=true;await page.reload();
+  await expect(page.locator('.official-status')).toContainText('Baignade interdite');
+  await expect(panel).toHaveCount(0);
+  await expect(page.locator('.community-flags')).toContainText('Observation majoritaire : Vert');
+  expect(requests).toBe(1);
+});
+
 test('drapeaux : un vert isole reste sans majorite',async({page})=>{
   await page.route('**/api/score/**',route=>route.fulfill({json:{...score,safety:{...score.safety,
     communityFlag:{flag:null,status:'insufficient',participants:1,agreement:null,confidence:0,counts:{green:1,yellow:0,red:0},history:[]}}}}));

@@ -3,7 +3,7 @@ import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, ParamMap, Params, Router, RouterLink } from "@angular/router";
 import { Subscription, timeout } from "rxjs";
-import type { BeachSearch } from '@littora/api-client/models';
+import type { BeachSearch, SearchBeach } from '@littora/api-client/models';
 import { Beach, BeachScore } from "../../models/beach.model";
 import { Commune } from "../../models/commune.model";
 import { LittoraApiService } from "../../services/littora-api.service";
@@ -14,13 +14,11 @@ import { NaturismComponent } from '../../shared/naturism.component';
 import { LoadingComponent } from "../../shared/loading.component";
 import { CoastMapComponent } from "../../shared/coast-map.component";
 import { COASTAL_ZONES, CoastalZone } from "../../shared/coastal-zones";
-import { metricValue, providerLabel, dataStatusLabel } from "../../shared/presentation";
-type Result = Beach & {
+import { metricValue, providerLabel, dataStatusLabel, flagLabel } from "../../shared/presentation";
+type Result = Beach & Partial<Pick<SearchBeach, 'flag' | 'flagSource' | 'recentRedAt' | 'bathingRestriction'>> & {
   selectedScore?: number | null;
   scoreExplanation?: import('@littora/api-client/models').ScoreExplanation;
   scores?: BeachScore["scores"];
-  flag?: string | null;
-  bathingRestriction?: 'closed' | 'unknown';
   waterTemp?: number | null;
 };
 @Component({
@@ -42,6 +40,8 @@ type Result = Beach & {
 })
 export class SearchComponent implements OnInit, OnDestroy {
   beaches: Result[] = [];
+  searchAsOf: string | null = null;
+  readonly flagLabel = flagLabel;
   selectedBeach: Beach | null = null;
   score: BeachScore | null = null;
   readonly coastalZones = COASTAL_ZONES;
@@ -320,6 +320,7 @@ export class SearchComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (r) => {
           this.beaches = r.items;
+          this.searchAsOf = r.asOf;
           this.resultLimit = 20;
           this.communePending = false;
           if (r.commune) {

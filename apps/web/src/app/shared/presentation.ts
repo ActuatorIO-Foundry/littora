@@ -1,5 +1,14 @@
 import { DataStatus } from '../models/beach.model';
 
+export function flagLabel(flag?: string | null): string {
+  switch (flag) {
+    case 'green': return 'Vert';
+    case 'yellow': return 'Jaune';
+    case 'red': return 'Rouge';
+    default: return '';
+  }
+}
+
 export function freshnessDeadline(data: DataStatus): number {
   return Date.parse(data.fetchedAt ?? '') + (data.collectionIntervalSeconds ?? NaN) * 1000;
 }

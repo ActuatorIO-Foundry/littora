@@ -135,3 +135,8 @@ Ajouts sur `architecture`, le 16 novembre 2026 :
 
 Ces retouches sont separees du commit de correction des dependances ; aucune
 fusion dans `main` n'est incluse.
+
+## Recette UI-03
+
+Les [captures de référence des quatre pages](visuels/ui-03/README.md)
+documentent les parcours de consultation sur téléphone, tablette et ordinateur.

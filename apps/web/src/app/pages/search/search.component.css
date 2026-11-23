@@ -274,6 +274,19 @@
   align-items: center;
   gap: 4px;
 }
+.bathing-status {
+  display: grid;
+  gap: 3px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+.bathing-status > span, .bathing-status > strong {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.bathing-status small { color: var(--muted); }
+.closure { color: var(--danger); }
 .details-link {
   font-size: 12px;
   white-space: nowrap;

@@ -214,14 +214,82 @@ test.describe('Dates civiles en France métropolitaine', () => {
     await expect(sources).toContainText('limite de détection : 15 / 100 ml');
     await expect(sources).toContainText('entérocoques (non renseigné)');
     await expect(sources).toContainText('Autorisation actuelle non confirmée');
+    await expect(page.locator('.official-status')).toContainText('Drapeau officiel');
     closed=true;await page.reload();
+    const warning = page.locator('.beach-heading').getByRole('link', {name:/Décision officielle.*Baignade interdite/});
+    await expect(warning).toBeVisible();
+    await warning.click();
+    await expect(page).toHaveURL(/#sources$/);
     await expect(sources).toContainText('Baignade interdite par décision officielle');
     await expect(sources.getByRole('link',{name:/Ville de Bandol/})).toContainText('20/07/2026');
     await expect(sources.getByRole('link',{name:/Ville de Bandol/})).toHaveAttribute('href','https://www.bandol.fr/acte');
     await page.route('**/api/search/beaches',route=>route.fulfill({json:searchResult(route.request().postDataJSON(),
-      [{...beaches[0],bathingRestriction:'closed',flag:'green'}])}));
+      [{...beaches[0],bathingRestriction:'closed',flag:'green',flagSource:'community'}])}));
     await page.goto('/recherche');
-    await expect(page.locator('.beach-tags')).toContainText('Baignade interdite');
+    await expect(page.locator('.bathing-status')).toContainText('Baignade interdite · décision officielle');
+    await expect(page.locator('.bathing-status')).not.toContainText('Vert');
+  });
+});
+
+test('drapeaux : filtre attribué, dernier rouge daté et aperçu indépendant de la météo', async ({page})=>{
+  const recentRedAt = '2026-07-15T12:00:00Z';
+  await page.route('**/api/search/beaches',route=>route.fulfill({json:searchResult(route.request().postDataJSON(),[
+    {...beaches[0],flag:'green',flagSource:'community',recentRedAt},
+    {...beaches[1],flag:'red',flagSource:null},
+  ])}));
+  await page.route('**/api/score/**',r=>r.fulfill({status:503,json:{}}));
+  await page.goto('/recherche');
+  await expect(page.locator('.beach-result')).toHaveCount(2);
+  await expect(page.locator('#beach-test-river .bathing-status')).toHaveCount(0);
+  await page.getByRole('button',{name:'Filtres',exact:true}).click();
+  await page.getByLabel('Drapeau observé par la communauté').selectOption('green');
+  await expect(page).toHaveURL(/flag=green/);
+  await expect(page.locator('.beach-result')).toHaveCount(1);
+  const result = page.locator('#beach-test-sea');
+  await expect(result.locator('.bathing-status')).toContainText('Drapeau communautaire : Vert');
+  await expect(result.locator('.bathing-status time')).toHaveAttribute('datetime',recentRedAt);
+  const details = result.getByRole('link',{name:'Détails'});
+  const status = await result.locator('.bathing-status').boundingBox();
+  const link = await details.boundingBox();
+  expect(status!.x + status!.width).toBeLessThanOrEqual(link!.x);
+  await result.getByRole('button',{name:beaches[0].name}).click();
+  await expect(result.locator('.notice.error')).toBeVisible();
+  await expect(result.locator('.overview-flag')).toHaveText('Drapeau officiel non renseigné');
+  await expect(page).toHaveURL(/recherche/);
+  await page.getByLabel('Drapeau observé par la communauté').selectOption('yellow');
+  await expect(page.getByRole('heading',{name:'Aucune plage pour ces critères'})).toBeVisible();
+  await page.getByRole('button',{name:'Effacer les filtres',exact:true}).last().click();
+  await expect(page.locator('.beach-result')).toHaveCount(2);
+});
+
+test.describe('Références UI-03', () => {
+  test.use({timezoneId:'Europe/Paris', reducedMotion:'reduce'});
+  test('quatre pages avec des données de démonstration isolées', async ({page}, info)=>{
+    const asOf = '2026-07-15T13:00:00Z';
+    await page.clock.setFixedTime(new Date(asOf));
+    await page.route('https://tile.openstreetmap.org/**', route=>route.abort());
+    await page.route('https://services.data.shom.fr/**', route=>route.abort());
+    await page.route('**/api/search/beaches',route=>route.fulfill({json:{
+      ...searchResult(route.request().postDataJSON(),[{...beaches[0],flag:'yellow',flagSource:'community'},beaches[1]]),asOf,
+    }}));
+    for (const [name, url, selector] of [
+      ['accueil','/','app-ocean-scene'],
+      ['recherche','/recherche','#beach-test-sea .bathing-status'],
+      ['fiche','/plages/test-sea','.conditions-grid'],
+      ['contact','/contact','textarea'],
+    ]) {
+      await page.goto(url);
+      await expect(page.locator(selector)).toBeVisible();
+      await page.evaluate(()=>document.fonts.ready);
+      await noOverflow(page);
+      if (name === 'recherche' && (page.viewportSize()?.width ?? 0) >= 1024) {
+        await expect(page.locator('.leaflet-fallback-map-pane path').first()).toBeAttached();
+        await expect(page.locator('.map-error')).toContainText('Fond de carte indisponible');
+        const mapWidth = (await page.locator('.map-canvas').boundingBox())!.width;
+        await expect.poll(async ()=>(await page.locator('.leaflet-fallback-map-pane svg').boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(mapWidth);
+      }
+      await page.screenshot({path:info.outputPath(name+'.jpg'),type:'jpeg',quality:78,scale:'css',animations:'disabled'});
+    }
   });
 });
 

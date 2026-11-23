@@ -20,8 +20,27 @@ en V1. La préversion (#43) peut consigner un seuil manqué, jamais le masquer.
 | Famille, baignade, paddle, bateau | Score expliqué par usage **ou** données insuffisantes. [Références SHOM](architecture/SHOM.md) au port identifié : hauteurs astronomiques et classe de courant de vive-eau, distinctes des conditions actuelles. | Horaires consultables chez le producteur ; pas de SUP/SAPM, rediffusion REFMAR, routage ou aide à la navigation. Les références du port ne déterminent pas le score de la plage. | Données / #17, #21 |
 | Vigilance et qualité de l'eau | [Vigilance vagues-submersion Météo-France](architecture/METEOFRANCE.md) sur les littoraux métropolitains : uniquement sur créneau officiel actif, avec accès abonné vérifié ; sinon indisponible. [Prélèvements historiques](architecture/QUALITE-BAIGNADE.md) sans bonus sanitaire ; rapportage annuel Santé/ARS distinct des décisions municipales vérifiées, sans couverture temps réel garantie. | BMS et modèles directs AROME/MFWAM différés ; prévisions Open-Meteo attribuées à l'intermédiaire. Prédictions de pollution et historiques Eaufrance différés. Une absence d'alerte collectée n'est pas un avis favorable. | Intégrations / #16, #18 |
 | Équipements, drapeaux, observations | Distinguer équipement référencé et service ouvert. Séparer signalement communautaire horodaté, indicateur calculé et autorité locale. Tester conflit, expiration et modération. | Drapeau officiel indisponible sans flux autoritatif ; connexion suivie après V1 (#49). | Communauté / #14, #22, #23, #27, #49 |
-| Accès et contact | Lecture sans inscription. Contribution protégée ; modération réservée aux habilités. Contact avec résultat réel ou erreur explicite. | Comptes grand public et favoris synchronisés après V1 ; pas de commande promettant une persistance fictive. | Produit et sécurité / #26, contact / #28 |
+| Comptes et accès | Consultation et dépôt sans inscription. Compte membre facultatif dès la V1 : connexion Google, 2FA au choix du membre, gestion des sessions et suppression de compte. Accès humains de modération et d’administration nominatifs avec MFA obligatoire. Voir les critères ci-dessous. | Fournisseurs supplémentaires, favoris synchronisés, points et badges ne sont pas des prérequis V1. | Identité / #26 ; accès privilégiés / #97 ; communauté / #98 |
+| Contact | Résultat réel ou erreur explicite, sans imposer de compte. | Pas de commande promettant un envoi fictif. | Contact / #28 |
 | Ouverture publique | Recette mobile/desktop, restauration vérifiée, budget et droits validés, blocages de publication levés. | Pas de déploiement public ou d'abonnement fournisseur autorisé par cette décision. | Exploitation / #29, #30, #31 ; qualité / #32, #43 |
+
+## Comptes : critères avant ouverture
+
+**Décision du 23 novembre 2026 (#26).** Cette révision avance les comptes membres en V1.
+Il s'agit d'un objectif de livraison, pas de l'annonce d'une connexion déjà disponible.
+
+- **Connexion.** Préférer un service d'identité éprouvé compatible [OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect).
+  NestJS termine le flux code avec PKCE, vérifie le retour et ouvre une session Littora révocable par cookie sécurisé, inaccessible au JavaScript.
+  Ne pas fusionner deux identités sur la seule égalité d'un e-mail. Une panne d'identité ne bloque pas les plages ni les dépôts sans compte.
+- **Deuxième facteur.** Un membre qui l'active ne peut plus accéder à son compte par Google seul. Avant tout accès privilégié humain, exiger une passkey ou une clé de sécurité avec vérification de l'utilisateur.
+  Vérifier aussi la voie opérateur privée et le retrait des droits. Tester perte de clé, récupération sans contournement, notification et révocation des sessions. Ne pas confondre ces comptes avec les identifiants des tâches automatiques.
+- **Données.** Ne demander que les attributs nécessaires. Ne pas relier les dépôts historiques sans compte à une identité.
+  Recommandation initiale : identité gérée séparément, identifiant applicatif opaque et rôles PostgreSQL distincts ; l'accès du catalogue ne doit pas pouvoir lire les identités ou les favoris privés.
+  Deux bases sur le même serveur ne protègent pas d'un administrateur de serveur compromis. Séparer les instances si une frontière d'administration ou de restauration indépendante est nécessaire.
+- **Recette.** Vérifier avec deux membres, un modérateur, un administrateur et un visiteur : confidentialité entre comptes, refus d'élévation de droits, déconnexion/révocation, récupération et suppression. Aucun jeton ni code de secours dans les journaux.
+  Documenter les durées de conservation, le devenir des sauvegardes, la réponse aux incidents et le coût du fournisseur (#30, #31). Pas de déploiement public ni de souscription autorisés par ce cadrage.
+
+Les [points et badges](https://github.com/ActuatorIO-Foundry/littora/issues/98) restent distincts du hub modéré : ils ne doivent donner ni droits, ni poids supplémentaire à un signalement, ni valeur officielle à une observation.
 
 ## Couverture minimale pour la recette
 

@@ -49,7 +49,18 @@ jobs:
         with:
           node-version-file: .nvmrc
           package-manager-cache: false
-      - name: Validate migrations, API startup and HTTPS through the real frontend and API
+      - name: Check out the schema-compatible rollback reference
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: e6c11951ecae3e20294d428eb6f0a0308fcb00c3 # architecture after PR 92
+          path: rollback-reference
+          persist-credentials: false
+      - name: Build the reference API and web from tracked source only
+        run: |
+          set -o pipefail
+          git -C rollback-reference archive HEAD | docker build --target api -f apps/api/Dockerfile -t littora-api:rollback-ci -
+          git -C rollback-reference archive HEAD | docker build -f apps/web/Dockerfile.prod -t littora-web:rollback-ci -
+      - name: Verify migrations, HTTPS and application rollback with post-upgrade writes
         run: node scripts/test-api-migrations.mjs
       - name: Install verified scanner
         run: |

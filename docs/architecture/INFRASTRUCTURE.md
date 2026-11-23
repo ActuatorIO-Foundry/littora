@@ -113,7 +113,42 @@ Redis et la recherche via le proxy Web. Les ports PostgreSQL/Redis sont maintena
 lies a 127.0.0.1. Ne jamais executer `down -v` sur la stack applicative ni rejouer
 `init.sql` dans la base restauree. Garder les anciens volumes et sauvegardes.
 
-## Retour arriere
+## Retour applicatif (#29)
+
+Cette procedure concerne le couple **interface + API**, lorsque la version
+precedente accepte le schema et les ecritures de la candidate. Une interface
+recente peut envoyer des filtres inconnus a une ancienne API. Ne pas dissocier
+les deux images sans preuve de compatibilite. Un retour du stockage ou du
+worker est une intervention distincte.
+
+1. Avant la mise a jour, relever les identifiants immuables des deux images
+   en service et les conserver. Tester cette paire sur une restauration isolee
+   apres les migrations prevues. Verifier aussi la compatibilite du worker
+   laisse en place. Sans preuve, ne pas engager ce retour arriere.
+2. En cas de regression, mettre les entrees en maintenance, suspendre les
+   ecritures et conserver une sauvegarde de l'etat **courant**. Garder les
+   memes volumes, secrets de contribution, proxy de confiance et origine.
+   Ne pas rejouer de seed, modifier le journal de migrations ou restaurer un
+   dump ancien pour revenir au code precedent.
+3. Selectionner les deux images conservees dans un override Compose prive
+   et recreer uniquement les services `api` puis `web`, sans build, pull,
+   migration ni recreation des dependances. Comparer les identifiants
+   d'images effectifs aux identifiants attendus.
+4. Depuis le point d'entree HTTPS, tester accueil, recherche, lien direct
+   vers une fiche et lecture API. En recette, verifier egalement qu'une
+   contribution deposee sous la candidate reste en attente, qu'un doublon
+   est refuse et qu'une nouvelle contribution est acceptee. En cas d'echec,
+   rester en maintenance ; ne pas contourner le controle des migrations.
+   Rouvrir apres verification, consigner les limites fonctionnelles de la
+   version reactivee et conserver les images de la candidate.
+
+La CI repete le trajet version de reference → candidate → reference →
+candidate dans une installation vierge isolee. Elle compare l'empreinte de
+l'index HTML servi par Caddy et celle des donnees avant/apres les bascules.
+Ce test ne garantit ni une bascule sans interruption, ni la compatibilite
+des onglets deja ouverts, ni le fonctionnement sur le futur domaine public.
+
+## Retour arriere du stockage
 
 Sans ecriture depuis le basculement : arreter l'API, re-selectionner les anciens
 volumes et les **anciennes images exactes** du manifeste via un override Compose

@@ -134,6 +134,11 @@ try {
   const api = start('ready', image, reportConfig);
   docker(['network', 'connect', '--alias', 'api', ingress, previous]);
   await until(() => request(api, '/api/beaches?limit=1').status === 200, 'HTTP after migration');
+  for (const path of ['/api/auth/status', '/api/favorites']) {
+    const unavailable = request(api, path);
+    assert.equal(unavailable.status, 404);
+    assert.equal(unavailable.body.code, 'NOT_FOUND');
+  }
   assert.notEqual(docker(['exec', api, 'id', '-u']), '0');
   const response = request(api, '/api/beaches/catalogue');
   assert.equal(response.status, 200);

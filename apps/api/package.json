@@ -16,7 +16,7 @@
     "db:seed:demo": "node scripts/database.cjs seed-demo",
     "start:dev": "node --watch --require ts-node/register src/main.ts",
     "start:prod": "node dist/main.js",
-    "build": "tsc -p tsconfig.json",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",
     "start": "node dist/main.js"
   },
   "dependencies": {

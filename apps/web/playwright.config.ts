@@ -30,5 +30,7 @@ export default defineConfig({
       use: { ...devices["iPhone 13"], defaultBrowserType: "chromium" },
     },
     { name: "wide", use: { viewport: { width: 1920, height: 1080 } } },
+    { name: "firefox-beta", grep: /@beta/, use: { browserName: "firefox", channel: undefined, viewport: {width: 1440, height: 1000} } },
+    { name: "webkit-beta", grep: /@beta/, use: { ...devices["iPhone 13"], browserName: "webkit", channel: undefined } },
   ],
 });

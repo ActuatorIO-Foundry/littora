@@ -469,7 +469,7 @@ test('prévisions : une mesure marine reçue pour une rivière ne devient pas sa
   await expect(chart.locator('.forecast-chart svg')).toHaveCount(0);
 });
 
-test('lac : une fermeture officielle reste visible en l’absence de modèle marin',async({page})=>{
+test('lac : une fermeture officielle reste visible en l’absence de modèle marin', {tag: '@beta'}, async({page})=>{
   const lake={...beaches[1],id:'test-lake',waterType:'lake'};
   await page.route('**/api/beaches/test-lake',r=>r.fulfill({json:lake}));
   await page.route('**/api/score/**',r=>r.fulfill({json:{...score,beach:lake,current:{...score.current,
@@ -698,7 +698,7 @@ test('recherche : mer, lac, riviere et inconnu restent distincts', async ({ page
   await noOverflow(page);
 });
 
-test("recherche : filtres, apercu distinct et retour", async ({
+test("recherche : filtres, apercu distinct et retour", {tag: '@beta'}, async ({
   page,
 }, info) => {
   await page.goto("/recherche");
@@ -893,7 +893,7 @@ test('contributions : session reutilisee, confiance absente et moderation explic
   await noOverflow(page);
 });
 
-test('contributions : doublon et quota produisent des erreurs actionnables', async ({page}) => {
+test('contributions : doublon et quota produisent des erreurs actionnables', {tag: '@beta'}, async ({page}) => {
   let status=409;
   await page.route('**/api/reports',route=>route.fulfill({status,json:{code:status===409?'CONFLICT':'RATE_LIMITED'}}));
   await page.goto('/plages/test-sea');
@@ -1056,7 +1056,7 @@ test("reduction des mouvements : image fixe et menu clavier", async ({
   await noOverflow(page);
 });
 
-test("carte : facade selectionnable et reperes visibles", async ({ page }) => {
+test("carte : facade selectionnable et reperes visibles", {tag: '@beta'}, async ({ page }) => {
   await page.goto("/");
   const label = page.locator(".zone-marker").filter({ hasText: "Bretagne" });
   await expect(label).toBeVisible();

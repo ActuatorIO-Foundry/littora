@@ -77,7 +77,7 @@ sans interrompre une application independante. Le proxy Docker reste distinct.
 
 ```sh
 npm run build:web
-npm exec --prefix apps/web -- playwright install chromium
+npm exec --prefix apps/web -- playwright install chromium firefox webkit
 npm --prefix apps/web run test:ui
 ```
 
@@ -85,6 +85,9 @@ Chrome deja installe peut etre utilise avec `PLAYWRIGHT_CHANNEL=chrome`.
 Les tests interceptent les API pour les etats controles et n'ecrivent pas dans
 la base. Captures et traces sont produites dans `apps/web/test-results`, ignore
 par Git. Viewports : 360, 390, 768, 1440 et 1920 pixels.
+Quatre parcours de recette tournent aussi sous Firefox desktop et WebKit mobile.
+Pour les rejouer seuls : `npm --prefix apps/web run test:ui -- --project firefox-beta --project webkit-beta`.
+Le profil mobile simule un appareil ; il ne remplace pas une recette sur un iPhone physique.
 
 Recette du 16 novembre 2026 : compilation production reussie, 55 tests de
 parcours et d'animation reussis sur les cinq formats et selection geographique rejouee

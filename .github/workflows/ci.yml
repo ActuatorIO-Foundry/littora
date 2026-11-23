@@ -124,7 +124,7 @@ jobs:
       - run: npm run audit
       - run: npm run test:tooling --workspace apps/web
       - run: npm run build:web
-      - run: npm exec -- playwright install --with-deps chromium
+      - run: npm exec -- playwright install --with-deps chromium firefox webkit
         working-directory: apps/web
       - run: npm run test:ui
       - run: git diff --exit-code -- package-lock.json

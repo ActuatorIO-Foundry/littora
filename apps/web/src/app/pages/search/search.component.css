@@ -348,15 +348,6 @@
   font-size: 11px;
   color: var(--muted);
 }
-.overview-metrics strong {
-  font-size: 20px;
-  font-weight: 650;
-  white-space: nowrap;
-}
-.overview-metrics small {
-  font-size: 10px;
-  font-weight: 400;
-}
 .overview-source {
   margin-top: 12px;
   font-size: 10px;
@@ -493,8 +484,8 @@
   .overview-metrics {
     gap: 8px;
   }
-  .overview-metrics strong {
-    font-size: 19px;
+  .overview-metrics {
+    --reading-size: 19px;
   }
 }
 .place-search {

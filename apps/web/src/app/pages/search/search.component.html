@@ -204,9 +204,8 @@
   <div *ngIf="message" class="notice" role="status">
     <app-icon name="info" [size]="18" />{{ message }}
   </div>
-  <div *ngIf="error" class="notice error" role="alert">
-    <app-icon name="alert" [size]="18" />{{ error
-    }}<button
+  <div *ngIf="error" [appRequestError]="error">
+    <button
       class="text-link"
       (click)="retrySearch()"
     >
@@ -341,33 +340,20 @@
           </div>
           <app-comfort-explanation [value]="beach.scoreExplanation" />
           <p *ngIf="loadingScore && !score" role="status" class="caption">Lecture des conditions…</p>
-          <p *ngIf="scoreError" class="notice error">{{ scoreError }}</p>
+          <div *ngIf="scoreError" [appRequestError]="scoreError"></div>
           <ng-container *ngIf="score"
             ><div class="overview-metrics">
               <div>
                 <app-icon name="sun" /><span>Air</span
-                ><strong
-                  >{{ metricValue(score.current?.weather, "temperature_2m")
-                  }}<small> °C</small></strong
-                >
+                ><app-metric-reading [value]="score.current?.weather?.['temperature_2m']" [status]="score.dataStatus?.['weather']" unit="°C" />
               </div>
               <div *ngIf="beach.waterType === 'sea'">
                 <app-icon name="waves" /><span>Eau</span
-                ><strong
-                  >{{
-                    metricValue(
-                      score.current?.marine,
-                      "sea_surface_temperature"
-                    )
-                  }}<small> °C</small></strong
-                >
+                ><app-metric-reading [value]="score.current?.marine?.['sea_surface_temperature']" [status]="score.dataStatus?.['marine']" unit="°C" />
               </div>
               <div>
                 <app-icon name="wind" /><span>Vent</span
-                ><strong
-                  >{{ metricValue(score.current?.weather, "wind_speed_10m")
-                  }}<small> km/h</small></strong
-                >
+                ><app-metric-reading [value]="score.current?.weather?.['wind_speed_10m']" [status]="score.dataStatus?.['weather']" unit="km/h" />
               </div>
             </div>
             <p class="overview-source">

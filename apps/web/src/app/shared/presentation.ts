@@ -27,21 +27,6 @@ export function dataStatusLabel(data?: DataStatus): string {
   ].filter(Boolean).join(' · ');
 }
 
-export function metricValue(
-  source: Record<string, unknown> | undefined,
-  key: string,
-  fallback = "—",
-): string {
-  const value = source?.[key];
-  if (value === null || value === undefined || value === "") return fallback;
-  if (typeof value === "number")
-    return Number.isFinite(value)
-      ? new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(
-          value,
-        )
-      : fallback;
-  return String(value);
-}
 export function providerLabel(provider?: string): string {
   const names: Record<string, string> = {
     "open-meteo": "Open-Meteo",

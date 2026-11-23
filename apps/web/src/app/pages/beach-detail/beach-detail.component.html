@@ -72,9 +72,8 @@
         <ng-template #unknownVigilance>information indisponible pour cette plage.</ng-template>
       </p>
       <p *ngIf="loadingScore" class="caption" role="status">Lecture des conditions…</p>
-      <div *ngIf="scoreError" class="notice error">
-        <app-icon name="alert" [size]="18" />{{ scoreError
-        }}<button class="text-link" (click)="loadScore(beach.id)">
+      <div *ngIf="scoreError" [appRequestError]="scoreError">
+        <button class="text-link" (click)="loadScore(beach.id)">
           Réessayer
         </button>
       </div>
@@ -86,11 +85,7 @@
             "
           >
             <app-icon name="sun" /><span>Température de l’air</span
-            ><strong
-              >{{ metricValue(score.current?.weather, "temperature_2m")
-              }}<small> °C</small></strong
-            >
-            <small *ngIf="oldReading('weather','temperature_2m')">Prévision périmée</small>
+            ><app-metric-reading [value]="score.current?.weather?.['temperature_2m']" [status]="score.dataStatus?.['weather']" unit="°C" />
           </div>
           <div *ngIf="beach.waterType === 'sea'"
             [ngClass]="
@@ -101,11 +96,7 @@
             "
           >
             <app-icon name="waves" /><span>Température de l’eau</span
-            ><strong
-              >{{ metricValue(score.current?.marine, "sea_surface_temperature")
-              }}<small> °C</small></strong
-            >
-            <small *ngIf="oldReading('marine','sea_surface_temperature')">Prévision périmée</small>
+            ><app-metric-reading [value]="score.current?.marine?.['sea_surface_temperature']" [status]="score.dataStatus?.['marine']" unit="°C" />
           </div>
           <div
             [ngClass]="
@@ -113,22 +104,15 @@
             "
           >
             <app-icon name="wind" /><span>Vent</span
-            ><strong
-              >{{ metricValue(score.current?.weather, "wind_speed_10m")
-              }}<small> km/h</small></strong
-            >
+            ><app-metric-reading [value]="score.current?.weather?.['wind_speed_10m']" [status]="score.dataStatus?.['weather']" unit="km/h" />
             <small class="wind-origin">{{ windOrigin }}</small>
-            <small *ngIf="oldReading('weather','wind_speed_10m') || oldReading('weather','wind_direction_10m')">Prévision périmée</small>
+            <small *ngIf="score.current?.weather?.['wind_speed_10m'] == null && oldReading('weather','wind_direction_10m')">Direction : prévision périmée</small>
           </div>
           <div
             [ngClass]="metricClass('uv', score.current?.weather?.['uv_index'])"
           >
             <app-icon name="sun" /><span>Indice UV</span
-            ><strong
-              >{{ metricValue(score.current?.weather, "uv_index")
-              }}<small> / 11+</small></strong
-            >
-            <small *ngIf="oldReading('weather','uv_index')">Prévision périmée</small>
+            ><app-metric-reading [value]="score.current?.weather?.['uv_index']" [status]="score.dataStatus?.['weather']" unit="/ 11+" />
           </div>
           <div *ngIf="beach.waterType === 'sea'"
             [ngClass]="
@@ -136,11 +120,7 @@
             "
           >
             <app-icon name="waves" /><span>Hauteur des vagues</span
-            ><strong
-              >{{ metricValue(score.current?.marine, "wave_height")
-              }}<small> m</small></strong
-            >
-            <small *ngIf="oldReading('marine','wave_height')">Prévision périmée</small>
+            ><app-metric-reading [value]="score.current?.marine?.['wave_height']" [status]="score.dataStatus?.['marine']" unit="m" />
           </div>
         </div>
         <div class="alerts" *ngIf="score.safety?.alerts?.length">

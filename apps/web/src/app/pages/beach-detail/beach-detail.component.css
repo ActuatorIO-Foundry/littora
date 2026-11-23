@@ -44,6 +44,8 @@
   color: var(--ink);
   margin-top: 3px;
 }
+.official-status.closure { background: #fff1ef; }
+.official-status.closure, .official-status.closure strong { color: var(--danger); }
 .section-nav {
   display: flex;
   gap: 30px;

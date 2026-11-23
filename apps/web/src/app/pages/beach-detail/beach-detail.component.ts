@@ -26,6 +26,7 @@ import {
   dataStatusLabel,
   forecastIsStale,
   freshnessDeadline,
+  flagLabel,
 } from "../../shared/presentation";
 type UsageKey = "bathing" | "family" | "paddle" | "boat";
 @Component({
@@ -507,16 +508,7 @@ export class BeachDetailComponent implements OnInit, OnDestroy {
       )[type] ?? "Observation"
     );
   }
-  flagLabel(flag?: string | null): string {
-    return flag
-      ? ((
-          { green: "Vert", yellow: "Jaune", red: "Rouge" } as Record<
-            string,
-            string
-          >
-        )[flag] ?? flag)
-      : "";
-  }
+  readonly flagLabel = flagLabel;
   dateLabel(raw: unknown): string {
     if (!raw) return "Non renseignée";
     const d = new Date(String(raw));

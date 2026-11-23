@@ -27,11 +27,15 @@
           </ng-container>
         </p>
       </div>
-      <span class="official-status"
+      <a *ngIf="score?.current?.waterQuality?.restriction?.status === 'closed'; else unknownFlag"
+        class="official-status closure" [routerLink]="[]" queryParamsHandling="preserve" fragment="sources">
+        <app-icon name="alert" [size]="20" /><span>Décision officielle<strong>Baignade interdite</strong></span>
+      </a>
+      <ng-template #unknownFlag><span class="official-status"
         ><app-icon name="flag" [size]="20" /><span
           >Drapeau officiel<strong>Non renseigné</strong></span
         ></span
-      >
+      ></ng-template>
     </header>
     <nav class="section-nav" aria-label="Sections de la plage">
       <a [routerLink]="[]" queryParamsHandling="preserve" fragment="conditions"

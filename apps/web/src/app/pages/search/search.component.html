@@ -146,7 +146,7 @@
       </select>
     </label>
     <label class="field"
-      >Drapeau renseigné<select
+      >Drapeau observé par la communauté<select
         [(ngModel)]="requiredFlag"
         (ngModelChange)="syncFilters()"
       >
@@ -240,7 +240,7 @@
       </div>
     </section>
     <section
-      class="results-column" [attr.aria-busy]="loading"
+      class="results-column"
       aria-label="Plages proposées"
       [attr.aria-busy]="loading"
     >
@@ -262,6 +262,7 @@
           </select></label
         >
       </div>
+      <p *ngIf="beaches.length && searchAsOf" class="caption">Recherche du <time [attr.datetime]="searchAsOf">{{ searchAsOf | date:'dd/MM à HH:mm' }}</time></p>
       <app-loading
         *ngIf="loading && initialLoad"
         label="À la recherche de votre prochaine escale…"
@@ -302,12 +303,18 @@
                 <span *ngIf="beach.city && beach.department"> · </span>{{ beach.department }}
               </ng-container>
             </p>
+            <div class="bathing-status" *ngIf="beach.bathingRestriction === 'closed' || (beach.flagSource === 'community' && flagLabel(beach.flag)) || beach.recentRedAt">
+              <strong *ngIf="beach.bathingRestriction === 'closed'; else observation" class="closure"><app-icon name="alert" [size]="15" />Baignade interdite · décision officielle</strong>
+              <ng-template #observation>
+                <span *ngIf="beach.flagSource === 'community' && flagLabel(beach.flag) as label"><app-icon name="flag" [size]="15" />Drapeau communautaire : {{ label }}</span>
+              </ng-template>
+              <small *ngIf="beach.recentRedAt">Dernier rouge signalé : <time [attr.datetime]="beach.recentRedAt">{{ beach.recentRedAt | date:'dd/MM à HH:mm' }}</time></small>
+            </div>
             <div class="beach-tags">
               <app-dog-access *ngIf="beach.dogAccess && beach.dogAccess.status !== 'unknown'" [access]="beach.dogAccess" />
               <app-naturism *ngIf="beach.naturism && beach.naturism.status !== 'unknown'" [info]="beach.naturism" />
               <span *ngIf="beach.scoreExplanation?.status === 'calculated'">Confort : {{ beach.selectedScore }}/100</span>
               <span *ngIf="beach.scoreExplanation?.status === 'partial'">Confort partiel : {{ beach.scoreExplanation?.partialScore ? '≤ ' : '' }}{{ beach.scoreExplanation?.partialScore }}/100 · {{ beach.scoreExplanation?.available }}/{{ beach.scoreExplanation?.required }} mesures</span>
-              <span *ngIf="beach.bathingRestriction === 'closed'"><app-icon name="alert" [size]="13" />Baignade interdite</span>
               <span>{{ waterLabel(beach.waterType) }}</span><span
                 *ngIf="beach.has_parking"
                 ><app-icon name="parking" [size]="13" />Parking</span
@@ -327,6 +334,7 @@
           /></a>
         </div>
         <div class="beach-overview" *ngIf="selectedBeach?.id === beach.id">
+          <div class="overview-flag"><app-icon name="flag" [size]="15" />Drapeau officiel non renseigné</div>
           <app-comfort-explanation [value]="beach.scoreExplanation" />
           <p *ngIf="loadingScore && !score" role="status" class="caption">Lecture des conditions…</p>
           <p *ngIf="scoreError" class="notice error">{{ scoreError }}</p>
@@ -366,9 +374,6 @@
                 {{ providerLabel(score.providers?.[source]) }} : {{ dataStatusLabel(score.dataStatus?.[source]) }}
               </ng-container>
             </p>
-            <div class="overview-flag">
-              <app-icon name="flag" [size]="15" />Drapeau officiel non renseigné
-            </div>
             <p class="caption" *ngIf="score.safety?.alerts?.length">
               {{ score.safety?.alerts?.join(" · ") }}
             </p></ng-container

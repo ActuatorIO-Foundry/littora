@@ -783,6 +783,49 @@ test("recherche : filtres, apercu distinct et retour", {tag: '@beta'}, async ({
   await expect(page.getByLabel("Parking", { exact: true })).toBeChecked();
 });
 
+test('parcours bêta : de la façade au signalement puis retour aux résultats filtrés', {tag:'@beta'}, async ({page})=>{
+  const coast=[beaches[0],{...beaches[0],id:'test-crique',name:'Crique sans parking',has_parking:false}];
+  const bbox='42.9,4.6,43.9,7.65';
+  await page.route('**/api/search/beaches',route=>{
+    const criteria=route.request().postDataJSON();
+    return route.fulfill({json:searchResult(criteria,criteria.bbox===bbox ? coast : [...coast,beaches[1]])});
+  });
+  let received=0;
+  await page.route('**/api/reports',route=>{
+    if(route.request().method()!=='POST') return route.fulfill({json:[]});
+    expect(route.request().postDataJSON()).toMatchObject({beachId:'test-sea',type:'jellyfish'});
+    expect(route.request().headers()['authorization']).toBe('Bearer '+'a'.repeat(64));
+    received++;
+    return route.fulfill({status:201,json:{status:'pending',confidence:0}});
+  });
+  await page.goto('/');
+  await page.locator('.zone-marker').filter({hasText:'Azur'}).click();
+  await expect(page).toHaveURL(/zone=azur/);
+  await expect(page.locator('.beach-result')).toHaveCount(2);
+  await page.getByRole('button',{name:'Filtres',exact:true}).click();
+  await page.getByLabel('Parking',{exact:true}).check();
+  const rows=page.locator('.beach-result');
+  await expect(rows).toHaveCount(1);
+  await rows.getByRole('button',{name:'Plage des Pins',exact:true}).click();
+  await expect(page.locator('.overview-metrics')).toBeVisible();
+  await expect(page).toHaveURL(/recherche/);
+  const filters=new URL(page.url()).searchParams;
+  expect(filters.get('zone')).toBe('azur'); expect(filters.get('parking')).toBe('1');
+  await rows.getByRole('link',{name:'Détails',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Plage des Pins',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Méduses',exact:true}).click();
+  await expect(page.getByText('Observation reçue, en attente de modération. Merci.')).toBeVisible();
+  expect(received).toBe(1);
+  await page.getByRole('link',{name:'Retour aux plages'}).click();
+  await expect(page).toHaveURL(/recherche/);
+  const returned=new URL(page.url()).searchParams;
+  expect([...returned].sort()).toEqual([...filters].sort());
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText('Plage des Pins');
+  await page.getByRole('button',{name:/Filtres/}).click();
+  await expect(page.getByLabel('Parking',{exact:true})).toBeChecked();
+});
+
 test("detail : series reelles, indisponibilite et equipements", async ({
   page,
 }, info) => {

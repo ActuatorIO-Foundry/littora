@@ -60,8 +60,8 @@ pour liberer un port, choisir par exemple `API_PORT=3001`.
 
 ## Lancer en production
 **Configuration presente mais non validee pour un deploiement public.** Les
-corrections proxy/HTTPS (#29) et les images d'infrastructure (#33) restent
-bloquantes. Une CI verte des images applicatives ne valide pas toute la stack.
+essais sur le domaine public (#29) et la validation de la preversion (#43)
+restent necessaires. Une CI verte ne valide pas une ouverture publique.
 
 ```bash
 test -f .env.prod || (umask 077 && cp .env.prod.example .env.prod)
@@ -69,7 +69,8 @@ test -f .env.prod || (umask 077 && cp .env.prod.example .env.prod)
 npm run docker:prod -- --check
 ```
 
-Le lanceur reste bloque tant que l'exception de securite #33 existe. Ne pas
+Le lanceur reste bloque par la decision de sortie (#43), independamment
+des exceptions de securite. Ne pas
 contourner ce controle par un `compose up` direct. La preparation explicite
 du schema avec le service `migrate` reste obligatoire avant toute future mise
 en service ; ce lot ne valide pas le deploiement de production (#29).

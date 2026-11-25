@@ -26,30 +26,21 @@ PostGIS 3.7 a separe Tiger du coeur. L'extension autonome est donc installee san
 suppression des schemas existants. L'ancien gosu embarquait un runtime Go obsolete ;
 il est retire et le point d'entree utilise `su-exec` 0.3-r0.
 
-## Securite et exception temporaire
+## Securite des images
 
-Scans complets Trivy 0.76.2 : PostGIS et Redis ne remontent aucune alerte dans les
-images finales verifiees. Caddy conserve trois avis JOSE v3 :
+L'image Caddy 2.11.9-r1 utilisait JOSE v3 sans correctif compatible. La r2
+epingle la [migration fusionnee par Smallstep](https://github.com/smallstep/certificates/pull/2848)
+a la revision Go immuable `v0.30.3-0.20261105213751-6d5a251fbe01`. Ce n'est
+pas une release numerotee ; au prochain tag contenant ce commit, tester le
+remplacement en recette. JOSE v4.1.9 remplace la v3 ; la construction verifie
+le graphe du **binaire**, puis Trivy controle les paquets des images finales.
+L'exception CVE-2026-116587 est retiree et non prolongee. Une nouvelle alerte
+haute ou critique bloque la CI. Les rapports restent des artefacts, hors Git.
 
-- CVE-2026-116587, eleve : parametres RSA/JWK malveillants, deni de service.
-- CVE-2026-116585 et CVE-2026-116586, moderes : parsing JOSE.
-
-La branche v3 ne publie pas de correctif compatible. L'essai avec Smallstep crypto
-0.92.0 / JOSE v4 casse la compilation de certificates 0.30.2 ; il n'est pas retenu.
-Les correctifs compatibles Go, x/net, x/crypto, OpenTelemetry et zlib sont appliques.
-La configuration actuelle n'expose pas de service ACME/PKI interne, mais cela
-ne constitue pas une preuve d'inexploitabilite de toutes les dependances.
-
-Une exception CI explicite est limitee a CVE-2026-116587, au paquet/version JOSE
-v3.0.5 de Caddy, jusqu'au **30 novembre 2026 exclu**. Un autre avis, un changement
-de version, un correctif disponible ou l'echeance fait echouer le controle.
-Les rapports complets restent des artefacts CI ; aucun `ignore-unfixed` global.
-Les deux avis moderes restent visibles et suivis dans #33.
-
-**Production bloquee** jusqu'a suppression de cette exception apres correction :
-`npm run docker:prod` refuse de demarrer tant qu'une exception est presente.
+**Production bloquee** : le lanceur refuse les exceptions de securite et,
+separement, les validations de sortie ouvertes dans `infra/release-holds.json`.
 Ne pas contourner ce controle en lancant directement le Compose production.
-#33 reste ouvert pour le correctif amont ; #29 conserve le chantier HTTPS public.
+#43 suit la decision de publication ; #29 conserve le chantier HTTPS public.
 Le lanceur production utilise exclusivement `.env.prod` et le projet Compose
 `littora-prod`, pour ne pas recuperer les selections de volumes du `.env` local.
 

@@ -16,10 +16,10 @@ test('image policy: exceptions cannot hide unrelated, fixed or expired findings'
   assert.throws(() => checkReport('caddy', {}, exceptions), /Incomplete/);
 });
 
-test('production stays blocked while an infrastructure exception remains', () => {
+test('retiring the Caddy exception does not authorise a public release', () => {
   const result = spawnSync(process.execPath, [fileURLToPath(new URL('../start-production.mjs', import.meta.url))], {
     encoding: 'utf8', env: { ...process.env, PATH: '' },
   });
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /Production blocked/);
+  assert.match(result.stderr, /Production blocked: release approval pending: .*issues\/43/);
 });

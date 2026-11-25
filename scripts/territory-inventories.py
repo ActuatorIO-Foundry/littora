@@ -17,6 +17,7 @@ from pathlib import Path
 from urllib.parse import urljoin
 
 from shapely.geometry import Point, Polygon, box
+from shapely.errors import ShapelyError
 from shapely.ops import unary_union
 from shapely.strtree import STRtree
 
@@ -41,6 +42,26 @@ class DatedLinks(HTMLParser):
 
 class DownloadError(ValueError):
     """Only fixed reason codes reach the operator's diagnostics."""
+
+
+TRANSIENT = {"dns", "connect", "timeout", "interrupted", "temporary-http"}
+STOP_PROVIDER = {"provider-backoff", "transfer-quota"}
+
+
+def transfer_reason(result):
+    if result.stdout in {"429", "503"}:
+        return "provider-backoff"
+    if result.returncode == 22 and result.stdout in {"408", "500", "502", "504"}:
+        return "temporary-http"
+    return {6:"dns", 7:"connect", 28:"timeout", 18:"interrupted", 52:"interrupted",
+            55:"interrupted", 56:"interrupted"}.get(result.returncode, "transfer-failed")
+
+
+def failure(stage, region, error):
+    reason = str(error) if isinstance(error, DownloadError) else "invalid-input-or-storage"
+    print(json.dumps({"event":"inventory_region_failed","stage":stage,"region":region,
+                      "reason":reason}), file=sys.stderr, flush=True)
+    return reason
 
 
 def replication(reader):
@@ -72,8 +93,7 @@ class Downloads:
                 cmd.extend(["--time-cond", str(cached)])
             result = subprocess.run([*cmd, url], capture_output=True, text=True)
             self.remaining -= dest.stat().st_size
-            transient = result.returncode in (6, 7, 18, 28, 52, 55, 56) or (
-                result.returncode == 22 and result.stdout in {"408", "500", "502", "504"})
+            transient = transfer_reason(result) in TRANSIENT
             if not transient or attempt or self.remaining <= 0:
                 return result
             time.sleep(3)
@@ -87,6 +107,8 @@ class Downloads:
             if pbf and (result.returncode == 47 or result.returncode == 22 and result.stdout in {"404", "410"}):
                 # Only the publisher's dated file for this exact region is eligible.
                 index = self.request(urljoin(ROOT+path,"./"), dest, MIB, timeout=20)
+                if index.returncode and transfer_reason(index) in STOP_PROVIDER | TRANSIENT:
+                    raise DownloadError(transfer_reason(index))
                 links = DatedLinks(path)
                 if index.returncode == 0 and index.stdout == "200":
                     links.feed(dest.read_text())
@@ -94,9 +116,7 @@ class Downloads:
                     raise DownloadError("edition-index")
                 result = self.request(max(links.links), dest, limit, cached=target)
             if result.returncode:
-                if result.stdout in {"429", "503"}:
-                    raise DownloadError("provider-backoff")
-                raise DownloadError("transfer-failed")
+                raise DownloadError(transfer_reason(result))
             if result.stdout == "304" and target.is_file():
                 return target
             if result.stdout != "200" or not dest.stat().st_size:
@@ -147,20 +167,22 @@ def window(site):
     return box(site["lon"]-dx, site["lat"]-dy, site["lon"]+dx, site["lat"]+dy)
 
 
-def plan(sites, shapes):
+def plan(sites, shapes, allow_partial=True):
     groups, uncovered = defaultdict(list), []
     for site in sites:
         disk = window(site)
         region = next((r for r, p in shapes.items() if p.covers(disk)), None)
         if region:
             groups[region].append({**site,"completeWindow":True})
-        else:
+        elif allow_partial:
             # E.g. a border or a coastal extract cut offshore: publish positive evidence only.
             overlaps = [(p.intersection(disk).area, r) for r,p in shapes.items() if p.covers(Point(site["lon"], site["lat"]))]
             if overlaps:
                 groups[max(overlaps)[1]].append({**site,"completeWindow":False})
             else:
                 uncovered.append(site["id"])
+        else:
+            uncovered.append(site["id"])
     return groups, uncovered
 
 
@@ -208,6 +230,39 @@ def bundle(region, sites, downloads):
     return out
 
 
+def prepare(sites, downloads, allowed, manifest, plan_only=False):
+    shapes, missing = {}, set()
+    consecutive = 0
+    for r in REGIONS:
+        try:
+            shapes[r] = polygon(downloads.get(r+".poly", r+"/"+r+".poly", MIB))
+            consecutive = 0
+        except (ValueError, OSError, RuntimeError, ShapelyError) as error:
+            reason = failure("boundary", r, error)
+            missing.add(r)
+            if reason in STOP_PROVIDER:
+                return 2
+            consecutive = consecutive + 1 if reason in TRANSIENT else 0
+            # A shared transport outage needs a later preflight, not 22 requests in a row.
+            if consecutive >= 2:
+                return 75
+    groups, uncovered = plan(sites, shapes, allow_partial=not missing)
+    print(json.dumps({"sites":len(sites),"regions":{r:len(v) for r,v in groups.items()},
+                      "uncovered":len(uncovered),"missingBoundaries":len(missing)}), flush=True)
+    incomplete = bool(missing or uncovered)
+    if not plan_only:
+        for r in sorted(allowed & groups.keys()):
+            try:
+                out = bundle(r, groups[r], downloads)
+                print(str(out.resolve()), file=manifest, flush=True)
+                print(f"{r}: {len(groups[r])} inventories prepared", flush=True)
+            except (ValueError, OSError, RuntimeError, ShapelyError) as error:
+                incomplete = True
+                if failure("extract", r, error) in STOP_PROVIDER:
+                    break
+    return 2 if incomplete or downloads.aging else 0
+
+
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("--sites", type=Path, required=True)
@@ -224,22 +279,8 @@ def main():
     sites = json.loads(args.sites.read_text())
     if not 0 < len(sites) <= 5000 or len({s["id"] for s in sites}) != len(sites):
         raise ValueError("Invalid catalogue size or duplicate site")
-    shapes = {r:polygon(downloads.get(r+".poly",r+"/"+r+".poly",MIB)) for r in REGIONS}
-    groups, uncovered = plan(sites,shapes)
-    print(json.dumps({"sites":len(sites),"regions":{r:len(v) for r,v in groups.items()},"uncovered":len(uncovered)}),flush=True)
-    failures = []
     with args.manifest.open("w") as manifest:
-        if not args.plan:
-            for r in sorted(allowed & groups.keys()):
-                try:
-                    out = bundle(r, groups[r], downloads)
-                    print(str(out.resolve()), file=manifest, flush=True)
-                    print(f"{r}: {len(groups[r])} inventories prepared", flush=True)
-                except (ValueError, OSError, RuntimeError) as error:
-                    failures.append(r)
-                    reason = str(error) if isinstance(error, DownloadError) else "invalid-extract-or-storage"
-                    print(f"{r}: inventory preparation failed ({reason})", file=sys.stderr, flush=True)
-    return 2 if failures or uncovered or downloads.aging else 0
+        return prepare(sites, downloads, allowed, manifest, args.plan)
 
 
 if __name__ == "__main__":

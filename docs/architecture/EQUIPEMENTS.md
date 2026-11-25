@@ -119,7 +119,8 @@ idempotente et ne rafraichit pas artificiellement son age.
 Une coupure de connexion ou certaines erreurs HTTP temporaires donnent lieu
 a un seul nouvel essai apres trois secondes. Les transferts partiels et la
 lecture de l'index debitent aussi le quota du cycle. Pour HTTP 429 ou 503,
-il n'y a pas de nouvel essai immediat du fichier. Si l'alias regional est
+le collecteur arrete les nouvelles requetes pour tout le cycle, y compris si
+le refus provient de l'index des editions. Si l'alias regional est
 introuvable ou boucle, seul un extrait date de la meme region sur l'index
 du fournisseur peut le remplacer. Un en-tete PBF illisible, une edition
 perimee ou anterieure a celle du cache utilisable ne remplace pas le fichier.
@@ -132,6 +133,33 @@ ou plus est refuse. Les autres regions peuvent progresser. L'etat de sante
 Docker devient negatif en cas d'echec ou en l'absence de succes depuis 27 h.
 Suivre `coverage` apres chaque cycle : avec points / vides valides / inconnus.
 Le service optionnel ne change pas les conditions de deploiement en production.
+
+### Diagnostiquer un cycle incomplet (#30)
+
+1. Comparer les dates UTC de `/cache/cycle.ok` et `/cache/cycle.failed`,
+   le nombre de lignes du manifeste et les compteurs `coverage`. Un processus
+   en marche ou un total de points non nul ne prouve pas une mise a jour.
+   Une reprise exige un nouveau `cycle.ok`, l'absence du temoin d'echec
+   et la verification des dates `beach_amenity_collections.fetched_at`
+   des sites publics. Une edition inchangee conserve sa date fournisseur.
+2. Chercher l'evenement `inventory_region_failed`. Il indique la phase
+   (`boundary` ou `extract`), la region et une cause bornee (DNS, connexion,
+   delai, HTTP temporaire, refus du fournisseur, entree ou stockage invalide).
+   Ne pas joindre de sorties brutes, d'URL de connexion ou de coordonnees.
+3. Si un contour manque, seuls les sites dont la fenetre entiere est couverte
+   par un contour verifie peuvent avancer. Les sites ambigus sont ignores,
+   leurs inventaires sont preserves, et le cycle reste en echec. L'ancien
+   contour en cache ne sert pas de preuve d'une mise a jour.
+4. Deux pannes de transport consecutives pendant les contours arretent la
+   preparation avant les gros transferts. Le delai avant reprise passe de
+   15 a 30 puis 60 minutes et double jusqu'a six heures. Pour un cycle partiel,
+   HTTP 429/503 ou un autre echec, attendre six heures. `cycle.retry`
+   contient l'echeance Unix et le delai en secondes ; un redemarrage respecte
+   cette attente. Ne pas supprimer les temoins pour forcer des telechargements.
+5. Lors d'un remplacement local, comparer le montage actif de `/cache` avec
+   celui prevu : omettre un `INVENTORY_CACHE` personnalise peut creer un volume
+   vide. Garder la meme source, la meme base, le plafond de transfert et
+   l'image precedente. Ne recreer que `inventories` avec `--no-deps`.
 
 ## Exploitation
 

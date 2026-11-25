@@ -14,43 +14,38 @@
         <app-icon name="mail" [size]="24" />
       </div>
       <div class="notice">
-        <app-icon name="info" [size]="18" />L’envoi direct est indisponible pour
-        le moment.
+        <app-icon name="info" [size]="18" />
+        {{ checking ? 'Vérification de la boîte de réception…' : available ? 'Seuls les gestionnaires de Littora liront votre demande. Votre adresse sert à vous répondre. Le message est supprimé après traitement ou au bout de 30 jours.' : 'L’envoi direct est indisponible pour le moment.' }}
       </div>
-      <form #contact="ngForm" (ngSubmit)="copyMessage()">
+      <form #contact="ngForm" (ngSubmit)="submit()">
         <div class="form-row">
           <label class="field"
-            >Votre nom<input
-              name="name"
-              [(ngModel)]="name"
-              autocomplete="name"
-              required
-              maxlength="100"
-              placeholder="Camille Martin" /></label
-          ><label class="field"
             >Adresse e-mail<input
               name="email"
               type="email"
               [(ngModel)]="email"
               autocomplete="email"
               required
+              [disabled]="busy"
+              maxlength="254"
               email
               placeholder="camille@exemple.fr"
           /></label>
+        <label class="field"
+          >À quel sujet ?<select name="subject" [(ngModel)]="subject" [disabled]="busy">
+            <option value="question">{{topics.question}}</option>
+            <option value="correction">{{topics.correction}}</option>
+            <option value="territory">{{topics.territory}}</option>
+            <option value="partnership">{{topics.partnership}}</option>
+          </select></label>
         </div>
         <label class="field"
-          >À quel sujet ?<select name="subject" [(ngModel)]="subject">
-            <option>Une question</option>
-            <option>Une donnée à corriger</option>
-            <option>Une commune ou un territoire</option>
-            <option>Un partenariat</option>
-          </select></label
-        ><label class="field"
           >Votre message<textarea
             name="message"
             [(ngModel)]="message"
             rows="6"
             required
+            [disabled]="busy"
             maxlength="5000"
             placeholder="Dites-nous ce qui vous amène…"
           ></textarea>
@@ -60,9 +55,9 @@
           ><button
             class="btn btn-sea"
             type="submit"
-            [disabled]="contact.invalid"
+            [disabled]="checking || busy || contact.invalid || !message.trim()"
           >
-            <app-icon name="mail" [size]="17" />Copier le message
+            <app-icon name="mail" [size]="17" />{{ busy ? 'Envoi en cours…' : available ? 'Envoyer le message' : 'Copier le message' }}
           </button>
         </div>
         <p class="form-status" *ngIf="status" role="status">{{ status }}</p>

@@ -54,6 +54,10 @@ export type { WaterQuality } from './models/water-quality';
 export { BaseService } from './base-service';
 export { LittoraService } from './services/littora.service';
 
+export type { GetContactAvailability$Params as GetContactAvailability$Params } from './fn/littora/get-contact-availability';
+export { getContactAvailability as getContactAvailability } from './fn/littora/get-contact-availability';
+export type { SubmitContact$Params as SubmitContact$Params } from './fn/littora/submit-contact';
+export { submitContact as submitContact } from './fn/littora/submit-contact';
 export type { SearchBeaches$Params as SearchBeaches$Params } from './fn/littora/search-beaches';
 export { searchBeaches as searchBeaches } from './fn/littora/search-beaches';
 export type { ListBeaches$Params as ListBeaches$Params } from './fn/littora/list-beaches';

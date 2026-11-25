@@ -18,5 +18,6 @@ import { IngestionModule } from './modules/ingestion/ingestion.module';
 import { PlacesModule } from './modules/places/places.module';
 import { SearchModule } from './modules/search/search.module';
 import { MembersModule } from './modules/members/members.module';
-@Module({imports:[ConfigModule.forRoot({isGlobal:true}),ScheduleModule.forRoot(),CacheModule,JobsModule,DatabaseModule,BeachesModule,PlacesModule,SearchModule,WeatherModule,MarineModule,TidesModule,WaterQualityModule,AlertsModule,ReportsModule,ScoreModule,RecommendationsModule,AdminModule,IngestionModule,MembersModule]})
+import { ContactModule } from './modules/contact/contact.module';
+@Module({imports:[ConfigModule.forRoot({isGlobal:true}),ScheduleModule.forRoot(),CacheModule,JobsModule,DatabaseModule,BeachesModule,PlacesModule,SearchModule,WeatherModule,MarineModule,TidesModule,WaterQualityModule,AlertsModule,ReportsModule,ScoreModule,RecommendationsModule,AdminModule,IngestionModule,MembersModule,ContactModule]})
 export class AppModule {}

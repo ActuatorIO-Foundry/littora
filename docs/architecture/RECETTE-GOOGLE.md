@@ -73,7 +73,12 @@ ne déconnecte pas la session précédente.
   client de test lorsque la recette est terminée.
 
 Les tests automatisés utilisent un transport simulé avec clés éphémères,
-le vrai client OIDC et PostgreSQL jetable. L’ouverture V1 reste conditionnée
+le vrai client OIDC et PostgreSQL jetable. Le contrôle d’intégration CI lance
+aussi Chrome entre deux origines HTTPS locales : formulaire, consentement
+simulé, portée des cookies et déconnexion. Pour le rejouer dans la suite
+d’intégration locale, installer les dépendances du dépôt et Chrome, puis
+définir `TEST_MEMBER_BROWSER=1` et `PLAYWRIGHT_CHANNEL=chrome`.
+L’ouverture V1 reste conditionnée
 au consentement réel, à la 2FA membre, à la récupération et à l’effacement.
 Le pilote ne donne aucun accès de modération ou d’administration (#97).
 

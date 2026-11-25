@@ -137,7 +137,7 @@ test('member sessions: two principals, private database permissions and real HTT
   await owner.query("delete from members.account where subject='multi-device'");
   for (const device of devices) assert.equal((await get(device)).status,401);
 
-  await t.test('isolated Google pilot: form, consent, session, cancellation and failure without a new account', async () => {
+  await t.test('isolated Google pilot: form, consent, session, cancellation and failure without a new account', async pilot => {
     const fixture = googleFixture();
     const settings = {origin, dsn:issuer.dsn, subject:'test-sub', clientId:fixture.clientId, secret:fixture.secret};
     for (const dsn of [reader.dsn, target.href]) {
@@ -191,5 +191,9 @@ test('member sessions: two principals, private database permissions and real HTT
     assert.equal((await state(renewed)).memberId,member.memberId);
     assert.equal((await end(renewed,{origin})).status,200);
     assert.equal((await get(renewed)).status,401);
+    if (process.env.TEST_MEMBER_BROWSER === '1') {
+      await pilot.test('Chromium carries only the Littora session back from cross-site consent', () =>
+        require('../helpers/google-browser.cjs').checkGoogleBrowser({origin,login:local,session:url,fixture,memberCookie}));
+    }
   });
 });

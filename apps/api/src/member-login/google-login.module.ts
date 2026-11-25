@@ -17,7 +17,8 @@ class GoogleLoginController {
 
   @Get()
   form(@Res() res: Response) {
-    res.send(page('<form method="post" action="/connexion/google"><button>Continuer avec Google</button></form>'));
+    // The browser needs its Origin for the same-origin form POST, never for a third party.
+    res.set('Referrer-Policy','same-origin').send(page('<form method="post" action="/connexion/google"><button>Continuer avec Google</button></form>'));
   }
 
   @Post()

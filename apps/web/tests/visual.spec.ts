@@ -72,6 +72,7 @@ const score = {
 async function mockApi(page: Page) {
   await page.route("**/api/**", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname === '/api/contact/availability') return route.fulfill({json:{available:false}});
     if (url.pathname === '/api/search/beaches') return route.fulfill({json:searchResult(route.request().postDataJSON(),beaches)});
     if (url.pathname.endsWith('/reports/session')) return route.fulfill({status:201,json:{token:'a'.repeat(64),expiresAt:'2099-01-01T00:00:00Z'}});
     if (url.pathname.startsWith('/api/places/')) return route.fulfill({ json: [] });
@@ -1044,7 +1045,6 @@ test("contact : pas de faux succes et champs accessibles", async ({
   await expect(
     page.getByRole("button", { name: "Copier le message" }),
   ).toBeDisabled();
-  await page.getByLabel("Votre nom").fill("Test");
   await page.getByLabel("Adresse e-mail").fill("test@example.org");
   await page
     .getByLabel("Votre message", { exact: true })
@@ -1065,6 +1065,28 @@ test("contact : pas de faux succes et champs accessibles", async ({
     path: info.outputPath("contact.png"),
     fullPage: true,
   });
+});
+
+test('contact : la référence suit la prise en charge, un échec préserve le brouillon',async({page})=>{
+  await page.route('**/api/contact/availability',r=>r.fulfill({json:{available:true}}));
+  const reference='68167677-a53f-4ffc-ae11-b755cf609408';
+  let step=0;
+  await page.route('**/api/contact',r=>{
+    expect(r.request().postDataJSON()).toEqual({email:'test@example.org',topic:'correction',message:'Demande de recette.'});
+    const status=[503,429,201,201][step++];
+    return r.fulfill({status,json:step===4 ? {reference}:{}});
+  });
+  await page.goto('/contact');
+  await page.getByLabel('Adresse e-mail').fill('test@example.org');
+  await page.getByLabel('À quel sujet ?').selectOption('correction');
+  const text=page.getByLabel('Votre message',{exact:true}), send=page.getByRole('button',{name:'Envoyer le message'});
+  await text.fill('Demande de recette.');
+  for(const expected of ['Réception non confirmée','Limite d’envoi atteinte','Réception non confirmée']) {
+    await send.click(); await expect(page.getByRole('status')).toContainText(expected);
+    await expect(text).toHaveValue('Demande de recette.');
+  }
+  await send.click(); await expect(page.getByRole('status')).toContainText(reference);
+  await expect(text).toHaveValue(''); await expect(send).toBeDisabled(); await noOverflow(page);
 });
 
 test("erreur API et refus de geolocalisation sans fausse position", async ({

@@ -43,6 +43,8 @@ import { getCatalogue } from '../fn/littora/get-catalogue';
 import { GetCatalogue$Params } from '../fn/littora/get-catalogue';
 import { getCommuneCatalogue } from '../fn/littora/get-commune-catalogue';
 import { GetCommuneCatalogue$Params } from '../fn/littora/get-commune-catalogue';
+import { getContactAvailability } from '../fn/littora/get-contact-availability';
+import { GetContactAvailability$Params } from '../fn/littora/get-contact-availability';
 import { getMarine } from '../fn/littora/get-marine';
 import { GetMarine$Params } from '../fn/littora/get-marine';
 import { getMemberSession } from '../fn/littora/get-member-session';
@@ -70,6 +72,8 @@ import { SearchBeaches$Params } from '../fn/littora/search-beaches';
 import { searchCommunes } from '../fn/littora/search-communes';
 import { SearchCommunes$Params } from '../fn/littora/search-communes';
 import { SearchPage } from '../models/search-page';
+import { submitContact } from '../fn/littora/submit-contact';
+import { SubmitContact$Params } from '../fn/littora/submit-contact';
 import { Tides } from '../models/tides';
 import { WaterQuality } from '../models/water-quality';
 
@@ -77,6 +81,76 @@ import { WaterQuality } from '../models/water-quality';
 export class LittoraService extends BaseService {
   constructor(config: ApiConfiguration, http: HttpClient) {
     super(config, http);
+  }
+
+  /** Path part for operation `getContactAvailability()` */
+  static readonly GetContactAvailabilityPath = '/contact/availability';
+
+  /**
+   * This method provides access to the full `HttpResponse`, allowing access to response headers.
+   * To access only the response body, use `getContactAvailability()` instead.
+   *
+   * This method doesn't expect any request body.
+   */
+  getContactAvailability$Response(params?: GetContactAvailability$Params, context?: HttpContext): Observable<StrictHttpResponse<{
+'available': boolean;
+}>> {
+    const obs = getContactAvailability(this.http, this.rootUrl, params, context);
+    return obs;
+  }
+
+  /**
+   * This method provides access only to the response body.
+   * To access the full response (for headers, for example), `getContactAvailability$Response()` instead.
+   *
+   * This method doesn't expect any request body.
+   */
+  getContactAvailability(params?: GetContactAvailability$Params, context?: HttpContext): Observable<{
+'available': boolean;
+}> {
+    const resp = this.getContactAvailability$Response(params, context);
+    return resp.pipe(
+      map((r: StrictHttpResponse<{
+'available': boolean;
+}>): {
+'available': boolean;
+} => r.body)
+    );
+  }
+
+  /** Path part for operation `submitContact()` */
+  static readonly SubmitContactPath = '/contact';
+
+  /**
+   * This method provides access to the full `HttpResponse`, allowing access to response headers.
+   * To access only the response body, use `submitContact()` instead.
+   *
+   * This method sends `application/json` and handles request body of type `application/json`.
+   */
+  submitContact$Response(params: SubmitContact$Params, context?: HttpContext): Observable<StrictHttpResponse<{
+'reference': string;
+}>> {
+    const obs = submitContact(this.http, this.rootUrl, params, context);
+    return obs;
+  }
+
+  /**
+   * This method provides access only to the response body.
+   * To access the full response (for headers, for example), `submitContact$Response()` instead.
+   *
+   * This method sends `application/json` and handles request body of type `application/json`.
+   */
+  submitContact(params: SubmitContact$Params, context?: HttpContext): Observable<{
+'reference': string;
+}> {
+    const resp = this.submitContact$Response(params, context);
+    return resp.pipe(
+      map((r: StrictHttpResponse<{
+'reference': string;
+}>): {
+'reference': string;
+} => r.body)
+    );
   }
 
   /** Path part for operation `searchBeaches()` */

@@ -62,6 +62,7 @@ export function configureHttpBoundary(app: INestApplication) {
     request.requestId = randomUUID();
     response.setHeader('x-request-id', request.requestId);
     response.setHeader('x-api-version', contract.info.version);
+    if (/^\/api\/contact(?:[/?]|$)/.test(request.url)) response.setHeader('cache-control','no-store');
     next();
   });
   // Read-only contract endpoint bypasses business services and never opens a database connection.

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Littora API
-  version: 0.8.1
+  version: 0.9.0
   description: >-
     Additive contract for the existing API. Model forecasts are not observations or
     official bathing instructions. Null means unknown, never zero or false.
@@ -11,6 +11,32 @@ servers:
 tags:
   - name: Littora
 paths:
+  /contact/availability:
+    get:
+      operationId: getContactAvailability
+      tags: [Littora]
+      responses:
+        '200': {description: Whether the private inbox can receive messages, content: {application/json: {schema: {type: object, additionalProperties: false, required: [available], properties: {available: {type: boolean}}}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /contact:
+    post:
+      operationId: submitContact
+      tags: [Littora]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email, topic, message]
+              properties:
+                email: {type: string, format: email, maxLength: 254}
+                topic: {type: string, enum: [question, correction, territory, partnership]}
+                message: {type: string, minLength: 1, maxLength: 5000}
+      responses:
+        '201': {description: Stored in the private inbox, content: {application/json: {schema: {type: object, additionalProperties: false, required: [reference], properties: {reference: {type: string, format: uuid}}}}}}
+        default: {$ref: '#/components/responses/Error'}
   /search/beaches:
     post:
       operationId: searchBeaches

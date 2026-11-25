@@ -103,7 +103,7 @@ services:
   caddy:
     entrypoint: *private-entrypoint
     command: [caddy, run, --config, /etc/caddy/Caddyfile, --adapter, caddyfile]
-    image: littora-caddy:2.11.9-r1
+    image: littora-caddy:2.11.9-r2
     build: ./infra/caddy
     environment:
       DOMAIN: ${DOMAIN:?DOMAIN required}

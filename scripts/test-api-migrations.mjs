@@ -125,7 +125,7 @@ try {
   docker(['start', previousWeb]);
   docker(['run', '-d', '--name', proxy, '--network', edge, '--network-alias', domain,
     '-e', `DOMAIN=${domain}`, '-v', `${resolve('infra/caddy/Caddyfile')}:/etc/caddy/Caddyfile:ro`,
-    ...privacyEntrypoint, 'littora-caddy:2.11.9-r1', guard, 'caddy', 'run', '--config', '/etc/caddy/Caddyfile', '--adapter', 'caddyfile']);
+    ...privacyEntrypoint, 'littora-caddy:2.11.9-r2', guard, 'caddy', 'run', '--config', '/etc/caddy/Caddyfile', '--adapter', 'caddyfile']);
   containers.push(proxy);
   docker(['network', 'connect', ingress, proxy]);
   const peer = docker(['inspect', '--format', `{{(index .NetworkSettings.Networks "${ingress}").IPAddress}}`, proxy]);

@@ -35,8 +35,9 @@ anciens chemins ne décrit pas une session. Le jeton de contribution anonyme
 reste strictement réservé aux signalements ; il ne donne aucun accès membre.
 
 Le [stockage privé des sessions et la déconnexion](architecture/SESSIONS-MEMBRES.md)
-peuvent être testés séparément. L’intégration du fournisseur et la vérification
-du second facteur restent nécessaires avant toute activation de la connexion.
+peuvent être testés séparément. Le [pilote Google](architecture/RECETTE-GOOGLE.md)
+est réservé à un seul compte de recette. Le consentement réel chez Google et
+le second facteur restent à valider avant toute ouverture aux membres.
 
 - **Connexion.** Préférer un service d'identité éprouvé compatible [OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect).
   NestJS termine le flux code avec PKCE, vérifie le retour et ouvre une session Littora révocable par cookie sécurisé, inaccessible au JavaScript.

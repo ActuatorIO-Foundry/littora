@@ -9,6 +9,9 @@ const {Test} = require('@nestjs/testing');
 const {configureHttpBoundary} = require('../../dist/http/http-boundary');
 const {MembersModule} = require('../../dist/modules/members/members.module');
 const {establishMemberSession, memberCookie} = require('../../dist/modules/members/member-session');
+const {GoogleLoginModule, secureLoginResponses, provider} = require('../../dist/member-login/google-login.module');
+const {loginSettings, SessionIssuer} = require('../../dist/member-login/login-settings');
+const {googleFixture} = require('../helpers/google-provider.cjs');
 
 test('member sessions: two principals, private database permissions and real HTTP revocation', {timeout:30000}, async t => {
   const target = new URL(process.env.TEST_DATABASE_URL);
@@ -133,4 +136,60 @@ test('member sessions: two principals, private database permissions and real HTT
   assert.equal((await owner.query("select count(*)::int as n from members.session s join members.account a on a.id=s.account_id where a.subject='multi-device'")).rows[0].n,5);
   await owner.query("delete from members.account where subject='multi-device'");
   for (const device of devices) assert.equal((await get(device)).status,401);
+
+  await t.test('isolated Google pilot: form, consent, session, cancellation and failure without a new account', async () => {
+    const fixture = googleFixture();
+    const settings = {origin, dsn:issuer.dsn, subject:'test-sub', clientId:fixture.clientId, secret:fixture.secret};
+    for (const dsn of [reader.dsn, target.href]) {
+      const wrong = new SessionIssuer({...settings,dsn});
+      try { await assert.rejects(wrong.ready()); } finally { await wrong.onModuleDestroy(); }
+    }
+    const module = await Test.createTestingModule({imports:[GoogleLoginModule]})
+      .overrideProvider(loginSettings).useValue(settings).overrideProvider(provider).useValue(fixture.config).compile();
+    const app = module.createNestApplication({logger:false,bodyParser:false});
+    apps.push(app); secureLoginResponses(app); await app.listen(0,'127.0.0.1');
+    const local = await app.getUrl(), path = '/connexion/google';
+    const form = await fetch(local + path);
+    assert.match(await form.text(),/Continuer avec Google/);
+    assert.equal(form.headers.has('set-cookie'),false);
+    assert.equal((await fetch(local + path,{method:'POST',headers:{origin:'https://other.example'}})).status,403);
+    const start = async () => {
+      const resp = await fetch(local+path,{method:'POST',headers:{origin},redirect:'manual'});
+      assert.equal(resp.status,303);
+      const cookie=resp.headers.get('set-cookie');
+      assert.match(cookie,/__Host-littora-login=.+Path=\/.*HttpOnly; Secure; SameSite=Lax/);
+      return {location:resp.headers.get('location'),cookie:cookie.split(';')[0]};
+    };
+    const finish = (cb, cookie) => fetch(local + cb.pathname + cb.search, {headers:{cookie},redirect:'manual'});
+    const outcome = (res, location) => {
+      assert.equal(res.status,303); assert.equal(res.headers.get('location'),location);
+      assert.match(res.headers.get('cache-control'),/no-store/); assert.equal(res.headers.get('referrer-policy'),'no-referrer');
+    };
+    const a = await start(), b = await start(), cb = fixture.authorise(a.location);
+    outcome(await finish(cb,b.cookie),path+'/echec');
+    const success = await finish(cb,a.cookie);
+    outcome(success,'/');
+    const session = success.headers.getSetCookie().find(c => c.startsWith(memberCookie+'=')).split(';')[0];
+    const member = await state(session);
+    assert.ok(member.memberId);
+    outcome(await finish(cb,a.cookie),path+'/echec');
+    const rows = () => owner.query("select count(*)::int as n from members.account");
+    const count = (await rows()).rows[0].n;
+    for (const [mode, suffix] of [['cancel','/annule'],['other','/echec'],['down','/echec']]) {
+      const x = await start(), back = fixture.authorise(x.location, mode === 'other' ? {claims:{sub:'not-enrolled'}} : {unavailable:true});
+      if (mode === 'cancel') { back.searchParams.delete('code'); back.searchParams.set('error','access_denied'); }
+      const res = await finish(back,x.cookie+'; '+session);
+      outcome(res,path+suffix);
+      assert.equal(res.headers.getSetCookie().some(c=>c.startsWith(memberCookie+'=')), false);
+      assert.equal((await rows()).rows[0].n,count);
+      assert.equal((await state(session)).memberId,member.memberId);
+    }
+    const relog = await start(), signed = await finish(fixture.authorise(relog.location), relog.cookie+'; '+session);
+    outcome(signed,'/');
+    assert.equal((await get(session)).status,401);
+    const renewed = signed.headers.getSetCookie().find(c => c.startsWith(memberCookie+'=')).split(';')[0];
+    assert.equal((await state(renewed)).memberId,member.memberId);
+    assert.equal((await end(renewed,{origin})).status,200);
+    assert.equal((await get(renewed)).status,401);
+  });
 });

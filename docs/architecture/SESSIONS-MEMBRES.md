@@ -1,8 +1,8 @@
 # Sessions membres : lot de recette (#26)
 
 Une session Littora identifie un membre ; elle ne lui attribue aucun droit de
-modération ou de gestion. Ce lot ne connecte pas Google et n’ajoute pas de
-bouton de connexion. La consultation des plages et le jeton de contribution
+modération ou de gestion. Le [pilote Google de recette](RECETTE-GOOGLE.md) est
+séparé de l’API publique et du site. La consultation des plages et le jeton de contribution
 anonyme ne dépendent pas du service de comptes.
 
 ## Frontière de stockage
@@ -41,8 +41,9 @@ indisponibles ; aucune substitution par la base publique. Aucun identifiant
 
 ## Cycle de vie
 
-- Seul le futur retour d’authentification serveur pourra appeler
-  `establishMemberSession`, après validation OIDC **et de tout facteur requis**.
+- Seul le service de connexion peut appeler `establishMemberSession`. En recette,
+  il exige une identité Google vérifiée et limite l’accès à un sujet de test.
+  L’ouverture au public exige aussi la vérification de tout second facteur enrôlé.
   Aucun endpoint public n’accepte un sujet ou un identifiant pour émettre une session.
 - L’identité est le couple exact (émetteur, sujet). Pas d’e-mail, profil
   Google, rôle, position, jeton fournisseur ou historique des plages en base.

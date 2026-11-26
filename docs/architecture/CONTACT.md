@@ -24,9 +24,10 @@ Sans boîte configurée, la copie du brouillon reste locale au navigateur.
   Ne pas la publier via le Caddy public. Accès via un tunnel privé conservant TLS de bout en bout.
 - Elle reçoit uniquement son `CONTACT_MANAGE_DATABASE_URL`, son origine HTTPS,
   `CONTACT_TLS_CERT_FILE`, `CONTACT_TLS_KEY_FILE`, `CONTACT_CLIENT_CA_FILE` et
-  `CONTACT_MANAGER_FINGERPRINTS` (empreintes SHA-256 individuelles séparées par des virgules).
+  la connexion restreinte `STAFF_DATABASE_URL` de la [console privée](ACCES-PRIVILEGIES.md).
+  La liste statique historique `CONTACT_MANAGER_FINGERPRINTS` ne donne plus accès.
   Le nom du certificat serveur doit correspondre au nom ouvert par le navigateur.
-  La chaîne du certificat client **et** son empreinte doivent être autorisées.
+  La chaîne du certificat client, son habilitation nominative et une vérification WebAuthn récente sont exigées.
   Une session membre, un rôle de modération ou un certificat valide non inscrit ne suffisent pas.
 - Ouvrir `/gestion/contact` avec un certificat nominatif habilité. La boîte
   présente les 50 demandes les plus anciennes ; terminer un message le supprime
@@ -52,11 +53,10 @@ Ne journaliser ni requêtes avec corps, ni paramètres SQL, ni messages, adresse
 références ou certificats. Désactiver la capture des formulaires, traces et
 exports de la boîte. Les compteurs et codes d'erreur suffisent au suivi.
 
-**Avant ouverture réelle (#97)** : nommer une relève, vérifier l'authentification
-forte (clé privée non exportable avec vérification de l'utilisateur, ou seconde
-barrière MFA), puis tester la révocation et la perte d'un appareil. Un certificat
+**Avant ouverture réelle (#97)** : vérifier la procédure de récupération sur les
+  appareils physiques et le cloisonnement des accès à l'infrastructure. Un certificat
 logiciel seul ne démontre pas deux facteurs. En cas de retrait, supprimer
-l'empreinte et redémarrer le lecteur pour couper les connexions. Ne pas distribuer
+le droit dans le registre privé : la prochaine opération vérifiera son retrait. Ne pas distribuer
 de certificat partagé. Seuls des certificats éphémères sont utilisés en recette.
 
 ## Vérification

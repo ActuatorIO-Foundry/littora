@@ -2,8 +2,7 @@ require('reflect-metadata');
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const {randomUUID,randomBytes,X509Certificate} = require('node:crypto');
-const {execFileSync} = require('node:child_process');
-const {mkdtempSync,readFileSync,writeFileSync,rmSync} = require('node:fs');
+const {mkdtempSync,readFileSync,rmSync} = require('node:fs');
 const {resolve,join} = require('node:path');
 const {tmpdir} = require('node:os');
 const https = require('node:https');
@@ -14,19 +13,7 @@ const {ContactStore} = require('../../dist/modules/contact/contact-store.service
 const {verifyContactRole} = require('../../dist/modules/contact/contact-store');
 const {managementServer} = require('../../dist/contact-management');
 const {configureHttpBoundary} = require('../../dist/http/http-boundary');
-
-function testCertificates(dir) {
-  const ssl = (...args)=>execFileSync('openssl',args,{cwd:dir,stdio:'ignore'});
-  const read = file=>readFileSync(join(dir,file));
-  ssl('req','-x509','-newkey','rsa:2048','-nodes','-days','1','-subj','/CN=Inbox Test CA','-out','ca.pem','-keyout','ca.key');
-  function leaf(name,usage) {
-    ssl('req','-new','-newkey','rsa:2048','-nodes','-subj','/CN='+name,'-out',name+'.csr','-keyout',name+'.key');
-    writeFileSync(join(dir,'leaf.ext'),'basicConstraints=CA:FALSE\nsubjectAltName=DNS:localhost\nextendedKeyUsage='+usage+'\n');
-    ssl('x509','-req','-in',name+'.csr','-CA','ca.pem','-CAkey','ca.key','-CAcreateserial','-days','1','-extfile','leaf.ext','-out',name+'.pem');
-    return {cert:read(name+'.pem'),key:read(name+'.key')};
-  }
-  return {ca:read('ca.pem'),server:leaf('localhost','serverAuth'),manager:leaf('manager','clientAuth'),member:leaf('member','clientAuth')};
-}
+const {testCertificates}=require('../helpers/staff-certificates.cjs');
 
 test('public contact to private manager inbox, independent of catalogue and member sessions',{timeout:45000},async t=>{
   const url=new URL(process.env.TEST_DATABASE_URL);
@@ -79,19 +66,23 @@ test('public contact to private manager inbox, independent of catalogue and memb
 
   const tls=testCertificates(dir), origin='https://localhost:9443';
   const fp=new X509Certificate(tls.manager.cert).fingerprint256.replaceAll(':','');
-  server=managementServer(manager.pool,{ca:tls.ca,...tls.server},new Set([fp]),origin);
+  // This test covers inbox delivery. staff-access.test exercises the real WebAuthn gate.
+  const gate={origin,actor:async f=>f===fp?{capability:'contact'}:undefined,
+    authorized:async(f,cookie)=>f===fp&&cookie==='test-session=valid'};
+  server=managementServer(manager.pool,{ca:tls.ca,...tls.server},gate);
   await new Promise(ok=>server.listen(0,'127.0.0.1',ok));
   const root='/gestion/contact';
   function visit(identity,path=root,method='GET',headers={}) {
     return new Promise((ok,fail)=>{
       const req=https.request({host:'127.0.0.1',port:server.address().port,servername:'localhost',agent:false,ca:tls.ca,
-        ...identity,path,method,headers:{host:new URL(origin).host,...headers}},res=>{
+        ...identity,path,method,headers:{host:new URL(origin).host,cookie:'test-session=valid',...headers}},res=>{
         let body=''; res.setEncoding('utf8');res.on('data',s=>body+=s);res.on('end',()=>ok({status:res.statusCode,headers:res.headers,body}));
       });req.on('error',fail);req.end();
     });
   }
   await assert.rejects(visit({})); assert.equal((await visit(tls.member)).status,403);
   assert.equal(await available(),false);
+  assert.equal((await visit(tls.manager,root,'GET',{cookie:''})).status,401);
   assert.equal((await visit(tls.manager)).status,200); assert.equal(await available(),true);
   for(const body of [{...data,email:'bad'},{...data,message:' '},{...data,topic:'other'},{...data,message:'x'.repeat(5001)},{...data,name:'unused'}]) {
     assert.equal((await submit(body)).status,400);

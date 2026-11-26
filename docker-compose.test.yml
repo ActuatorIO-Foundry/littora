@@ -19,7 +19,7 @@ services:
       timeout: 5s
       retries: 30
   redis:
-    image: littora-redis:7.4.12-r1
+    image: littora-redis:7.4.12-r2
     build: ./infra/redis
     ports:
       - "127.0.0.1:${TEST_REDIS_PORT:-56379}:6379"

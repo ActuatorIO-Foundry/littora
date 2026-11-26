@@ -13,9 +13,13 @@ const docker = (args) => execFileSync('docker', args, { encoding: 'utf8', stdio:
 const source = process.env.REDIS_CONTAINER;
 assert.ok(source, 'REDIS_CONTAINER must identify the disposable Compose test service');
 const metadata = JSON.parse(docker(['inspect', source]))[0];
-assert.equal(metadata.Config.Labels['com.docker.compose.project'], 'littora-tests');
+assert.match(metadata.Config.Labels['com.docker.compose.project'], /^littora-tests(?:-[a-z0-9-]+)?$/);
+assert.equal(metadata.Config.Labels['com.docker.compose.service'], 'redis');
 const url = process.env.TEST_REDIS_URL;
-assert.equal(new URL(url).pathname, '/15');
+const sourceUrl = new URL(url);
+assert.equal(sourceUrl.pathname, '/15');
+assert.ok(['127.0.0.1','localhost'].includes(sourceUrl.hostname));
+assert.ok(metadata.NetworkSettings.Ports['6379/tcp'].some(p=>p.HostIp==='127.0.0.1' && p.HostPort===sourceUrl.port));
 const connection = new Redis(url, { maxRetriesPerRequest: null });
 const name = `restore-${randomUUID()}`;
 const queue = new Queue(name, { connection });
@@ -30,7 +34,7 @@ try {
   docker(['exec', source, 'redis-cli', 'SAVE']);
   docker(['cp', `${source}:/data/dump.rdb`, join(directory, 'dump.rdb')]);
   restored = `littora-${name}`;
-  docker(['create', '--name', restored, '-p', '127.0.0.1::6379', 'littora-redis:7.4.12-r1']);
+  docker(['create', '--name', restored, '-p', '127.0.0.1::6379', 'littora-redis:7.4.12-r2']);
   docker(['cp', join(directory, 'dump.rdb'), `${restored}:/data/dump.rdb`]);
   docker(['start', restored]);
   const port = JSON.parse(docker(['inspect', restored]))[0].NetworkSettings.Ports['6379/tcp'][0].HostPort;

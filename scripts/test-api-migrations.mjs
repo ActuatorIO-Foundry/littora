@@ -15,6 +15,13 @@ const suffix = name.slice(-8);
 const subnet = index => `10.${parseInt(suffix.slice(0, 2), 16)}.${parseInt(suffix.slice(2, 4), 16)}.${index * 16}/28`;
 const containers = [];
 const networks = [];
+const volumes = [];
+function volume(target) {
+  const id = docker(['volume','create','--label','littora.fixture='+name]);
+  if (!/^[a-f0-9]{64}$/.test(id)) throw new Error('Expected a fresh Docker-generated volume');
+  volumes.push(id);
+  return ['--mount','type=volume,source='+id+',target='+target];
+}
 const edge = name + '-edge';
 const ingress = name + '-ingress';
 const imageId = ref => docker(['image','inspect','--format','{{.Id}}',ref]);
@@ -88,11 +95,11 @@ try {
   }
   containers.push(postgres);
   docker(['run', '-d', '--name', postgres, '--network', name, '--platform', 'linux/amd64',
-    '--tmpfs', '/var/lib/postgresql/data', '-e', 'POSTGRES_USER=littora',
+    ...volume('/var/lib/postgresql/data'), '-e', 'POSTGRES_USER=littora',
     '-e', 'POSTGRES_PASSWORD=test-only-password', '-e', 'POSTGRES_DB=littora_ci_test',
     ...privacyEntrypoint, 'littora-postgres:16.16-3.7.0-r2', guard, 'postgres']);
   containers.push(redis);
-  docker(['run', '-d', '--name', redis, '--network', name, '--tmpfs', '/data', ...privacyEntrypoint,
+  docker(['run', '-d', '--name', redis, '--network', name, ...volume('/data'), ...privacyEntrypoint,
     'littora-redis:7.4.12-r1', guard, 'redis-server']);
   await until(() => docker(['exec', postgres, 'pg_isready', '-h', '127.0.0.1', '-U', 'littora']) !== '', 'PostgreSQL TCP');
   await until(() => docker(['exec', redis, 'redis-cli', 'ping']) === 'PONG', 'Redis');
@@ -214,6 +221,18 @@ try {
     const afterRollbackWrite = storedState();
     await switchRelease(baseline, candidate);
     assert.equal(storedState(), afterRollbackWrite, 'Rollback-time write lost returning to candidate');
+    // A cold start must recover the existing volumes, not repopulate an empty database at API startup.
+    const witness = randomUUID();
+    assert.equal(docker(['exec',redis,'redis-cli','SET','qa:restart',witness]),'OK');
+    assert.equal(docker(['exec',redis,'redis-cli','SAVE']),'OK');
+    docker(['stop','--time','10',api,postgres,redis]);
+    docker(['start',postgres,redis]);
+    await until(()=>sql('select 1')==='1','PostgreSQL after cold start');
+    await until(()=>docker(['exec',redis,'redis-cli','GET','qa:restart'])===witness,'Redis snapshot after cold start');
+    assert.equal(storedState(),afterRollbackWrite,'Persistent storage changed after cold start');
+    docker(['start',api]);
+    await until(viaProxy,'existing beach over HTTPS after storage cold start');
+    probe(web);
     const marker = 'private-' + randomUUID();
     const probePrivacy = (path, method, expected) => docker(['exec', visitors[0], 'node', '-e',
       `const marker=${JSON.stringify(marker)};
@@ -255,7 +274,7 @@ try {
 
   console.log(JSON.stringify({ verified: true, readonlyStartup: true, migrations: pending.length, verifiedHttps: true,
     seedIdempotent: true, beaches: 5, sanitarySamples: 0, http: true, offlineScoreContract: true,
-    verifiedApplicationRollback: true, pendingReportsPreserved: 3 }));
+    verifiedApplicationRollback: true, persistentColdStart: true, pendingReportsPreserved: 3 }));
 } finally {
   const failures = [];
   for (const container of containers.reverse()) {
@@ -263,6 +282,12 @@ try {
   }
   for (const network of networks.reverse()) {
     try { docker(['network', 'rm', network]); } catch { failures.push(network); }
+  }
+  for (const id of volumes) {
+    try {
+      if (docker(['volume','inspect','--format','{{index .Labels "littora.fixture"}}',id]) !== name) throw new Error();
+      docker(['volume','rm',id]);
+    } catch { failures.push('disposable volume'); }
   }
   if (failures.length) throw new Error(`Test cleanup incomplete: ${failures.join(', ')}`);
 }

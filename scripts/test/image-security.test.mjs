@@ -22,4 +22,5 @@ test('retiring the Caddy exception does not authorise a public release', () => {
   });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /Production blocked: release approval pending: .*issues\/43/);
+  assert.match(result.stderr, /issues\/113/);
 });

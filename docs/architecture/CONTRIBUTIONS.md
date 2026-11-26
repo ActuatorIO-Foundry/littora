@@ -98,7 +98,11 @@ instance : sauvegarder, tester la migration sur restauration, appliquer les migr
 avant de redémarrer l’API et le worker, puis habiliter les opérateurs. Garder
 l’image précédente et la sauvegarde ; ne pas effacer le journal pour revenir en arrière.
 
-**Habilitation.** En pré-V1, la console opérateur est `psql`, sur connexion de
+**Ancienne procédure de recette, à retirer avant ouverture.** La [console privée
+avec deux clés enregistrées](ACCES-PRIVILEGIES.md) remplace les connexions SQL
+humaines. Les instructions suivantes décrivent les anciens droits à inventorier
+et le fonctionnement des primitives de modération ; ne plus remettre ces identifiants aux utilisateurs.
+L’ancienne console opérateur était `psql`, sur connexion de
 confiance (locale ou privée chiffrée). Utiliser un login PostgreSQL *individuel*
 avec identifiant technique, non propriétaire, sans privilèges d’administration,
 sans accès aux tables publiques ni aux rôles d’écriture. Ne jamais modérer via le

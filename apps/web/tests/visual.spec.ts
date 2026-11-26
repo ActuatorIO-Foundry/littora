@@ -1184,14 +1184,10 @@ test("carte : facade selectionnable et reperes visibles", {tag: '@beta'}, async 
   const selectedZone = page.locator("app-coast-map .zone-marker.selected");
   await expect(selectedZone).toHaveCount(1);
   await expect(selectedZone).toBeVisible();
-  expect(
-    await page
-      .locator("app-coast-map .leaflet-overlay-pane path")
-      .evaluateAll(
-        (paths) =>
-          paths.filter((p) => (p.getAttribute("d")?.length ?? 0) > 20).length,
-      ),
-  ).toBeGreaterThan(0);
+  await expect(selectedZone).toHaveText("Bretagne");
+  const shoreline = page.locator("app-coast-map .leaflet-shoreline-selected-pane");
+  await expect(shoreline).toHaveCSS("clip-path", /^polygon\(/);
+  await expect(shoreline.locator(".shoreline-selected-tiles img.leaflet-tile-loaded").first()).toBeVisible();
   await noOverflow(page);
 });
 

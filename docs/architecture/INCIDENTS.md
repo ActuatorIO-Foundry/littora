@@ -1,6 +1,7 @@
 # Intervention et astreinte (#30)
 
-**État pré-V1 :** procédure de recette. Personne n’est annoncé de garde et aucun
+**État pré-V1 :** exploitation confiée à un responsable unique. Aucun horaire
+de garde n'est annoncé et aucun
 envoi réel ni délai d’intervention ne sont garantis par la CI. Les coordonnées,
 horaires de garde, accès et comptes rendus nominatifs restent hors Git.
 
@@ -8,18 +9,18 @@ horaires de garde, accès et comptes rendus nominatifs restent hors Git.
 
 | Rôle | Décision attendue |
 |---|---|
-| Titulaire de garde | Accuse réception dans le circuit privé, qualifie l’impact sur une fiche et coordonne l’intervention jusqu’à la relève explicite. |
-| Suppléant | Prend le relais si le titulaire est absent ou sans réponse. Vérifie la reprise indépendamment pour une panne critique. |
-| Responsable de reprise | Contrôle l’archive hors hôte, restaure sur une cible isolée et décide avec le titulaire si une bascule protège les écritures. |
-| Responsable de publication | Autorise le retour de version ou la réouverture après vérification des données, des accès et des blocages de publication. |
+| Responsable d'exploitation | Accuse réception en privé, qualifie l'impact et décide des mesures conservatoires. |
+| Reprise et publication (même responsable) | Contrôle la copie hors machine, restaure sur une cible isolée, vérifie les écritures et décide d'une réouverture. |
 
-Avant ouverture, consigner dans l’annuaire **privé** les titulaires et suppléants
-qui ont accepté ces rôles, les horaires couverts (y compris les trous de garde),
-un moyen de secours indépendant du serveur et l’autorité de décision.
-Pendant la garde, viser un accusé humain sous 15 min pour un site illisible,
-une suspicion de fuite ou des données à risque. Sans réponse, joindre le
-suppléant par le moyen de secours ; après 15 min supplémentaires, escalader au
-responsable de publication. Ce sont des objectifs d’exercice, pas un engagement 24/7.
+Avant ouverture, consigner dans l'annuaire **privé** le canal principal, le canal
+de secours indépendant du serveur et les plages effectivement couvertes.
+Pendant ces plages, viser un accusé humain sous 15 minutes pour un site illisible,
+une suspicion de fuite ou des données à risque. Sans réponse, utiliser le canal
+de secours, garder l'incident ouvert et suspendre la publication ou la bascule.
+Il n'y a pas de seconde personne d'astreinte présumée. Les futures automatisations
+et le tableau de bord ne remplacent ni un accusé humain ni une décision de reprise.
+Le [contrôle préalable à l'ouverture #113](https://github.com/ActuatorIO-Foundry/littora/issues/113)
+exige une alerte effectivement reçue et une restauration depuis une copie hors machine.
 
 ## Qualifier, intervenir, vérifier
 
@@ -55,7 +56,7 @@ installée par Compose ou par le lancement du site.
 1. Sans démarrer la surveillance, faire un essai depuis le serveur :
    `node /opt/littora/scripts/notify-collection.mjs --test-channel`. Le sujet
    se termine par `test` ; la commande ne lit aucun conteneur ni état d’incident.
-   Faire confirmer la **réception par le destinataire**, puis tester la relève.
+   Faire confirmer la **réception par le destinataire**, puis tester le canal de secours.
    Un code zéro indique seulement l’acceptation par la messagerie locale.
 2. Installer les deux unités de `infra/monitoring/` dans `/etc/systemd/system/`,
    faire `systemctl daemon-reload`, puis `systemctl start littora-collection-watch.service`.

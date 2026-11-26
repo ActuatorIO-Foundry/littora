@@ -69,7 +69,7 @@ tester la restauration. Ne jamais purger les copies pour faire passer un contrô
 Conserver seulement le résultat, la date et les durées dans le suivi d’incident,
 pas les données, clés ou chemins privés.
 
-Avant ouverture (#30/#31) : désigner l’astreinte et un suppléant, configurer
+Avant ouverture (#113/#31) : avec le responsable d'exploitation désigné, configurer
 le stockage hors hôte et les notifications, valider la durée de conservation
 et exercer une reprise chronométrée. Cet export ne couvre ni les identifiants
 d’exploitation, ni Redis/BullMQ, ni les certificats Caddy.

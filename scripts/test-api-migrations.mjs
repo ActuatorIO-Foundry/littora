@@ -93,7 +93,7 @@ try {
     ...privacyEntrypoint, 'littora-postgres:16.16-3.7.0-r2', guard, 'postgres']);
   containers.push(redis);
   docker(['run', '-d', '--name', redis, '--network', name, '--tmpfs', '/data', ...privacyEntrypoint,
-    'littora-redis:7.4.12-r1', guard, 'redis-server']);
+    'littora-redis:7.4.12-r2', guard, 'redis-server']);
   await until(() => docker(['exec', postgres, 'pg_isready', '-h', '127.0.0.1', '-U', 'littora']) !== '', 'PostgreSQL TCP');
   await until(() => docker(['exec', redis, 'redis-cli', 'ping']) === 'PONG', 'Redis');
 

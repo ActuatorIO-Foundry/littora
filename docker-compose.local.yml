@@ -22,7 +22,7 @@ services:
   redis:
     entrypoint: *private-entrypoint
     command: [redis-server]
-    image: littora-redis:7.4.12-r1
+    image: littora-redis:7.4.12-r2
     build: ./infra/redis
     volumes:
       - redisdata:/data

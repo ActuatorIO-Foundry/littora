@@ -21,7 +21,7 @@ services:
   redis:
     entrypoint: *private-entrypoint
     command: [redis-server]
-    image: littora-redis:7.4.12-r1
+    image: littora-redis:7.4.12-r2
     build: ./infra/redis
     volumes:
       - redisdata:/data
@@ -61,7 +61,7 @@ services:
       redis-jobs: {condition: service_healthy}
   redis-jobs:
     entrypoint: *private-entrypoint
-    image: littora-redis:7.4.12-r1
+    image: littora-redis:7.4.12-r2
     build: ./infra/redis
     command: [redis-server, --appendonly, "yes", --maxmemory-policy, noeviction]
     restart: unless-stopped

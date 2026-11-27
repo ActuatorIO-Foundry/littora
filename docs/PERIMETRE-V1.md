@@ -85,6 +85,8 @@ pas à lui seul la publication.
 
 ## Sources et enveloppe de fonctionnement
 
+Le [registre de diffusion pré-V1](architecture/REGISTRE-SOURCES.md) précise les produits effectivement retenus, les crédits, les conditions par service et les accès restant à obtenir.
+
 | Source / couverture | Droit, limite ou coût à prendre en compte | Décision |
 |---|---|---|
 | Open-Meteo Forecast et Marine | [Accès non commercial, données CC BY 4.0](https://open-meteo.com/en/terms) ; [plafonds](https://open-meteo.com/en/pricing) : 600/min, 5 000/h, 10 000/j, 300 000/mois. | Prévisions, pas observations. Collecte mutualisée ; compter les unités du fournisseur, pas les pages vues. |

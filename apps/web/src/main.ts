@@ -24,6 +24,11 @@ const routes: Routes = [
     loadComponent: () => import("./app/pages/bareme/bareme.component").then(m => m.BaremeComponent),
   },
   {
+    path: "sources",
+    title: "Données et sources · Littora",
+    loadComponent: () => import("./app/pages/sources/sources.component").then(m => m.SourcesComponent),
+  },
+  {
     path: "contact",
     title: "Contact · Littora",
     loadComponent: () =>

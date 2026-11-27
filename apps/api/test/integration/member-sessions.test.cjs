@@ -45,6 +45,8 @@ test('member sessions: two principals, private database permissions and real HTT
   } finally { await catalogueAdmin.query('rollback'); catalogueAdmin.release(); }
   await owner.query(ddl);
   roles.push('littora_members_owner','littora_session_reader','littora_session_issuer');
+  await owner.query(readFileSync(resolve(__dirname,'../../../../infra/members/0002_privacy.sql'),'utf8'));
+  roles.push('littora_member_privacy');
   async function login(prefix, grant) {
     const name = prefix + suffix, password = randomBytes(32).toString('hex');
     await admin.query(`create role ${name} login password '${password}'`);
@@ -57,6 +59,7 @@ test('member sessions: two principals, private database permissions and real HTT
   }
   const reader = await login('read_', 'littora_session_reader');
   const issuer = await login('issue_', 'littora_session_issuer');
+  const privacy = await login('privacy_', 'littora_member_privacy');
   const catalogue = await login('catalogue_', null);
   await assert.rejects(catalogue.pool.query('select 1'), {code:'42501'});
   await assert.rejects(reader.pool.query('select * from members.account'), {code:'42501'});
@@ -83,14 +86,14 @@ test('member sessions: two principals, private database permissions and real HTT
   const get = cookie => fetch(url, {headers: cookie ? {cookie} : {}});
   const end = (cookie, headers) => fetch(url,{method:'DELETE', headers:{cookie,...headers}});
   const idp = 'https://id.example';
-  const start = async (sub, previous, iss=idp) => {
+  const startMember = async (sub, previous, iss=idp) => {
     const c = await establishMemberSession(issuer.pool,{issuer:iss, subject:sub},previous);
     assert.equal(c.name, memberCookie);
     assert.deepEqual({...c.options,expires:undefined},{path:'/',sameSite:'lax',secure:true,httpOnly:true,expires:undefined});
     assert.ok(Math.abs(c.options.expires.getTime()-Date.now()-12*3600000)<10000);
     return c.name+'='+c.value;
   };
-  const a = await start('same-subject'), b = await start('same-subject',undefined,'https://other.example');
+  const a = await startMember('same-subject'), b = await startMember('same-subject',undefined,'https://other.example');
   const state = async cookie => {
     const response=await get(cookie);
     assert.equal(response.status,200); assert.match(response.headers.get('cache-control'),/no-store/);
@@ -104,7 +107,7 @@ test('member sessions: two principals, private database permissions and real HTT
   assert.equal((await end(a+'; '+b,{origin})).status,400);
   await state(a); await state(b);
   assert.equal((await fetch(url+'?memberId='+bob.memberId,{headers:{cookie:a}})).status,400);
-  const a2 = await start('same-subject',a);
+  const a2 = await startMember('same-subject',a);
   assert.notEqual(a,a2);
   assert.equal((await get(a)).status,401);
   assert.equal((await state(a2)).memberId,alice.memberId);
@@ -130,8 +133,8 @@ test('member sessions: two principals, private database permissions and real HTT
   assert.equal((await owner.query('select digest from members.session where account_id=$1',[bob.memberId])).rows[0].digest.equals(hash),true);
   await owner.query("update members.session set expires_at=now()-interval '1 second' where digest=$1",[hash]);
   assert.equal((await get(b)).status,401);
-  const first=await start('multi-device');
-  const devices=await Promise.all(Array.from({length:6},()=>start('multi-device')));
+  const first=await startMember('multi-device');
+  const devices=await Promise.all(Array.from({length:6},()=>startMember('multi-device')));
   assert.equal((await get(first)).status,401);
   assert.equal((await owner.query("select count(*)::int as n from members.session s join members.account a on a.id=s.account_id where a.subject='multi-device'")).rows[0].n,5);
   await owner.query("delete from members.account where subject='multi-device'");
@@ -139,7 +142,7 @@ test('member sessions: two principals, private database permissions and real HTT
 
   await t.test('isolated Google pilot: form, consent, session, cancellation and failure without a new account', async pilot => {
     const fixture = googleFixture();
-    const settings = {origin, dsn:issuer.dsn, subject:'test-sub', clientId:fixture.clientId, secret:fixture.secret};
+    const settings = {origin, dsn:issuer.dsn, privacyDsn:privacy.dsn, subject:'test-sub', clientId:fixture.clientId, secret:fixture.secret};
     for (const dsn of [reader.dsn, target.href]) {
       const wrong = new SessionIssuer({...settings,dsn});
       try { await assert.rejects(wrong.ready()); } finally { await wrong.onModuleDestroy(); }
@@ -150,7 +153,8 @@ test('member sessions: two principals, private database permissions and real HTT
     apps.push(app); secureLoginResponses(app); await app.listen(0,'127.0.0.1');
     const local = await app.getUrl(), path = '/connexion/google';
     const form = await fetch(local + path);
-    assert.match(await form.text(),/Continuer avec Google/);
+    const html=await form.text();
+    assert.match(html,/Continuer avec Google/);assert.match(html,/Mes données Littora/);
     assert.equal(form.headers.has('set-cookie'),false);
     assert.equal((await fetch(local + path,{method:'POST',headers:{origin:'https://other.example'}})).status,403);
     const start = async () => {
@@ -191,6 +195,55 @@ test('member sessions: two principals, private database permissions and real HTT
     assert.equal((await state(renewed)).memberId,member.memberId);
     assert.equal((await end(renewed,{origin})).status,200);
     assert.equal((await get(renewed)).status,401);
+    await pilot.test('private export, idempotent erasure request and offline completion isolate two accounts', async () => {
+      const p = path+'/confidentialite';
+      const page = await fetch(local+p);
+      assert.equal(page.status,200);
+      assert.match(await page.text(),/Confirmer ma demande/);
+      const act = (action,cookie,options={}) => fetch(local+p+'/'+action,{
+        method:'POST',headers:{origin,...(cookie ? {cookie}:{}),...options.headers},body:options.body});
+      const one = await startMember('privacy-one'), otherDevice = await startMember('privacy-one');
+      const two = await startMember('privacy-two');
+      const first = (await state(one)).memberId, second = (await state(two)).memberId;
+      for (const c of [reader,issuer,privacy]) {
+        assert.equal((await c.pool.query("select has_function_privilege(current_user,'members.complete_erasure(uuid,timestamptz)','execute') ok")).rows[0].ok,false);
+      }
+      for (const c of [reader,issuer]) {
+        assert.equal((await c.pool.query("select has_function_privilege(current_user,'members.export_self(bytea)','execute') ok")).rows[0].ok,false);
+      }
+      const file = await act('export',one);
+      assert.match(file.headers.get('cache-control'),/no-store/);
+      assert.match(file.headers.get('content-disposition'),/attachment;.*littora-mes-donnees.json/);
+      const data=await file.json();
+      assert.deepEqual(Object.keys(data).sort(),['erasureRequestedAt','issuer','memberId','sessions','subject']);
+      assert.equal(data.memberId,first);assert.equal(data.subject,'privacy-one');
+      assert.equal(data.sessions.length,2);assert.deepEqual(Object.keys(data.sessions[0]).sort(),['expiresAt','issuedAt']);
+      assert.equal(data.erasureRequestedAt,null);
+      assert.equal((await act('export',null)).status,401);
+      assert.equal((await act('effacement',one+'; '+two)).status,401);
+      assert.equal((await act('effacement',one,{headers:{origin:'https://other.example'}})).status,403);
+      assert.equal((await act('export?memberId='+second,one)).status,400);
+      assert.equal((await act('effacement',one,{body:'memberId='+second})).status,400);
+      assert.equal((await act('effacement',one)).status,202);
+      const pending=(await (await act('export',one)).json()).erasureRequestedAt;
+      assert.ok(pending);
+      assert.equal((await act('effacement',otherDevice)).status,202);
+      assert.equal((await (await act('export',one)).json()).erasureRequestedAt,pending);
+      assert.equal((await (await act('export',two)).json()).erasureRequestedAt,null);
+      const finish = async(id,date)=>(await owner.query('select members.complete_erasure($1,$2) ok',[id,date])).rows[0].ok;
+      assert.equal(await finish(second,pending),false);
+      assert.equal(await finish(first,'2001-01-01Z'),false);
+      assert.equal(await finish(first,pending),true);
+      assert.equal(await finish(first,pending),false);
+      for (const c of [one,otherDevice]) {assert.equal((await act('export',c)).status,401);assert.equal((await get(c)).status,401);}
+      assert.equal((await state(two)).memberId,second);
+      await owner.query("update members.session set issued_at=now()-interval '11 minutes' where account_id=$1",[second]);
+      assert.equal((await act('export',two)).status,401);assert.equal((await act('effacement',two)).status,401);
+      assert.equal((await state(two)).memberId,second);
+      const recreated=await startMember('privacy-one');
+      assert.notEqual((await state(recreated)).memberId,first);
+      assert.equal(await finish(first,pending),false);
+    });
     if (process.env.TEST_MEMBER_BROWSER === '1') {
       await pilot.test('Chromium carries only the Littora session back from cross-site consent', () =>
         require('../helpers/google-browser.cjs').checkGoogleBrowser({origin,login:local,session:url,fixture,memberCookie}));

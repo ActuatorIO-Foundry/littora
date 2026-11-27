@@ -5,9 +5,10 @@ import { establishMemberSession, cookieScope } from '../modules/members/member-s
 import { authorizationUrl, callbackPath, googleClient, loginPath, verifyGoogle } from './google-oidc';
 import { attemptCookie, attemptLifetime, browserHandle, LoginAttempts } from './login-attempts';
 import { loginSettings, LoginSettings, readSettings, SessionIssuer } from './login-settings';
+import { loginPage as page, sameOriginPost } from './login-page';
+import { MemberPrivacy, MemberPrivacyController, privacyPath } from './member-privacy';
 
 export const provider = Symbol('googleClient');
-const page = (content: string) => '<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connexion | Littora</title><main><h1>Littora</h1>' + content + '</main></html>';
 
 @Controller(loginPath)
 class GoogleLoginController {
@@ -18,13 +19,13 @@ class GoogleLoginController {
   @Get()
   form(@Res() res: Response) {
     // The browser needs its Origin for the same-origin form POST, never for a third party.
-    res.set('Referrer-Policy','same-origin').send(page('<form method="post" action="/connexion/google"><button>Continuer avec Google</button></form>'));
+    const privacy = this.settings.privacyDsn ? '<p><a href="' + privacyPath + '">Mes données Littora</a></p>' : '';
+    res.set('Referrer-Policy','same-origin').send(page('<form method="post" action="/connexion/google"><button>Continuer avec Google</button></form>' + privacy));
   }
 
   @Post()
   async start(@Req() req: Request, @Res() res: Response) {
-    if (req.headers.origin !== this.settings.origin ||
-        (req.headers['sec-fetch-site'] && req.headers['sec-fetch-site'] !== 'same-origin')) return res.sendStatus(403);
+    if (!sameOriginPost(req,this.settings.origin)) return res.sendStatus(403);
     const attempt = this.attempts.start(browserHandle(req.headers.cookie));
     if (!attempt) return res.set('Retry-After', String(attemptLifetime / 1000)).sendStatus(429);
     const location = await authorizationUrl(this.client, this.settings.origin + callbackPath, attempt.tx);
@@ -70,7 +71,7 @@ class GoogleLoginController {
   }
 }
 
-@Module({controllers:[GoogleLoginController], providers:[
+@Module({controllers:[GoogleLoginController,MemberPrivacyController], providers:[MemberPrivacy,
   {provide: loginSettings, useFactory: () => readSettings()},
   {provide: provider, useFactory: (s: LoginSettings) => googleClient(s.clientId, s.secret), inject:[loginSettings]},
   {provide: SessionIssuer, useFactory: (s: LoginSettings) => new SessionIssuer(s), inject:[loginSettings]},

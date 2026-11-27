@@ -31,6 +31,7 @@ suit le provisionnement et le consentement réel, séparément des tests simulé
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Client de test et secret serveur |
 | `GOOGLE_TEST_SUBJECT` | Un seul sujet de test autorisé |
 | `MEMBER_ISSUER_DATABASE_URL` | Connexion privée de l’émetteur, jamais celle du catalogue |
+| `MEMBER_PRIVACY_DATABASE_URL` | Facultatif : autre login de la même base, membre uniquement de `littora_member_privacy`, après application de `infra/members/0002_privacy.sql`. Sans lui, aucun lien « Mes données Littora ». |
 | `MEMBER_LOGIN_PORT` | Facultatif, 3101 par défaut |
 
 Depuis `apps/api` après compilation, lancer `node dist/member-login.js`.
@@ -40,6 +41,12 @@ vers ce service. Sur **la même origine**, garder `/api/member/session` sur
 l’API configurée avec son lecteur. Exclure ces routes des caches, des
 statistiques et des journaux d’accès contenant URL, en-têtes ou corps.
 Ne pas changer le routage en production. La racine renvoie au site de recette.
+
+Après connexion, revenir à `/connexion/google` et choisir « Mes données Littora »
+dans les dix minutes. Les deux formulaires envoient une requête à la même origine.
+Le fichier est personnel : ne pas l’envoyer au support ni l’ajouter aux preuves de recette.
+Une demande d’effacement n’est pas une confirmation de suppression.
+Voir la [procédure privée de traitement et de restauration](SESSIONS-MEMBRES.md#droits-du-membre).
 
 ## Ce que vérifie le parcours
 
@@ -79,7 +86,7 @@ simulé, portée des cookies et déconnexion. Pour le rejouer dans la suite
 d’intégration locale, installer les dépendances du dépôt et Chrome, puis
 définir `TEST_MEMBER_BROWSER=1` et `PLAYWRIGHT_CHANNEL=chrome`.
 L’ouverture V1 reste conditionnée
-au consentement réel, à la 2FA membre, à la récupération et à l’effacement.
+au consentement réel, à la 2FA membre, à la récupération et à la mise en service du traitement des demandes d’effacement.
 Le pilote ne donne aucun accès de modération ou d’administration (#97).
 
 Références : [Google OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect),

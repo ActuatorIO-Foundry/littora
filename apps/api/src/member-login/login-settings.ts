@@ -12,7 +12,11 @@ export function readSettings(env: NodeJS.ProcessEnv = process.env) {
       !/^\/littora_members(_ci_[a-f0-9]{32})?$/.test(dsn.pathname) ||
       !clientId?.endsWith('.apps.googleusercontent.com') || !secret || !subject || Buffer.byteLength(subject) > 255)
     throw new Error('Invalid private login configuration');
-  return {origin: origin.origin, dsn: dsn.href, clientId, secret, subject};
+  const privacy = env.MEMBER_PRIVACY_DATABASE_URL ? new URL(env.MEMBER_PRIVACY_DATABASE_URL) : undefined;
+  if (privacy && (!['postgres:', 'postgresql:'].includes(privacy.protocol) || privacy.host !== dsn.host ||
+      privacy.pathname !== dsn.pathname || !privacy.username || privacy.username === dsn.username))
+    throw new Error('Invalid private login configuration');
+  return {origin: origin.origin, dsn: dsn.href, clientId, secret, subject, privacyDsn: privacy?.href};
 }
 
 export class SessionIssuer {
@@ -27,6 +31,7 @@ export class SessionIssuer {
       and not rolreplication and not rolbypassrls
       and not pg_has_role(current_user,'littora_members_owner','MEMBER')
       and not pg_has_role(current_user,'littora_session_reader','MEMBER')
+      and not coalesce(pg_has_role(current_user,to_regrole('littora_member_privacy'),'MEMBER'),false)
       and not has_table_privilege(current_user,'members.account','SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
       and not has_table_privilege(current_user,'members.session','SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
       and not has_function_privilege(current_user,'members.read_session(bytea)','EXECUTE')

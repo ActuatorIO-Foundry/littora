@@ -30,11 +30,12 @@ export class MemberAccess implements OnModuleDestroy {
   }
 
   private async checkRole(pool: Pool) {
-    const { rows } = await pool.query(`select not rolsuper and not rolcreaterole and not rolcreatedb and not rolreplication
+    const { rows } = await pool.query(`select not rolsuper and not rolcreaterole and not rolcreatedb and not rolreplication and not rolbypassrls
       and not pg_has_role(current_user,'littora_members_owner','MEMBER')
       and not pg_has_role(current_user,'littora_session_issuer','MEMBER')
-      and not has_table_privilege(current_user,'members.session','SELECT')
-      and not has_table_privilege(current_user,'members.account','SELECT')
+      and not coalesce(pg_has_role(current_user,to_regrole('littora_member_privacy'),'MEMBER'),false)
+      and not has_table_privilege(current_user,'members.session','SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+      and not has_table_privilege(current_user,'members.account','SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
       and not has_function_privilege(current_user,'members.start_session(text,text,bytea,bytea)','EXECUTE')
       and has_function_privilege(current_user,'members.read_session(bytea)','EXECUTE')
       and has_function_privilege(current_user,'members.end_session(bytea)','EXECUTE') as allowed

@@ -59,6 +59,16 @@ async function checkGoogleBrowser({origin, login, session, fixture, memberCookie
     const issued = cookies.find(c=>c.name===memberCookie);
     assert.ok(issued?.httpOnly && issued.secure && issued.sameSite==='Lax');
     assert.equal(cookies.some(c=>c.name==='__Host-littora-login'),false);
+    await page.goto(origin+'/connexion/google');
+    await page.getByRole('link',{name:'Mes données Littora'}).click();
+    const [download]=await Promise.all([page.waitForEvent('download'),
+      page.getByRole('button',{name:'Télécharger mes données'}).click()]);
+    assert.equal(download.suggestedFilename(),'littora-mes-donnees.json');
+    assert.equal(await download.failure(),null);
+    await download.delete();
+    await page.getByRole('button',{name:'Confirmer ma demande d’effacement'}).click();
+    await page.getByRole('heading',{name:'Demande enregistrée'}).waitFor();
+    await page.getByRole('link',{name:'Retour à Littora'}).click();
     assert.equal(await page.evaluate(async ()=>(await fetch('/api/member/session',{method:'DELETE'})).status),200);
     assert.equal(await page.evaluate(async ()=>(await fetch('/api/member/session')).status),401);
   } finally {

@@ -54,8 +54,12 @@ test('no implicit enablement, public catalogue storage, insecure origin or open 
   const base = {MEMBER_GOOGLE_MODE:'recette', MEMBER_PUBLIC_ORIGIN:'https://recette.example',
     MEMBER_ISSUER_DATABASE_URL:'postgresql://issuer@db/littora_members', GOOGLE_CLIENT_ID:'test.apps.googleusercontent.com',
     GOOGLE_CLIENT_SECRET:'test', GOOGLE_TEST_SUBJECT:'test-sub'};
-  assert.ok(readSettings(base));
+  assert.equal(readSettings(base).privacyDsn,undefined);
+  assert.ok(readSettings({...base,MEMBER_PRIVACY_DATABASE_URL:'postgresql://privacy@db/littora_members'}).privacyDsn);
   for (const override of [{MEMBER_GOOGLE_MODE:''}, {MEMBER_PUBLIC_ORIGIN:'http://recette.example'},
+    {MEMBER_PRIVACY_DATABASE_URL:base.MEMBER_ISSUER_DATABASE_URL},
+    {MEMBER_PRIVACY_DATABASE_URL:'postgresql://privacy@db/littora'},
+    {MEMBER_PRIVACY_DATABASE_URL:'postgresql://privacy@other/littora_members'},
     {MEMBER_ISSUER_DATABASE_URL:'postgresql://issuer@db/littora'}, {GOOGLE_TEST_SUBJECT:''}, {GOOGLE_CLIENT_SECRET:''}])
     assert.throws(() => readSettings({...base,...override}));
 });

@@ -130,6 +130,9 @@
         </div>
         <div class="conditions-source">
           {{ providerLabel(score.providers?.["weather"]) }}<ng-container *ngIf="beach.waterType === 'sea'"> · {{ providerLabel(score.providers?.["marine"]) }}</ng-container>
+          @if (score.providers?.['weather'] === 'open-meteo' || (beach.waterType === 'sea' && score.providers?.['marine'] === 'open-meteo-marine')) {
+            · <a href="https://open-meteo.com/">Open-Meteo.com</a> · <a routerLink="/sources">Crédits des données</a>
+          }
         </div>
         <p class="caption" *ngFor="let source of beach.waterType === 'sea' ? ['weather', 'marine'] : ['weather']">
           <ng-container *ngIf="score.dataStatus?.[source]">

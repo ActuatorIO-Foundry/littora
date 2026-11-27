@@ -2,7 +2,7 @@ services:
   postgres:
     entrypoint: &private-entrypoint ["/bin/sh", "/usr/local/bin/littora-daemon"]
     command: [postgres]
-    image: littora-postgres:16.16-3.7.0-r2
+    image: littora-postgres:16.16-3.7.0-r3
     platform: linux/amd64
     build: ./infra/postgres
     environment:

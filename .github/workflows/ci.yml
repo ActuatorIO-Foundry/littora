@@ -42,7 +42,7 @@ jobs:
           docker run --rm littora-inventories:ci node -e "require('./apps/api/scripts/amenities.cjs')"
           docker run --rm -v "$PWD/scripts/test:/app/scripts/test:ro" littora-inventories:ci python3 scripts/test/test_territory_inventories.py
           docker build -f apps/web/Dockerfile.prod -t littora-web:ci .
-          docker build --platform linux/amd64 -t littora-postgres:16.16-3.7.0-r2 infra/postgres
+          docker build --platform linux/amd64 -t littora-postgres:16.16-3.7.0-r3 infra/postgres
           docker build -t littora-redis:7.4.12-r2 infra/redis
           docker build -t littora-caddy:2.11.9-r2 infra/caddy
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -74,7 +74,7 @@ jobs:
           for image in api web inventories; do
             /tmp/trivy image --image-src docker --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --format json --output "image-reports/$image.json" "littora-$image:ci" || status=1
           done
-          for entry in postgres:16.16-3.7.0-r2 redis:7.4.12-r2 caddy:2.11.9-r2; do
+          for entry in postgres:16.16-3.7.0-r3 redis:7.4.12-r2 caddy:2.11.9-r2; do
             name="${entry%%:*}"
             if /tmp/trivy image --image-src docker --scanners vuln --format json --output "image-reports/$name.json" "littora-$entry"; then
               node scripts/check-image-report.mjs "$name" "image-reports/$name.json" || status=1

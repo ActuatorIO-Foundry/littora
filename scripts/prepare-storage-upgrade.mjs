@@ -19,7 +19,7 @@ const source = Object.fromEntries(['api', 'postgres', 'redis'].map((service) => 
   assert.ok(info.State.Running, `${service} must be running`);
   return [service, { id, image: info.Image, mounts: info.Mounts }];
 }));
-const postgresImage = 'littora-postgres:16.16-3.7.0-r2';
+const postgresImage = 'littora-postgres:16.16-3.7.0-r3';
 const redisImage = 'littora-redis:7.4.12-r2';
 const id = `littora-upgrade-${randomUUID().slice(0, 8)}`;
 const directory = resolve('.local/backups', id);

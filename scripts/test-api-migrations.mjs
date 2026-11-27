@@ -97,7 +97,7 @@ try {
   docker(['run', '-d', '--name', postgres, '--network', name, '--platform', 'linux/amd64',
     ...volume('/var/lib/postgresql/data'), '-e', 'POSTGRES_USER=littora',
     '-e', 'POSTGRES_PASSWORD=test-only-password', '-e', 'POSTGRES_DB=littora_ci_test',
-    ...privacyEntrypoint, 'littora-postgres:16.16-3.7.0-r2', guard, 'postgres']);
+    ...privacyEntrypoint, 'littora-postgres:16.16-3.7.0-r3', guard, 'postgres']);
   containers.push(redis);
   docker(['run', '-d', '--name', redis, '--network', name, ...volume('/data'), ...privacyEntrypoint,
     'littora-redis:7.4.12-r2', guard, 'redis-server']);
